@@ -3,8 +3,8 @@
 ## Group Members
 - Soham Kolhatkar
 - Arnav Akula
-- 
-- 
+- Natalie Hoang 
+- Ria Rajput
 - 
 
 ## Elevator Pitch
