@@ -16,33 +16,39 @@ actor MockService {
         // Simulate network delay (1 second)
         try await Task.sleep(nanoseconds: 1_000_000_000)
 
-        // Generate mock burndown data for the current month
-        let burndownData = generateMockBurndownData()
+        // Simulate a "High Spending" alert scenario
+        let spent = 1876.0
+        let budget = 2500.0
+        let idealPace = 1450.0 // Where spending should be at this point in month
 
-        // Return a response with both text and a visual component
+        // Return a response with both text and a burndown chart visual component
         return AssistantResponse(
-            textMessage: generateMockResponse(for: text),
-            visualPayload: .budgetBurndown(data: burndownData)
+            textMessage: generateMockResponse(for: text, spent: spent, budget: budget),
+            visualPayload: .burndownChart(spent: spent, budget: budget, idealPace: idealPace)
         )
     }
 
     /// Generates a contextual mock response based on user input
-    private func generateMockResponse(for userMessage: String) -> String {
+    private func generateMockResponse(for userMessage: String, spent: Double, budget: Double) -> String {
         let lowercased = userMessage.lowercased()
+        let remaining = budget - spent
+        let overBudget = spent > (budget * 0.7) // 70% threshold for alert
 
-        if lowercased.contains("afford") || lowercased.contains("spend") {
-            return "Based on your current spending velocity, you have $127.50 safe to spend today. Your upcoming rent payment of $1,200 is accounted for. Here's your budget burndown for the month:"
+        if overBudget {
+            return "⚠️ **High Spending Alert!** You've spent $\(Int(spent)) of your $\(Int(budget)) monthly budget. At this pace, you'll exceed your budget by day 24. Consider reducing discretionary spending by $15/day to stay on track."
+        } else if lowercased.contains("afford") || lowercased.contains("spend") {
+            return "Based on your current spending velocity, you have $\(Int(remaining)) safe to spend. Your upcoming rent payment of $1,200 is accounted for. Here's your spending trajectory:"
         } else if lowercased.contains("budget") {
-            return "I've analyzed your spending patterns. You're currently on track with your monthly budget. Here's a visual breakdown of your remaining budget over time:"
+            return "I've analyzed your spending patterns. You've used \(Int((spent/budget) * 100))% of your monthly budget. Here's your burndown chart:"
         } else if lowercased.contains("save") || lowercased.contains("saving") {
-            return "Great question about savings! At your current rate, you'll save $340 this month. Here's how your budget is projected to burn down:"
+            return "At your current rate, you'll have $\(Int(remaining)) left at month end. Here's how your spending compares to the ideal pace:"
         } else {
-            return "I've pulled up your financial overview. Your safe-to-spend amount is $127.50 for today. Here's your budget burndown chart showing your projected balance through the end of the month:"
+            return "Here's your budget overview. You've spent $\(Int(spent)) of $\(Int(budget)) so far this month. The chart below shows your actual spending vs. the ideal pace:"
         }
     }
 
-    /// Generates mock burndown data points for visualization
-    private func generateMockBurndownData() -> [BurndownDataPoint] {
+    /// Generates mock burndown data points for visualization (legacy support)
+    func generateMockBurndownData() -> [BurndownDataPoint] {
         let calendar = Calendar.current
         let today = Date()
 
