@@ -11,7 +11,8 @@ import SwiftUI
 struct BudgetBuddyApp: App {
     var body: some Scene {
         WindowGroup {
-            ChatView()
+            ContentView()
+                .preferredColorScheme(.dark)
         }
     }
 }

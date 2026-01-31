@@ -20,6 +20,8 @@ enum VisualComponent: Codable, Equatable {
     case budgetBurndown(data: [BurndownDataPoint])
     case sankeyFlow(nodes: [SankeyNode])
     case interactiveSlider(category: String, current: Double, max: Double)
+    case burndownChart(spent: Double, budget: Double, idealPace: Double)
+    case budgetSlider(category: String, current: Double, max: Double)
 
     // Custom coding for complex associated values
     enum CodingKeys: String, CodingKey {
@@ -29,6 +31,9 @@ enum VisualComponent: Codable, Equatable {
         case category
         case current
         case max
+        case spent
+        case budget
+        case idealPace
     }
 
     init(from decoder: Decoder) throws {
@@ -47,6 +52,16 @@ enum VisualComponent: Codable, Equatable {
             let current = try container.decode(Double.self, forKey: .current)
             let max = try container.decode(Double.self, forKey: .max)
             self = .interactiveSlider(category: category, current: current, max: max)
+        case "burndownChart":
+            let spent = try container.decode(Double.self, forKey: .spent)
+            let budget = try container.decode(Double.self, forKey: .budget)
+            let idealPace = try container.decode(Double.self, forKey: .idealPace)
+            self = .burndownChart(spent: spent, budget: budget, idealPace: idealPace)
+        case "budgetSlider":
+            let category = try container.decode(String.self, forKey: .category)
+            let current = try container.decode(Double.self, forKey: .current)
+            let max = try container.decode(Double.self, forKey: .max)
+            self = .budgetSlider(category: category, current: current, max: max)
         default:
             throw DecodingError.dataCorruptedError(forKey: .type, in: container, debugDescription: "Unknown type")
         }
@@ -64,6 +79,16 @@ enum VisualComponent: Codable, Equatable {
             try container.encode(nodes, forKey: .nodes)
         case .interactiveSlider(let category, let current, let max):
             try container.encode("interactiveSlider", forKey: .type)
+            try container.encode(category, forKey: .category)
+            try container.encode(current, forKey: .current)
+            try container.encode(max, forKey: .max)
+        case .burndownChart(let spent, let budget, let idealPace):
+            try container.encode("burndownChart", forKey: .type)
+            try container.encode(spent, forKey: .spent)
+            try container.encode(budget, forKey: .budget)
+            try container.encode(idealPace, forKey: .idealPace)
+        case .budgetSlider(let category, let current, let max):
+            try container.encode("budgetSlider", forKey: .type)
             try container.encode(category, forKey: .category)
             try container.encode(current, forKey: .current)
             try container.encode(max, forKey: .max)
