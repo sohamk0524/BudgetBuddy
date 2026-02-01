@@ -74,6 +74,14 @@ final class ChatViewModel {
             )
             messages.append(assistantMessage)
 
+        } catch let decodingError as DecodingError {
+            errorMessage = "Failed to parse response."
+            print("Decoding Error: \(decodingError)")
+            if case .keyNotFound(let key, let context) = decodingError {
+                print("Missing key: \(key.stringValue) in \(context.debugDescription)")
+            } else if case .typeMismatch(let type, let context) = decodingError {
+                print("Type mismatch: expected \(type) at \(context.codingPath)")
+            }
         } catch {
             errorMessage = "Failed to get response. Please try again."
             print("API Error: \(error)")

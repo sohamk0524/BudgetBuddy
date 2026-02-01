@@ -105,7 +105,7 @@ struct BurndownDataPoint: Codable, Equatable, Identifiable {
 }
 
 struct SankeyNode: Codable, Equatable, Identifiable {
-    let id: UUID
+    let id: String
     let name: String
     let value: Double
 }
