@@ -10,6 +10,11 @@ import Foundation
 @Observable
 final class ChatViewModel {
 
+    // MARK: - Configuration
+
+    /// Set to true to use the real Flask backend, false to use mock data
+    private let useRealAPI: Bool = true
+
     // MARK: - Published State
 
     var messages: [ChatMessage] = []
@@ -20,6 +25,7 @@ final class ChatViewModel {
     // MARK: - Dependencies
 
     private let mockService = MockService()
+    private let apiService = APIService.shared
 
     // MARK: - Initialization
 
@@ -52,8 +58,13 @@ final class ChatViewModel {
         isLoading = true
 
         do {
-            // Call mock service
-            let response = try await mockService.sendMessage(text: text)
+            // Call the appropriate service based on configuration
+            let response: AssistantResponse
+            if useRealAPI {
+                response = try await apiService.sendMessage(text: text)
+            } else {
+                response = try await mockService.sendMessage(text: text)
+            }
 
             // Add assistant response
             let assistantMessage = ChatMessage(
@@ -65,6 +76,7 @@ final class ChatViewModel {
 
         } catch {
             errorMessage = "Failed to get response. Please try again."
+            print("API Error: \(error)")
         }
 
         isLoading = false

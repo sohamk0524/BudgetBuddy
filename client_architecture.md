@@ -21,9 +21,9 @@ The iOS client uses a modern **MVVM (Model-View-ViewModel)** architecture with *
 * **Responsibility:** Handles secure communication with the backend AI agent.
 * **Key Logic:** Streaming response handling (typing effect) and error management for API hallucinations.
 
-### 5. BankLinkManager
+<!-- ### 5. BankLinkManager
 * **Responsibility:** Wraps the external banking SDK (e.g., Plaid/Teller).
-* **Key Logic:** Securely handles OAuth tokens and refreshes transaction data in the background.
+* **Key Logic:** Securely handles OAuth tokens and refreshes transaction data in the background. -->
 
 ## Key Data Structures
 
