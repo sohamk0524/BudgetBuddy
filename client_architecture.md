@@ -5,21 +5,17 @@ The iOS client uses a modern **MVVM (Model-View-ViewModel)** architecture with *
 
 ## Key Modules
 
-### 1. ChatOrchestrator (ViewModel)
-* **Responsibility:** Manages the conversation state. It sends user input to the backend and handles the parsing of the response.
-* **Key Logic:** Distinguishes between simple text responses and "Command Payloads" (responses that trigger a UI change).
+### 1. ChatViewModel (ViewModel)
+* **Responsibility:** Manages the conversation state using `@Observable` macro. Sends user input to the backend and handles response parsing.
+* **Key Logic:** Toggle `useRealAPI` to switch between real backend and mock data. Distinguishes between text responses and visual payloads.
 
-### 2. DynamicViewRenderer (View Factory)
-* **Responsibility:** The "Generative UI" engine. It takes a structured data object (e.g., `VisualPlanType`) and returns the corresponding SwiftUI View.
-* **Capabilities:** Can render `SankeyDiagramView`, `BurndownChartView`, or `BudgetSliderView` on demand.
+### 2. GenerativeWidgetView (View Factory)
+* **Responsibility:** The "Generative UI" engine. Takes a `VisualComponent` enum and returns the corresponding SwiftUI View.
+* **Capabilities:** Can render `BurndownWidgetView`, `BudgetSliderView`, or `SankeyFlowView` on demand.
 
-### 3. DataRepository (Model Layer)
-* **Responsibility:** The single source of truth. Manages `SwiftData` (local persistence) and interacts with the API Service.
-* **Key Logic:** Optimistic UI updates (updating the UI immediately before the server confirms).
-
-### 4. LLMService (Network Layer)
-* **Responsibility:** Handles secure communication with the backend AI agent.
-* **Key Logic:** Streaming response handling (typing effect) and error management for API hallucinations.
+### 3. APIService / MockService (Network Layer)
+* **Responsibility:** Actor-isolated services for thread-safe async communication with the backend.
+* **Key Logic:** `APIService` connects to Flask backend (localhost:5000). `MockService` provides simulated responses for offline development.
 
 <!-- ### 5. BankLinkManager
 * **Responsibility:** Wraps the external banking SDK (e.g., Plaid/Teller).
@@ -35,9 +31,11 @@ struct AssistantResponse: Codable {
 }
 
 enum VisualComponent: Codable {
-    case budgetBurndown(data: [Date: Double])
+    case budgetBurndown(data: [BurndownDataPoint])
     case sankeyFlow(nodes: [SankeyNode])
     case interactiveSlider(category: String, current: Double, max: Double)
+    case burndownChart(spent: Double, budget: Double, idealPace: Double)
+    case budgetSlider(category: String, current: Double, max: Double)
 }
 
 struct Transaction: Identifiable, Codable {

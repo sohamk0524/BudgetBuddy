@@ -94,4 +94,43 @@ final class ChatViewModel {
     func clearError() {
         errorMessage = nil
     }
+
+    /// Uploads a bank statement for analysis
+    @MainActor
+    func uploadStatement(url: URL) async {
+        // Clear error state
+        errorMessage = nil
+
+        // Add user message indicating upload
+        let filename = url.lastPathComponent
+        let userMessage = ChatMessage(type: .user, text: "📄 Uploaded: \(filename)")
+        messages.append(userMessage)
+
+        // Set loading state
+        isLoading = true
+
+        do {
+            // Need to access the security-scoped resource
+            guard url.startAccessingSecurityScopedResource() else {
+                throw APIError.invalidResponse
+            }
+            defer { url.stopAccessingSecurityScopedResource() }
+
+            let response = try await apiService.uploadStatement(fileURL: url)
+
+            // Add assistant response
+            let assistantMessage = ChatMessage(
+                type: .assistant,
+                text: response.textMessage,
+                visualPayload: response.visualPayload
+            )
+            messages.append(assistantMessage)
+
+        } catch {
+            errorMessage = "Failed to analyze statement. Please try again."
+            print("Upload Error: \(error)")
+        }
+
+        isLoading = false
+    }
 }

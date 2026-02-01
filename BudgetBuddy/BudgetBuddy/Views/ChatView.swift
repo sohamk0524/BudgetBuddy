@@ -6,10 +6,12 @@
 //
 
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct ChatView: View {
     @State private var viewModel = ChatViewModel()
     @FocusState private var isInputFocused: Bool
+    @State private var showingFilePicker = false
 
     var body: some View {
         ZStack(alignment: .top) {
@@ -67,12 +69,29 @@ struct ChatView: View {
                 InputBarView(
                     text: $viewModel.inputText,
                     isLoading: viewModel.isLoading,
-                    isFocused: $isInputFocused
+                    isFocused: $isInputFocused,
+                    onAttach: { showingFilePicker = true }
                 ) {
                     Task {
                         await viewModel.sendMessage()
                     }
                 }
+            }
+        }
+        .fileImporter(
+            isPresented: $showingFilePicker,
+            allowedContentTypes: [.pdf, .commaSeparatedText],
+            allowsMultipleSelection: false
+        ) { result in
+            switch result {
+            case .success(let urls):
+                if let url = urls.first {
+                    Task {
+                        await viewModel.uploadStatement(url: url)
+                    }
+                }
+            case .failure(let error):
+                viewModel.errorMessage = "Failed to select file: \(error.localizedDescription)"
             }
         }
     }
@@ -199,10 +218,19 @@ private struct InputBarView: View {
     @Binding var text: String
     let isLoading: Bool
     var isFocused: FocusState<Bool>.Binding
+    let onAttach: () -> Void
     let onSend: () -> Void
 
     var body: some View {
         HStack(spacing: 12) {
+            // Attachment button
+            Button(action: onAttach) {
+                Image(systemName: "paperclip")
+                    .font(.title2)
+                    .foregroundStyle(isLoading ? Color.textSecondary : Color.accent)
+            }
+            .disabled(isLoading)
+
             TextField("Ask about your finances...", text: $text, axis: .vertical)
                 .textFieldStyle(.plain)
                 .font(.roundedBody)
