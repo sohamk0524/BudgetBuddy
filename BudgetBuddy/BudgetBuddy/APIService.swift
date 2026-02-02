@@ -16,7 +16,7 @@ actor APIService {
     private let baseURL: URL
 
     /// Shared instance using localhost (for simulator)
-    static let shared = APIService(host: "localhost", port: 5000)
+    static let shared = APIService(host: "127.0.0.1", port: 5000)
 
     // MARK: - Initialization
 
@@ -44,6 +44,47 @@ actor APIService {
         ]
 
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw APIError.invalidResponse
+        }
+
+        guard httpResponse.statusCode == 200 else {
+            throw APIError.serverError(statusCode: httpResponse.statusCode)
+        }
+
+        let decoder = JSONDecoder()
+        return try decoder.decode(AssistantResponse.self, from: data)
+    }
+
+    // MARK: - Statement Upload API
+
+    /// Uploads a bank statement file for analysis
+    /// - Parameter fileURL: Local URL to the PDF or CSV file
+    /// - Returns: An AssistantResponse with analysis and optional visual component
+    func uploadStatement(fileURL: URL) async throws -> AssistantResponse {
+        let url = baseURL.appendingPathComponent("upload-statement")
+
+        // Read file data
+        let fileData = try Data(contentsOf: fileURL)
+        let filename = fileURL.lastPathComponent
+
+        // Build multipart form data
+        let boundary = UUID().uuidString
+        var body = Data()
+
+        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"file\"; filename=\"\(filename)\"\r\n".data(using: .utf8)!)
+        body.append("Content-Type: application/octet-stream\r\n\r\n".data(using: .utf8)!)
+        body.append(fileData)
+        body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        request.httpBody = body
 
         let (data, response) = try await URLSession.shared.data(for: request)
 

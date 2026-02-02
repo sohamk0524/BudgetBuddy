@@ -1,13 +1,13 @@
-# Server Architecture (Python - FastAPI)
+# Server Architecture (Python - Flask)
 
 ## High-Level Overview
-The backend acts as the "Brain." It orchestrates the flow between the user, the database, the Banking APIs, and the LLM. It is built using **FastAPI** for high performance and easy async handling.
+The backend acts as the "Brain." It orchestrates the flow between the user and the LLM (Ollama running locally). It is built using **Flask** with CORS enabled for iOS simulator communication.
 
 ## Key Modules
 
 ### 1. The Orchestrator (Agent Logic)
-* **Responsibility:** The core decision maker. Receives user input, decides which tools to call (e.g., "GetTransactions", "UpdateBudget"), and formats the final prompt for the LLM.
-* **Tech:** LangChain or custom Python logic.
+* **Responsibility:** The core decision maker. Receives user input, decides which tools to call (e.g., `get_budget_overview`, `get_spending_status`), and formats the final prompt for the LLM.
+* **Tech:** Custom Python logic with OpenAI SDK client for Ollama (llama3.2:3b model). Uses keyword filtering to prevent over-eager tool calls on non-financial queries.
 
 <!-- ### 2. Banking Integrator
 * **Responsibility:** Interacts with Plaid/Teller APIs.
@@ -21,18 +21,17 @@ The backend acts as the "Brain." It orchestrates the flow between the user, the 
 * **Responsibility:** Auth (Supabase/Firebase Auth) and user settings.
 * **Key Logic:** Stores privacy preferences and encryption keys.
 
-### 4. API Gateway
+### 4. API Gateway (app.py)
 * **Responsibility:** Exposes REST endpoints to the iOS client.
 * **Endpoints:**
-    * `POST /chat`: Main interaction point.
-    * `GET /sync`: Triggers a bank data refresh.
+    * `POST /chat`: Main interaction point. Returns `AssistantResponse` with text and optional visual payload.
+    * `GET /health`: Health check endpoint.
 
 ## Key Data Interfaces (JSON)
 
 **Chat Request:**
 ```json
 {
-  "user_id": "12345",
-  "message": "Can I afford dinner?",
-  "current_context": { "lat": 34.05, "long": -118.25 }
+  "userId": "12345",
+  "message": "Can I afford dinner?"
 }
