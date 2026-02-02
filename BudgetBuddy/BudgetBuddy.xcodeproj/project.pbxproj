@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 77;
+	objectVersion = 70;
 	objects = {
 
 /* Begin PBXFileReference section */
@@ -11,7 +11,7 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		ACEBD1C12F2BE42A00FA1D26 /* Exceptions for "BudgetBuddy" folder in "BudgetBuddy" target */ = {
+		ACEBD1C12F2BE42A00FA1D26 /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
@@ -21,14 +21,7 @@
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		ACEBD1B62F2BE42700FA1D26 /* BudgetBuddy */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-				ACEBD1C12F2BE42A00FA1D26 /* Exceptions for "BudgetBuddy" folder in "BudgetBuddy" target */,
-			);
-			path = BudgetBuddy;
-			sourceTree = "<group>";
-		};
+		ACEBD1B62F2BE42700FA1D26 /* BudgetBuddy */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (ACEBD1C12F2BE42A00FA1D26 /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = BudgetBuddy; sourceTree = "<group>"; };
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -99,6 +92,7 @@
 				};
 			};
 			buildConfigurationList = ACEBD1AF2F2BE42700FA1D26 /* Build configuration list for PBXProject "BudgetBuddy" */;
+			compatibilityVersion = "Xcode 15.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -107,7 +101,6 @@
 			);
 			mainGroup = ACEBD1AB2F2BE42700FA1D26;
 			minimizedProjectReferenceProxies = 1;
-			preferredProjectObjectVersion = 77;
 			productRefGroup = ACEBD1B52F2BE42700FA1D26 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
