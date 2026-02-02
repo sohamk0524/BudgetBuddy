@@ -64,7 +64,7 @@ struct PulseHeaderView: View {
         .padding(.vertical, 20)
         .frame(maxWidth: .infinity)
         .background(
-            Color.background
+            Color.appBackground
                 .shadow(color: .black.opacity(0.3), radius: 10, x: 0, y: 5)
         )
     }
@@ -84,5 +84,5 @@ struct PulseHeaderView: View {
 
         Spacer()
     }
-    .background(Color.background)
+    .background(Color.appBackground)
 }

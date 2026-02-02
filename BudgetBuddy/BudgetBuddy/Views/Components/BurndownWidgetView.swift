@@ -219,5 +219,5 @@ struct LegendItem: View {
             .cardStyle()
     }
     .padding()
-    .background(Color.background)
+    .background(Color.appBackground)
 }

@@ -16,7 +16,7 @@ struct LoginView: View {
 
     var body: some View {
         ZStack {
-            Color.background
+            Color.appBackground
                 .ignoresSafeArea()
 
             VStack(spacing: 32) {
@@ -97,13 +97,13 @@ struct LoginView: View {
                     } label: {
                         if authManager.isLoading {
                             ProgressView()
-                                .tint(Color.background)
+                                .tint(Color.appBackground)
                                 .frame(maxWidth: .infinity)
                                 .padding()
                         } else {
                             Text(isRegistering ? "Create Account" : "Sign In")
                                 .font(.roundedHeadline)
-                                .foregroundStyle(Color.background)
+                                .foregroundStyle(Color.appBackground)
                                 .frame(maxWidth: .infinity)
                                 .padding()
                         }

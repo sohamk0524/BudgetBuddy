@@ -147,7 +147,17 @@ class AuthManager {
 
     // MARK: - Complete Onboarding
 
-    func completeOnboarding(income: Double, expenses: Double, goalName: String, goalTarget: Double) async {
+    func completeOnboarding(
+        income: Double,
+        expenses: Double,
+        goalName: String,
+        goalTarget: Double,
+        incomeFrequency: String = "monthly",
+        housingSituation: String = "rent",
+        debtTypes: [String] = [],
+        financialPersonality: String = "balanced",
+        primaryGoal: String = "stability"
+    ) async {
         guard let userId = authToken else { return }
 
         await MainActor.run {
@@ -166,7 +176,12 @@ class AuthManager {
                 "income": income,
                 "expenses": expenses,
                 "goalName": goalName,
-                "goalTarget": goalTarget
+                "goalTarget": goalTarget,
+                "incomeFrequency": incomeFrequency,
+                "housingSituation": housingSituation,
+                "debtTypes": debtTypes,
+                "financialPersonality": financialPersonality,
+                "primaryGoal": primaryGoal
             ]
             request.httpBody = try JSONSerialization.data(withJSONObject: body)
 

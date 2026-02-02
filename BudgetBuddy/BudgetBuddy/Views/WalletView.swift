@@ -2,40 +2,54 @@
 //  WalletView.swift
 //  BudgetBuddy
 //
-//  The "Wallet" Dashboard - A Bento Box style grid for quick status checks
+//  The "Wallet" Dashboard - Shows financial overview and quick metrics
 //
 
 import SwiftUI
 
 struct WalletView: View {
+
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 16) {
+                VStack(spacing: 24) {
+                    // Quick Overview Header
+                    Text("Financial Overview")
+                        .font(.roundedHeadline)
+                        .foregroundStyle(Color.textSecondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
                     // Top Row: Large + Medium cards
                     HStack(spacing: 16) {
-                        // Large Card: Net Worth
                         NetWorthCard()
-
-                        // Medium Card: Upcoming Bills
                         UpcomingBillsCard()
                     }
 
                     // Bottom Row: Small cards
                     HStack(spacing: 16) {
-                        // Small Card: Anomalies
                         AnomaliesCard()
-
-                        // Small Card: Goal Progress
                         GoalProgressCard()
                     }
+
+                    // Hint to check Plan tab
+                    HStack {
+                        Image(systemName: "lightbulb.fill")
+                            .foregroundStyle(Color.accent)
+                        Text("Check the Plan tab to view or create your personalized spending plan")
+                            .font(.roundedCaption)
+                            .foregroundStyle(Color.textSecondary)
+                    }
+                    .padding()
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color.surface)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
                 .padding()
             }
-            .background(Color.background)
+            .background(Color.appBackground)
             .navigationTitle("Wallet")
             .navigationBarTitleDisplayMode(.large)
-            .toolbarBackground(Color.background, for: .navigationBar)
+            .toolbarBackground(Color.appBackground, for: .navigationBar)
             .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -51,7 +65,7 @@ struct WalletView: View {
     }
 }
 
-// MARK: - Net Worth Card (Large)
+// MARK: - Legacy Cards (kept for no-plan state)
 
 struct NetWorthCard: View {
     var body: some View {
@@ -89,8 +103,6 @@ struct NetWorthCard: View {
     }
 }
 
-// MARK: - Upcoming Bills Card (Medium)
-
 struct UpcomingBillsCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -115,11 +127,10 @@ struct UpcomingBillsCard: View {
                     .foregroundStyle(Color.textSecondary)
             }
 
-            // Progress indicator
             GeometryReader { geometry in
                 ZStack(alignment: .leading) {
                     RoundedRectangle(cornerRadius: 2)
-                        .fill(Color.background)
+                        .fill(Color.appBackground)
                         .frame(height: 4)
 
                     RoundedRectangle(cornerRadius: 2)
@@ -135,8 +146,6 @@ struct UpcomingBillsCard: View {
         .clipShape(RoundedRectangle(cornerRadius: 16))
     }
 }
-
-// MARK: - Anomalies Card (Small)
 
 struct AnomaliesCard: View {
     var body: some View {
@@ -168,8 +177,6 @@ struct AnomaliesCard: View {
     }
 }
 
-// MARK: - Goal Progress Card (Small)
-
 struct GoalProgressCard: View {
     private let progress: Double = 0.65
 
@@ -191,11 +198,10 @@ struct GoalProgressCard: View {
                 .font(.roundedCaption)
                 .foregroundStyle(Color.textSecondary)
 
-            // Progress bar
             GeometryReader { geometry in
                 ZStack(alignment: .leading) {
                     RoundedRectangle(cornerRadius: 2)
-                        .fill(Color.background)
+                        .fill(Color.appBackground)
                         .frame(height: 4)
 
                     RoundedRectangle(cornerRadius: 2)
