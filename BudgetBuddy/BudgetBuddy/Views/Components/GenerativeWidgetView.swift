@@ -28,6 +28,9 @@ struct GenerativeWidgetView: View {
 
             case .sankeyFlow:
                 PlaceholderView(title: "Cash Flow Diagram", message: "Sankey flow visualization coming soon")
+
+            case .spendingPlan(let safeToSpend, let categories):
+                SpendingPlanWidgetView(safeToSpend: safeToSpend, categories: categories)
             }
         }
         .cardStyle()
@@ -78,7 +81,7 @@ struct BudgetSliderView: View {
                 ZStack(alignment: .leading) {
                     // Background track
                     RoundedRectangle(cornerRadius: 4)
-                        .fill(Color.background)
+                        .fill(Color.appBackground)
                         .frame(height: 8)
 
                     // Fill
@@ -143,6 +146,57 @@ struct LegacyBurndownView: View {
     }
 }
 
+// MARK: - Spending Plan Widget View
+
+struct SpendingPlanWidgetView: View {
+    let safeToSpend: Double
+    let categories: [BudgetCategory]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Your Spending Plan")
+                .font(.roundedHeadline)
+                .foregroundStyle(Color.textPrimary)
+
+            HStack {
+                Text("Safe to Spend:")
+                    .font(.roundedBody)
+                    .foregroundStyle(Color.textSecondary)
+
+                Spacer()
+
+                Text("$\(Int(safeToSpend))")
+                    .font(.roundedTitle)
+                    .monospacedDigit()
+                    .foregroundStyle(Color.accent)
+            }
+
+            Divider()
+                .background(Color.textSecondary.opacity(0.3))
+
+            ForEach(categories.prefix(4)) { category in
+                HStack {
+                    Circle()
+                        .fill(Color(hex: category.color))
+                        .frame(width: 8, height: 8)
+
+                    Text(category.name)
+                        .font(.roundedCaption)
+                        .foregroundStyle(Color.textPrimary)
+
+                    Spacer()
+
+                    Text("$\(Int(category.amount))")
+                        .font(.roundedCaption)
+                        .monospacedDigit()
+                        .foregroundStyle(Color.textSecondary)
+                }
+            }
+        }
+        .padding()
+    }
+}
+
 // MARK: - Placeholder View
 
 struct PlaceholderView: View {
@@ -182,5 +236,5 @@ struct PlaceholderView: View {
         }
         .padding()
     }
-    .background(Color.background)
+    .background(Color.appBackground)
 }

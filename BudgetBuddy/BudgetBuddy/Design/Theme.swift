@@ -3,7 +3,7 @@ import SwiftUI
 // MARK: - Color Palette Extension
 extension Color {
     /// Deep Midnight Blue - Primary background
-    static let background = Color(hex: "#0F172A")
+    static let appBackground = Color(hex: "#0F172A")
 
     /// Lighter Slate Blue - Cards and surfaces
     static let surface = Color(hex: "#1E293B")
@@ -137,5 +137,5 @@ extension Font {
         .foregroundStyle(Color.textPrimary)
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity)
-    .background(Color.background)
+    .background(Color.appBackground)
 }

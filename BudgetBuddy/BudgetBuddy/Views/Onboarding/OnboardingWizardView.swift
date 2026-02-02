@@ -14,7 +14,16 @@ struct OnboardingWizardView: View {
     @State private var savingsGoalName: String = ""
     @State private var savingsGoalTarget: String = ""
 
+    // New profile fields
+    @State private var incomeFrequency: String = "monthly"
+    @State private var housingSituation: String = "rent"
+    @State private var selectedDebtTypes: Set<String> = []
+    @State private var financialPersonality: String = "balanced"
+    @State private var primaryGoal: String = "stability"
+
     var authManager = AuthManager.shared
+
+    private let totalPages = 8
 
     private var canFinish: Bool {
         !monthlyIncome.isEmpty && !fixedExpenses.isEmpty
@@ -22,7 +31,7 @@ struct OnboardingWizardView: View {
 
     var body: some View {
         ZStack {
-            Color.background
+            Color.appBackground
                 .ignoresSafeArea()
 
             VStack(spacing: 0) {
@@ -32,7 +41,7 @@ struct OnboardingWizardView: View {
                         .font(.roundedTitle)
                         .foregroundStyle(Color.textPrimary)
 
-                    Text("Step \(currentPage + 1) of 3")
+                    Text("Step \(currentPage + 1) of \(totalPages)")
                         .font(.roundedCaption)
                         .foregroundStyle(Color.textSecondary)
                 }
@@ -40,11 +49,11 @@ struct OnboardingWizardView: View {
                 .padding(.bottom, 24)
 
                 // Page Indicator
-                HStack(spacing: 8) {
-                    ForEach(0..<3, id: \.self) { index in
+                HStack(spacing: 6) {
+                    ForEach(0..<totalPages, id: \.self) { index in
                         Capsule()
                             .fill(index == currentPage ? Color.accent : Color.surface)
-                            .frame(width: index == currentPage ? 24 : 8, height: 8)
+                            .frame(width: index == currentPage ? 20 : 6, height: 6)
                             .animation(.spring(response: 0.3), value: currentPage)
                     }
                 }
@@ -63,7 +72,15 @@ struct OnboardingWizardView: View {
                     )
                     .tag(0)
 
-                    // Page 2: Fixed Expenses
+                    // Page 2: Income Frequency
+                    IncomeFrequencyPage(selectedFrequency: $incomeFrequency)
+                        .tag(1)
+
+                    // Page 3: Housing Situation
+                    HousingSituationPage(selectedSituation: $housingSituation)
+                        .tag(2)
+
+                    // Page 4: Fixed Expenses
                     OnboardingPage(
                         icon: "house.fill",
                         title: "Fixed Expenses",
@@ -72,14 +89,26 @@ struct OnboardingWizardView: View {
                         text: $fixedExpenses,
                         keyboardType: .decimalPad
                     )
-                    .tag(1)
+                    .tag(3)
 
-                    // Page 3: Savings Goal
+                    // Page 5: Debt Obligations
+                    DebtTypesPage(selectedDebtTypes: $selectedDebtTypes)
+                        .tag(4)
+
+                    // Page 6: Financial Personality
+                    FinancialPersonalityPage(selectedPersonality: $financialPersonality)
+                        .tag(5)
+
+                    // Page 7: Primary Goal
+                    PrimaryGoalPage(selectedGoal: $primaryGoal)
+                        .tag(6)
+
+                    // Page 8: Savings Goal
                     SavingsGoalPage(
                         goalName: $savingsGoalName,
                         goalTarget: $savingsGoalTarget
                     )
-                    .tag(2)
+                    .tag(7)
                 }
                 .tabViewStyle(.page(indexDisplayMode: .never))
 
@@ -106,7 +135,7 @@ struct OnboardingWizardView: View {
 
                     // Next / Finish Button
                     Button {
-                        if currentPage < 2 {
+                        if currentPage < totalPages - 1 {
                             withAnimation {
                                 currentPage += 1
                             }
@@ -116,21 +145,21 @@ struct OnboardingWizardView: View {
                     } label: {
                         if authManager.isLoading {
                             ProgressView()
-                                .tint(Color.background)
+                                .tint(Color.appBackground)
                                 .frame(maxWidth: .infinity)
                                 .padding()
                         } else {
-                            Text(currentPage < 2 ? "Next" : "Finish")
+                            Text(currentPage < totalPages - 1 ? "Next" : "Finish")
                                 .font(.roundedHeadline)
-                                .foregroundStyle(Color.background)
+                                .foregroundStyle(Color.appBackground)
                                 .frame(maxWidth: .infinity)
                                 .padding()
                         }
                     }
                     .background(Color.accent)
                     .clipShape(RoundedRectangle(cornerRadius: 12))
-                    .disabled(currentPage == 2 && !canFinish)
-                    .opacity(currentPage == 2 && !canFinish ? 0.6 : 1.0)
+                    .disabled(currentPage == totalPages - 1 && !canFinish)
+                    .opacity(currentPage == totalPages - 1 && !canFinish ? 0.6 : 1.0)
                 }
                 .padding(.horizontal, 24)
                 .padding(.bottom, 32)
@@ -156,7 +185,12 @@ struct OnboardingWizardView: View {
                 income: income,
                 expenses: expenses,
                 goalName: savingsGoalName,
-                goalTarget: goalTarget
+                goalTarget: goalTarget,
+                incomeFrequency: incomeFrequency,
+                housingSituation: housingSituation,
+                debtTypes: Array(selectedDebtTypes),
+                financialPersonality: financialPersonality,
+                primaryGoal: primaryGoal
             )
         }
     }
@@ -207,6 +241,247 @@ struct OnboardingPage: View {
             .background(Color.surface)
             .clipShape(RoundedRectangle(cornerRadius: 16))
             .padding(.horizontal, 48)
+
+            Spacer()
+        }
+        .padding(.top, 24)
+    }
+}
+
+// MARK: - Income Frequency Page
+
+struct IncomeFrequencyPage: View {
+    @Binding var selectedFrequency: String
+
+    private let options = [
+        ("biweekly", "Biweekly", "Every two weeks"),
+        ("monthly", "Monthly", "Once a month"),
+        ("irregular", "Irregular", "Varies each month")
+    ]
+
+    var body: some View {
+        VStack(spacing: 24) {
+            Image(systemName: "calendar.badge.clock")
+                .font(.system(size: 56))
+                .foregroundStyle(Color.accent)
+
+            Text("Income Frequency")
+                .font(.roundedHeadline)
+                .foregroundStyle(Color.textPrimary)
+
+            Text("How often do you get paid?")
+                .font(.roundedBody)
+                .foregroundStyle(Color.textSecondary)
+
+            VStack(spacing: 12) {
+                ForEach(options, id: \.0) { value, title, subtitle in
+                    SelectableOptionCard(
+                        title: title,
+                        subtitle: subtitle,
+                        isSelected: selectedFrequency == value
+                    ) {
+                        selectedFrequency = value
+                    }
+                }
+            }
+            .padding(.horizontal, 24)
+
+            Spacer()
+        }
+        .padding(.top, 24)
+    }
+}
+
+// MARK: - Housing Situation Page
+
+struct HousingSituationPage: View {
+    @Binding var selectedSituation: String
+
+    private let options = [
+        ("rent", "Renting", "I pay rent monthly"),
+        ("own", "Own Home", "I have a mortgage or own outright"),
+        ("family", "Living with Family", "No housing payment")
+    ]
+
+    var body: some View {
+        VStack(spacing: 24) {
+            Image(systemName: "house.fill")
+                .font(.system(size: 56))
+                .foregroundStyle(Color.accent)
+
+            Text("Housing Situation")
+                .font(.roundedHeadline)
+                .foregroundStyle(Color.textPrimary)
+
+            Text("What's your current living arrangement?")
+                .font(.roundedBody)
+                .foregroundStyle(Color.textSecondary)
+
+            VStack(spacing: 12) {
+                ForEach(options, id: \.0) { value, title, subtitle in
+                    SelectableOptionCard(
+                        title: title,
+                        subtitle: subtitle,
+                        isSelected: selectedSituation == value
+                    ) {
+                        selectedSituation = value
+                    }
+                }
+            }
+            .padding(.horizontal, 24)
+
+            Spacer()
+        }
+        .padding(.top, 24)
+    }
+}
+
+// MARK: - Debt Types Page
+
+struct DebtTypesPage: View {
+    @Binding var selectedDebtTypes: Set<String>
+
+    private let options = [
+        ("student_loans", "Student Loans", "Education debt"),
+        ("credit_cards", "Credit Cards", "Revolving credit"),
+        ("car", "Car Payment", "Auto loan"),
+        ("none", "No Debt", "Debt-free")
+    ]
+
+    var body: some View {
+        VStack(spacing: 24) {
+            Image(systemName: "creditcard.fill")
+                .font(.system(size: 56))
+                .foregroundStyle(Color.accent)
+
+            Text("Debt Obligations")
+                .font(.roundedHeadline)
+                .foregroundStyle(Color.textPrimary)
+
+            Text("Select all that apply")
+                .font(.roundedBody)
+                .foregroundStyle(Color.textSecondary)
+
+            VStack(spacing: 12) {
+                ForEach(options, id: \.0) { value, title, subtitle in
+                    MultiSelectOptionCard(
+                        title: title,
+                        subtitle: subtitle,
+                        isSelected: selectedDebtTypes.contains(value)
+                    ) {
+                        if value == "none" {
+                            // If "No Debt" is selected, clear all others
+                            if selectedDebtTypes.contains(value) {
+                                selectedDebtTypes.remove(value)
+                            } else {
+                                selectedDebtTypes = [value]
+                            }
+                        } else {
+                            // Remove "none" if selecting a debt type
+                            selectedDebtTypes.remove("none")
+                            if selectedDebtTypes.contains(value) {
+                                selectedDebtTypes.remove(value)
+                            } else {
+                                selectedDebtTypes.insert(value)
+                            }
+                        }
+                    }
+                }
+            }
+            .padding(.horizontal, 24)
+
+            Spacer()
+        }
+        .padding(.top, 24)
+    }
+}
+
+// MARK: - Financial Personality Page
+
+struct FinancialPersonalityPage: View {
+    @Binding var selectedPersonality: String
+
+    private let options = [
+        ("aggressive_saver", "Aggressive Saver", "I prioritize saving over spending"),
+        ("balanced", "Balanced", "I maintain a healthy balance"),
+        ("paycheck_to_paycheck", "Living Paycheck-to-Paycheck", "Most of my income goes to expenses")
+    ]
+
+    var body: some View {
+        VStack(spacing: 24) {
+            Image(systemName: "person.fill.questionmark")
+                .font(.system(size: 56))
+                .foregroundStyle(Color.accent)
+
+            Text("Financial Personality")
+                .font(.roundedHeadline)
+                .foregroundStyle(Color.textPrimary)
+
+            Text("How would you describe your spending style?")
+                .font(.roundedBody)
+                .foregroundStyle(Color.textSecondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 24)
+
+            VStack(spacing: 12) {
+                ForEach(options, id: \.0) { value, title, subtitle in
+                    SelectableOptionCard(
+                        title: title,
+                        subtitle: subtitle,
+                        isSelected: selectedPersonality == value
+                    ) {
+                        selectedPersonality = value
+                    }
+                }
+            }
+            .padding(.horizontal, 24)
+
+            Spacer()
+        }
+        .padding(.top, 24)
+    }
+}
+
+// MARK: - Primary Goal Page
+
+struct PrimaryGoalPage: View {
+    @Binding var selectedGoal: String
+
+    private let options = [
+        ("emergency_fund", "Build Emergency Fund", "Save 3-6 months of expenses"),
+        ("pay_debt", "Pay Off Debt", "Become debt-free"),
+        ("save_purchase", "Save for a Purchase", "Big item like car, vacation, etc."),
+        ("stability", "General Stability", "Maintain financial health")
+    ]
+
+    var body: some View {
+        VStack(spacing: 24) {
+            Image(systemName: "flag.fill")
+                .font(.system(size: 56))
+                .foregroundStyle(Color.accent)
+
+            Text("Primary Goal")
+                .font(.roundedHeadline)
+                .foregroundStyle(Color.textPrimary)
+
+            Text("What's your main financial priority right now?")
+                .font(.roundedBody)
+                .foregroundStyle(Color.textSecondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 24)
+
+            VStack(spacing: 12) {
+                ForEach(options, id: \.0) { value, title, subtitle in
+                    SelectableOptionCard(
+                        title: title,
+                        subtitle: subtitle,
+                        isSelected: selectedGoal == value
+                    ) {
+                        selectedGoal = value
+                    }
+                }
+            }
+            .padding(.horizontal, 24)
 
             Spacer()
         }
@@ -277,6 +552,82 @@ struct SavingsGoalPage: View {
             Spacer()
         }
         .padding(.top, 24)
+    }
+}
+
+// MARK: - Selectable Option Card (Single Select)
+
+struct SelectableOptionCard: View {
+    let title: String
+    let subtitle: String
+    let isSelected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title)
+                        .font(.roundedHeadline)
+                        .foregroundStyle(Color.textPrimary)
+
+                    Text(subtitle)
+                        .font(.roundedCaption)
+                        .foregroundStyle(Color.textSecondary)
+                }
+
+                Spacer()
+
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    .font(.title2)
+                    .foregroundStyle(isSelected ? Color.accent : Color.textSecondary)
+            }
+            .padding()
+            .background(isSelected ? Color.accent.opacity(0.15) : Color.surface)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(isSelected ? Color.accent : Color.clear, lineWidth: 2)
+            )
+        }
+    }
+}
+
+// MARK: - Multi-Select Option Card
+
+struct MultiSelectOptionCard: View {
+    let title: String
+    let subtitle: String
+    let isSelected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title)
+                        .font(.roundedHeadline)
+                        .foregroundStyle(Color.textPrimary)
+
+                    Text(subtitle)
+                        .font(.roundedCaption)
+                        .foregroundStyle(Color.textSecondary)
+                }
+
+                Spacer()
+
+                Image(systemName: isSelected ? "checkmark.square.fill" : "square")
+                    .font(.title2)
+                    .foregroundStyle(isSelected ? Color.accent : Color.textSecondary)
+            }
+            .padding()
+            .background(isSelected ? Color.accent.opacity(0.15) : Color.surface)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(isSelected ? Color.accent : Color.clear, lineWidth: 2)
+            )
+        }
     }
 }
 
