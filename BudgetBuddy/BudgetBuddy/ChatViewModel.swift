@@ -22,6 +22,10 @@ final class ChatViewModel {
     var isLoading: Bool = false
     var errorMessage: String?
 
+    // Financial summary state (for PulseHeader)
+    var safeToSpend: Double = 0.0
+    var hasStatement: Bool = false
+
     // MARK: - Dependencies
 
     private let mockService = MockService()
@@ -36,6 +40,24 @@ final class ChatViewModel {
             text: "Hi! I'm BudgetBuddy, your AI financial copilot. Ask me anything about your finances - like \"Can I afford dinner tonight?\" or \"How's my budget looking?\""
         )
         messages.append(welcomeMessage)
+    }
+
+    /// Fetches the financial summary to update the PulseHeader
+    @MainActor
+    func fetchFinancialSummary() async {
+        guard let userId = AuthManager.shared.authToken else {
+            hasStatement = false
+            safeToSpend = 0.0
+            return
+        }
+
+        do {
+            let summary = try await apiService.getFinancialSummary(userId: userId)
+            hasStatement = summary.hasStatement
+            safeToSpend = summary.safeToSpend ?? 0.0
+        } catch {
+            print("Failed to fetch financial summary: \(error)")
+        }
     }
 
     // MARK: - Actions
@@ -116,7 +138,7 @@ final class ChatViewModel {
             }
             defer { url.stopAccessingSecurityScopedResource() }
 
-            let response = try await apiService.uploadStatement(fileURL: url)
+            let response = try await apiService.uploadStatement(fileURL: url, userId: AuthManager.shared.authToken)
 
             // Add assistant response
             let assistantMessage = ChatMessage(
@@ -125,6 +147,9 @@ final class ChatViewModel {
                 visualPayload: response.visualPayload
             )
             messages.append(assistantMessage)
+
+            // Refresh financial summary after successful upload
+            await fetchFinancialSummary()
 
         } catch {
             errorMessage = "Failed to analyze statement. Please try again."

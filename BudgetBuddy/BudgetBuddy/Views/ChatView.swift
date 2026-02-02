@@ -20,11 +20,11 @@ struct ChatView: View {
                 .ignoresSafeArea()
 
             VStack(spacing: 0) {
-                // Pulse Header (Pinned at top)
+                // Pulse Header (Pinned at top) - uses live data from viewModel
                 PulseHeaderView(
-                    safeToSpend: 124.0,
-                    isHealthy: true,
-                    status: "On Track"
+                    safeToSpend: viewModel.safeToSpend,
+                    isHealthy: viewModel.safeToSpend > 100,
+                    status: pulseStatus
                 )
 
                 // Messages ScrollView
@@ -93,6 +93,25 @@ struct ChatView: View {
             case .failure(let error):
                 viewModel.errorMessage = "Failed to select file: \(error.localizedDescription)"
             }
+        }
+        .task {
+            // Fetch financial summary on appear
+            await viewModel.fetchFinancialSummary()
+        }
+    }
+
+    /// Computed status for the Pulse Header
+    private var pulseStatus: String {
+        if !viewModel.hasStatement {
+            return "No Statement"
+        } else if viewModel.safeToSpend > 500 {
+            return "Looking Good"
+        } else if viewModel.safeToSpend > 100 {
+            return "On Track"
+        } else if viewModel.safeToSpend > 0 {
+            return "Be Careful"
+        } else {
+            return "Over Budget"
         }
     }
 

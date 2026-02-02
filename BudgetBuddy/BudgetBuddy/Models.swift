@@ -134,3 +134,25 @@ struct ChatMessage: Identifiable, Equatable {
         self.timestamp = timestamp
     }
 }
+
+// MARK: - Financial Summary (from saved statement)
+
+struct FinancialSummary: Codable {
+    let hasStatement: Bool
+    let netWorth: Double?
+    let safeToSpend: Double?
+    let statementInfo: StatementInfo?
+    let spendingBreakdown: [SpendingCategory]?
+}
+
+struct StatementInfo: Codable {
+    let filename: String
+    let statementPeriod: String?
+    let uploadedAt: String?
+}
+
+struct SpendingCategory: Codable, Identifiable {
+    var id: String { category }
+    let category: String
+    let amount: Double
+}

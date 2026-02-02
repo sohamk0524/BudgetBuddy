@@ -12,7 +12,7 @@ struct PulseHeaderView: View {
     let isHealthy: Bool
     let status: String
 
-    init(safeToSpend: Double = 124.0, isHealthy: Bool = true, status: String = "On Track") {
+    init(safeToSpend: Double = 124, isHealthy: Bool = true, status: String = "On Track") {
         self.safeToSpend = safeToSpend
         self.isHealthy = isHealthy
         self.status = status

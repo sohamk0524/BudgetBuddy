@@ -62,9 +62,11 @@ actor APIService {
     // MARK: - Statement Upload API
 
     /// Uploads a bank statement file for analysis
-    /// - Parameter fileURL: Local URL to the PDF or CSV file
+    /// - Parameters:
+    ///   - fileURL: Local URL to the PDF or CSV file
+    ///   - userId: The authenticated user's ID (statement will be saved if provided)
     /// - Returns: An AssistantResponse with analysis and optional visual component
-    func uploadStatement(fileURL: URL) async throws -> AssistantResponse {
+    func uploadStatement(fileURL: URL, userId: Int?) async throws -> AssistantResponse {
         let url = baseURL.appendingPathComponent("upload-statement")
 
         // Read file data
@@ -75,11 +77,21 @@ actor APIService {
         let boundary = UUID().uuidString
         var body = Data()
 
+        // Add file field
         body.append("--\(boundary)\r\n".data(using: .utf8)!)
         body.append("Content-Disposition: form-data; name=\"file\"; filename=\"\(filename)\"\r\n".data(using: .utf8)!)
         body.append("Content-Type: application/octet-stream\r\n\r\n".data(using: .utf8)!)
         body.append(fileData)
-        body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
+        body.append("\r\n".data(using: .utf8)!)
+
+        // Add userId field if authenticated
+        if let userId = userId {
+            body.append("--\(boundary)\r\n".data(using: .utf8)!)
+            body.append("Content-Disposition: form-data; name=\"userId\"\r\n\r\n".data(using: .utf8)!)
+            body.append("\(userId)\r\n".data(using: .utf8)!)
+        }
+
+        body.append("--\(boundary)--\r\n".data(using: .utf8)!)
 
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -98,6 +110,57 @@ actor APIService {
 
         let decoder = JSONDecoder()
         return try decoder.decode(AssistantResponse.self, from: data)
+    }
+
+    // MARK: - Financial Summary API
+
+    /// Gets the financial summary derived from the user's saved statement
+    /// - Parameter userId: The authenticated user's ID
+    /// - Returns: A FinancialSummary with net worth, safe to spend, and statement info
+    func getFinancialSummary(userId: Int) async throws -> FinancialSummary {
+        var urlComponents = URLComponents(url: baseURL.appendingPathComponent("user/financial-summary"), resolvingAgainstBaseURL: false)!
+        urlComponents.queryItems = [URLQueryItem(name: "userId", value: String(userId))]
+
+        guard let url = urlComponents.url else {
+            throw APIError.invalidResponse
+        }
+
+        let (data, response) = try await URLSession.shared.data(from: url)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw APIError.invalidResponse
+        }
+
+        guard httpResponse.statusCode == 200 else {
+            throw APIError.serverError(statusCode: httpResponse.statusCode)
+        }
+
+        let decoder = JSONDecoder()
+        return try decoder.decode(FinancialSummary.self, from: data)
+    }
+
+    /// Deletes the user's saved statement
+    /// - Parameter userId: The authenticated user's ID
+    func deleteStatement(userId: Int) async throws {
+        var urlComponents = URLComponents(url: baseURL.appendingPathComponent("user/statement"), resolvingAgainstBaseURL: false)!
+        urlComponents.queryItems = [URLQueryItem(name: "userId", value: String(userId))]
+
+        guard let url = urlComponents.url else {
+            throw APIError.invalidResponse
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "DELETE"
+
+        let (_, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw APIError.invalidResponse
+        }
+
+        guard httpResponse.statusCode == 204 else {
+            throw APIError.serverError(statusCode: httpResponse.statusCode)
+        }
     }
 
     /// Checks if the backend is available
