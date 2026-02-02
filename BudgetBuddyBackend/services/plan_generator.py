@@ -127,8 +127,9 @@ def format_deep_dive_data(deep_dive_data: Dict[str, Any]) -> str:
             lines.append(f"  - Groceries: ${variable['groceries']:,.2f}/month")
         transport = variable.get("transportation", {})
         if isinstance(transport, dict):
-            total_transport = transport.get("gas", 0) + transport.get("insurance", 0)
-            lines.append(f"  - Transportation: ${total_transport:,.2f}")
+            total_transport = transport.get("gas", 0) + transport.get("insurance", 0) + transport.get("transitPass", 0)
+            transport_type = transport.get("type", "car")
+            lines.append(f"  - Transportation ({transport_type}): ${total_transport:,.2f}")
         elif transport:
             lines.append(f"  - Transportation: ${transport:,.2f}")
         if variable.get("diningEntertainment"):
@@ -312,7 +313,7 @@ def generate_fallback_plan(profile: Dict[str, Any], deep_dive_data: Dict[str, An
     variable = deep_dive_data.get("variableSpending", {})
     groceries = variable.get("groceries", income * 0.1)
     transport = variable.get("transportation", {})
-    transport_total = transport.get("gas", 0) + transport.get("insurance", 0) if isinstance(transport, dict) else 0
+    transport_total = (transport.get("gas", 0) + transport.get("insurance", 0) + transport.get("transitPass", 0)) if isinstance(transport, dict) else 0
     dining = variable.get("diningEntertainment", income * 0.05)
 
     total_flexible = groceries + transport_total

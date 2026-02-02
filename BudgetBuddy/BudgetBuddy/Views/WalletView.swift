@@ -2,25 +2,47 @@
 //  WalletView.swift
 //  BudgetBuddy
 //
-//  The "Wallet" Dashboard - Shows spending plan or prompts to create one
+//  The "Wallet" Dashboard - Shows financial overview and quick metrics
 //
 
 import SwiftUI
 
 struct WalletView: View {
-    @State private var viewModel = SpendingPlanViewModel()
 
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 16) {
-                    if viewModel.isLoading {
-                        loadingView
-                    } else if viewModel.hasPlan, let plan = viewModel.currentPlan {
-                        planDashboard(plan: plan)
-                    } else {
-                        noPlanView
+                VStack(spacing: 24) {
+                    // Quick Overview Header
+                    Text("Financial Overview")
+                        .font(.roundedHeadline)
+                        .foregroundStyle(Color.textSecondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                    // Top Row: Large + Medium cards
+                    HStack(spacing: 16) {
+                        NetWorthCard()
+                        UpcomingBillsCard()
                     }
+
+                    // Bottom Row: Small cards
+                    HStack(spacing: 16) {
+                        AnomaliesCard()
+                        GoalProgressCard()
+                    }
+
+                    // Hint to check Plan tab
+                    HStack {
+                        Image(systemName: "lightbulb.fill")
+                            .foregroundStyle(Color.accent)
+                        Text("Check the Plan tab to view or create your personalized spending plan")
+                            .font(.roundedCaption)
+                            .foregroundStyle(Color.textSecondary)
+                    }
+                    .padding()
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color.surface)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
                 .padding()
             }
@@ -31,17 +53,6 @@ struct WalletView: View {
             .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    if viewModel.hasPlan {
-                        Button {
-                            viewModel.startQuestionFlow()
-                        } label: {
-                            Image(systemName: "arrow.clockwise")
-                                .foregroundStyle(Color.textSecondary)
-                        }
-                    }
-                }
-
-                ToolbarItem(placement: .navigationBarTrailing) {
                     Button {
                         AuthManager.shared.signOut()
                     } label: {
@@ -50,131 +61,6 @@ struct WalletView: View {
                     }
                 }
             }
-            .sheet(isPresented: $viewModel.showQuestionFlow) {
-                PlanQuestionFlowView(viewModel: viewModel)
-            }
-            .task {
-                await viewModel.loadExistingPlan()
-            }
-        }
-    }
-
-    // MARK: - Loading View
-
-    private var loadingView: some View {
-        VStack(spacing: 16) {
-            ProgressView()
-                .tint(Color.accent)
-            Text("Loading your plan...")
-                .font(.roundedBody)
-                .foregroundStyle(Color.textSecondary)
-        }
-        .frame(maxWidth: .infinity, minHeight: 300)
-    }
-
-    // MARK: - No Plan View
-
-    private var noPlanView: some View {
-        VStack(spacing: 24) {
-            GeneratePlanCard {
-                viewModel.startQuestionFlow()
-            }
-
-            // Show legacy cards below the CTA
-            Text("Quick Overview")
-                .font(.roundedHeadline)
-                .foregroundStyle(Color.textSecondary)
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-            // Top Row: Large + Medium cards
-            HStack(spacing: 16) {
-                NetWorthCard()
-                UpcomingBillsCard()
-            }
-
-            // Bottom Row: Small cards
-            HStack(spacing: 16) {
-                AnomaliesCard()
-                GoalProgressCard()
-            }
-        }
-    }
-
-    // MARK: - Plan Dashboard
-
-    @ViewBuilder
-    private func planDashboard(plan: SpendingPlan) -> some View {
-        VStack(spacing: 16) {
-            // Hero: Safe to Spend
-            SafeToSpendCard(
-                amount: plan.safeToSpend,
-                daysRemaining: plan.daysRemaining,
-                budgetUsedPercent: plan.budgetUsedPercent
-            )
-
-            // Summary text
-            if !plan.summary.isEmpty {
-                Text(plan.summary)
-                    .font(.roundedBody)
-                    .foregroundStyle(Color.textSecondary)
-                    .padding()
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color.surface)
-                    .clipShape(RoundedRectangle(cornerRadius: 16))
-            }
-
-            // Budget Breakdown
-            BudgetBreakdownCard(
-                categories: plan.categoryAllocations,
-                totalIncome: plan.totalIncome
-            )
-
-            // Savings Progress
-            SavingsProgressCard(plan: plan)
-
-            // Recommendations
-            if !plan.recommendations.isEmpty {
-                RecommendationsCard(recommendations: plan.recommendations)
-            }
-
-            // Warnings
-            if !plan.warnings.isEmpty {
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .foregroundStyle(Color.danger)
-                        Text("Warnings")
-                            .font(.roundedCaption)
-                            .foregroundStyle(Color.danger)
-                    }
-
-                    ForEach(plan.warnings, id: \.self) { warning in
-                        Text(warning)
-                            .font(.roundedCaption)
-                            .foregroundStyle(Color.textSecondary)
-                    }
-                }
-                .padding()
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.danger.opacity(0.1))
-                .clipShape(RoundedRectangle(cornerRadius: 16))
-            }
-
-            // Edit button
-            Button {
-                viewModel.startQuestionFlow()
-            } label: {
-                HStack {
-                    Image(systemName: "pencil")
-                    Text("Update Your Plan")
-                }
-                .font(.roundedBody)
-                .foregroundStyle(Color.accent)
-                .frame(maxWidth: .infinity)
-                .padding()
-            }
-            .background(Color.surface)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
         }
     }
 }

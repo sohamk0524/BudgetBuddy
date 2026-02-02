@@ -210,14 +210,17 @@ final class SpendingPlanViewModel {
 
         do {
             let response = try await APIService.shared.generatePlan(userId: userId, planInput: planInput)
-            currentPlan = response.plan
-            hasPlan = response.plan != nil
+            // Update state in a single batch to ensure UI refresh
+            let plan = response.plan
+            currentPlan = plan
+            hasPlan = plan != nil
+            isGenerating = false
+            // Dismiss the question flow after state is updated
             showQuestionFlow = false
         } catch {
             errorMessage = "Failed to generate plan: \(error.localizedDescription)"
+            isGenerating = false
         }
-
-        isGenerating = false
     }
 
     // MARK: - Helpers
