@@ -37,6 +37,16 @@ struct WalletView: View {
             .navigationBarTitleDisplayMode(.large)
             .toolbarBackground(Color.background, for: .navigationBar)
             .toolbarColorScheme(.dark, for: .navigationBar)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button {
+                        AuthManager.shared.signOut()
+                    } label: {
+                        Image(systemName: "rectangle.portrait.and.arrow.right")
+                            .foregroundStyle(Color.textSecondary)
+                    }
+                }
+            }
         }
     }
 }

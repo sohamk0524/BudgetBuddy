@@ -3,11 +3,33 @@ Orchestrator service - The "Brain" of BudgetBuddy.
 Uses OpenAI SDK with Ollama for intelligent conversation and tool calling.
 """
 
+import re
 from typing import Optional, Dict, Any
 from models import AssistantResponse, VisualPayload, SankeyNode
 from services.llm_service import BudgetBuddyAgent, OllamaConnectionError, OllamaError
 from services.tools import get_tool_definitions, execute_tool
 from services.data_mock import get_budget_overview_data, get_spending_status_data
+
+
+def get_user_profile(user_id):
+    """
+    Fetch user's financial profile from the database.
+    Returns None if user or profile doesn't exist.
+    """
+    try:
+        from db_models import User
+        user = User.query.get(user_id)
+        if user and user.profile:
+            return {
+                "monthly_income": user.profile.monthly_income,
+                "fixed_expenses": user.profile.fixed_expenses,
+                "discretionary": user.profile.monthly_income - user.profile.fixed_expenses,
+                "savings_goal_name": user.profile.savings_goal_name,
+                "savings_goal_target": user.profile.savings_goal_target
+            }
+    except Exception:
+        pass
+    return None
 
 
 # System prompt that guides conversation and tool usage
@@ -62,6 +84,71 @@ def _should_use_tools(text: str) -> bool:
     return any(keyword in text_lower for keyword in finance_keywords)
 
 
+def _extract_amount(text: str) -> float:
+    """Extract a dollar amount from text, default to 100 if not found."""
+    match = re.search(r'\$?([\d,]+(?:\.\d{2})?)', text)
+    if match:
+        return float(match.group(1).replace(',', ''))
+    return 100.0
+
+
+def _handle_personalized_query(text: str, user_id) -> Optional[AssistantResponse]:
+    """
+    Handle queries that require user's financial profile.
+    Returns None if no personalized response is needed.
+    """
+    text_lower = text.lower()
+    profile = get_user_profile(user_id)
+
+    if not profile:
+        return None
+
+    discretionary = profile["discretionary"]
+
+    # Handle "afford" or "can I buy" queries
+    if "afford" in text_lower or "can i buy" in text_lower:
+        amount = _extract_amount(text)
+
+        if amount <= discretionary:
+            response_text = f"Based on your budget, you have ${discretionary:,.2f} discretionary income. You can afford this ${amount:,.2f} purchase!"
+        else:
+            response_text = f"Your discretionary budget is ${discretionary:,.2f}. A ${amount:,.2f} purchase would exceed your available funds."
+
+        return AssistantResponse(
+            text_message=response_text,
+            visual_payload=VisualPayload.burndown_chart(
+                spent=amount,
+                budget=discretionary,
+                ideal_pace=discretionary * 0.5
+            )
+        )
+
+    # Handle "plan" queries
+    if "plan" in text_lower:
+        income = profile["monthly_income"]
+        expenses = profile["fixed_expenses"]
+
+        nodes = [
+            SankeyNode(id="income", name="Income", value=income),
+            SankeyNode(id="expenses", name="Fixed Expenses", value=expenses),
+            SankeyNode(id="discretionary", name="Discretionary", value=discretionary),
+        ]
+
+        if profile["savings_goal_name"]:
+            nodes.append(SankeyNode(
+                id="savings",
+                name=profile["savings_goal_name"],
+                value=profile["savings_goal_target"]
+            ))
+
+        return AssistantResponse(
+            text_message=f"Here's your financial plan. You earn ${income:,.2f}/month with ${expenses:,.2f} in fixed expenses, leaving ${discretionary:,.2f} for spending and savings.",
+            visual_payload=VisualPayload.sankey_flow(nodes)
+        )
+
+    return None
+
+
 def process_message(text: str, user_id: str = "default") -> AssistantResponse:
     """
     Process user message using the AI agent with optional tool calling.
@@ -73,6 +160,11 @@ def process_message(text: str, user_id: str = "default") -> AssistantResponse:
     Returns:
         AssistantResponse with text and optional visual payload
     """
+    # Try personalized response first if user has a profile
+    personalized = _handle_personalized_query(text, user_id)
+    if personalized:
+        return personalized
+
     try:
         # Check if Ollama is available
         if not agent.is_available():

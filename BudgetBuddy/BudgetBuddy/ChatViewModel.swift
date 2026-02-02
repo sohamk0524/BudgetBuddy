@@ -61,7 +61,7 @@ final class ChatViewModel {
             // Call the appropriate service based on configuration
             let response: AssistantResponse
             if useRealAPI {
-                response = try await apiService.sendMessage(text: text)
+                response = try await apiService.sendMessage(text: text, userId: AuthManager.shared.authToken)
             } else {
                 response = try await mockService.sendMessage(text: text)
             }
