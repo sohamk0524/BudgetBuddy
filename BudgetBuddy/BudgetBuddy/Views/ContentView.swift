@@ -2,15 +2,31 @@
 //  ContentView.swift
 //  BudgetBuddy
 //
-//  Root view with TabView for Chat and Wallet
+//  Root view with auth routing and TabView for Chat and Wallet
 //
 
 import SwiftUI
 
 struct ContentView: View {
+    @State private var authManager = AuthManager.shared
     @State private var selectedTab = 0
 
     var body: some View {
+        Group {
+            if !authManager.isAuthenticated {
+                // Show login/registration
+                LoginView()
+            } else if authManager.needsOnboarding {
+                // Show onboarding wizard
+                OnboardingWizardView()
+            } else {
+                // Show main app
+                mainTabView
+            }
+        }
+    }
+
+    private var mainTabView: some View {
         TabView(selection: $selectedTab) {
             // Tab 1: Chat (Command Center)
             ChatView()

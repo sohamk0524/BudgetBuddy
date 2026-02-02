@@ -29,9 +29,9 @@ actor APIService {
     /// Sends a message to the AI backend and returns the response
     /// - Parameters:
     ///   - text: The user's message
-    ///   - userId: The user's identifier
+    ///   - userId: The authenticated user's ID (from AuthManager.authToken)
     /// - Returns: An AssistantResponse with text and optional visual component
-    func sendMessage(text: String, userId: String = "user123") async throws -> AssistantResponse {
+    func sendMessage(text: String, userId: Int?) async throws -> AssistantResponse {
         let url = baseURL.appendingPathComponent("chat")
 
         var request = URLRequest(url: url)
@@ -40,7 +40,7 @@ actor APIService {
 
         let body: [String: Any] = [
             "message": text,
-            "userId": userId
+            "userId": userId ?? "anonymous"
         ]
 
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
