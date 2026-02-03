@@ -22,6 +22,7 @@ enum VisualComponent: Codable, Equatable {
     case interactiveSlider(category: String, current: Double, max: Double)
     case burndownChart(spent: Double, budget: Double, idealPace: Double)
     case budgetSlider(category: String, current: Double, max: Double)
+    case spendingPlan(safeToSpend: Double, categories: [BudgetCategory])
 
     // Custom coding for complex associated values
     enum CodingKeys: String, CodingKey {
@@ -34,6 +35,8 @@ enum VisualComponent: Codable, Equatable {
         case spent
         case budget
         case idealPace
+        case safeToSpend
+        case categories
     }
 
     init(from decoder: Decoder) throws {
@@ -62,6 +65,10 @@ enum VisualComponent: Codable, Equatable {
             let current = try container.decode(Double.self, forKey: .current)
             let max = try container.decode(Double.self, forKey: .max)
             self = .budgetSlider(category: category, current: current, max: max)
+        case "spendingPlan":
+            let safeToSpend = try container.decode(Double.self, forKey: .safeToSpend)
+            let categories = try container.decode([BudgetCategory].self, forKey: .categories)
+            self = .spendingPlan(safeToSpend: safeToSpend, categories: categories)
         default:
             throw DecodingError.dataCorruptedError(forKey: .type, in: container, debugDescription: "Unknown type")
         }
@@ -92,6 +99,10 @@ enum VisualComponent: Codable, Equatable {
             try container.encode(category, forKey: .category)
             try container.encode(current, forKey: .current)
             try container.encode(max, forKey: .max)
+        case .spendingPlan(let safeToSpend, let categories):
+            try container.encode("spendingPlan", forKey: .type)
+            try container.encode(safeToSpend, forKey: .safeToSpend)
+            try container.encode(categories, forKey: .categories)
         }
     }
 }
@@ -108,6 +119,162 @@ struct SankeyNode: Codable, Equatable, Identifiable {
     let id: String
     let name: String
     let value: Double
+}
+
+// MARK: - Spending Plan Models
+
+struct SpendingPlanInput: Codable {
+    var fixedExpenses: FixedExpenses
+    var variableSpending: VariableSpending
+    var upcomingEvents: [UpcomingEvent]
+    var savingsGoals: [SavingsGoal]
+    var spendingPreferences: SpendingPreferences
+
+    init() {
+        self.fixedExpenses = FixedExpenses()
+        self.variableSpending = VariableSpending()
+        self.upcomingEvents = []
+        self.savingsGoals = []
+        self.spendingPreferences = SpendingPreferences()
+    }
+}
+
+struct FixedExpenses: Codable {
+    var rent: Double = 0
+    var utilities: Double = 0
+    var subscriptions: [Subscription] = []
+}
+
+struct Subscription: Codable, Identifiable {
+    let id: UUID
+    var name: String
+    var amount: Double
+
+    init(id: UUID = UUID(), name: String = "", amount: Double = 0) {
+        self.id = id
+        self.name = name
+        self.amount = amount
+    }
+}
+
+struct VariableSpending: Codable {
+    var groceries: Double = 0
+    var transportation: TransportationExpense = TransportationExpense()
+    var diningEntertainment: Double = 0
+}
+
+struct TransportationExpense: Codable {
+    var type: String = "car"  // "car", "transit", "mix"
+    var gas: Double = 0
+    var insurance: Double = 0
+    var transitPass: Double = 0
+}
+
+struct UpcomingEvent: Codable, Identifiable {
+    let id: UUID
+    var name: String
+    var date: Date
+    var cost: Double
+    var saveGradually: Bool
+
+    init(id: UUID = UUID(), name: String = "", date: Date = Date(), cost: Double = 0, saveGradually: Bool = true) {
+        self.id = id
+        self.name = name
+        self.date = date
+        self.cost = cost
+        self.saveGradually = saveGradually
+    }
+}
+
+struct SavingsGoal: Codable, Identifiable {
+    let id: UUID
+    var name: String
+    var target: Double
+    var current: Double
+    var priority: Int
+
+    init(id: UUID = UUID(), name: String = "", target: Double = 0, current: Double = 0, priority: Int = 1) {
+        self.id = id
+        self.name = name
+        self.target = target
+        self.current = current
+        self.priority = priority
+    }
+}
+
+struct SpendingPreferences: Codable {
+    var spendingStyle: Double = 0.5  // 0.0 = frugal, 1.0 = liberal
+    var priorities: [String] = []  // ["savings", "experiences", "security", "flexibility"]
+    var strictness: String = "moderate"  // "flexible", "moderate", "strict"
+}
+
+// MARK: - Spending Plan Response
+
+struct SpendingPlanResponse: Codable {
+    let textMessage: String
+    let plan: SpendingPlan?
+    let visualPayload: VisualComponent?
+
+    enum CodingKeys: String, CodingKey {
+        case textMessage
+        case plan
+        case visualPayload
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        textMessage = try container.decode(String.self, forKey: .textMessage)
+        plan = try container.decodeIfPresent(SpendingPlan.self, forKey: .plan)
+        visualPayload = try container.decodeIfPresent(VisualComponent.self, forKey: .visualPayload)
+    }
+}
+
+struct SpendingPlan: Codable {
+    let summary: String
+    let safeToSpend: Double
+    let totalIncome: Double
+    let totalExpenses: Double
+    let totalSavings: Double
+    let daysRemaining: Int
+    let budgetUsedPercent: Double
+    let categoryAllocations: [BudgetCategory]
+    let recommendations: [Recommendation]
+    let warnings: [String]
+    let createdAt: String?
+}
+
+struct BudgetCategory: Codable, Identifiable, Equatable {
+    let id: String
+    let name: String
+    let amount: Double
+    let color: String
+    let items: [BudgetItem]?
+
+    static func == (lhs: BudgetCategory, rhs: BudgetCategory) -> Bool {
+        lhs.id == rhs.id && lhs.amount == rhs.amount
+    }
+}
+
+struct BudgetItem: Codable, Equatable {
+    let name: String
+    let amount: Double
+}
+
+struct Recommendation: Codable, Identifiable {
+    var id: String { category + title }
+    let category: String
+    let title: String
+    let description: String
+    let potentialSavings: Double?
+}
+
+// MARK: - Get Plan Response
+
+struct GetPlanResponse: Codable {
+    let hasPlan: Bool
+    let plan: SpendingPlan?
+    let createdAt: String?
+    let monthYear: String?
 }
 
 // MARK: - Assistant Response

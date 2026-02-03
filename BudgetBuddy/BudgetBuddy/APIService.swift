@@ -183,6 +183,121 @@ actor APIService {
             return false
         }
     }
+
+    // MARK: - Spending Plan API
+
+    /// Generates a personalized spending plan
+    /// - Parameters:
+    ///   - userId: The authenticated user's ID
+    ///   - planInput: The data collected from the question flow
+    /// - Returns: A SpendingPlanResponse with the generated plan
+    func generatePlan(userId: Int, planInput: SpendingPlanInput) async throws -> SpendingPlanResponse {
+        let url = baseURL.appendingPathComponent("generate-plan")
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        // Format the date for JSON
+        let dateFormatter = ISO8601DateFormatter()
+
+        // Build the deep dive data structure
+        var deepDiveData: [String: Any] = [:]
+
+        // Fixed expenses
+        var subscriptionsArray: [[String: Any]] = []
+        for sub in planInput.fixedExpenses.subscriptions {
+            subscriptionsArray.append(["name": sub.name, "amount": sub.amount])
+        }
+        deepDiveData["fixedExpenses"] = [
+            "rent": planInput.fixedExpenses.rent,
+            "utilities": planInput.fixedExpenses.utilities,
+            "subscriptions": subscriptionsArray
+        ]
+
+        // Variable spending
+        deepDiveData["variableSpending"] = [
+            "groceries": planInput.variableSpending.groceries,
+            "transportation": [
+                "type": planInput.variableSpending.transportation.type,
+                "gas": planInput.variableSpending.transportation.gas,
+                "insurance": planInput.variableSpending.transportation.insurance,
+                "transitPass": planInput.variableSpending.transportation.transitPass
+            ],
+            "diningEntertainment": planInput.variableSpending.diningEntertainment
+        ]
+
+        // Upcoming events
+        var eventsArray: [[String: Any]] = []
+        for event in planInput.upcomingEvents {
+            eventsArray.append([
+                "name": event.name,
+                "date": dateFormatter.string(from: event.date),
+                "cost": event.cost,
+                "saveGradually": event.saveGradually
+            ])
+        }
+        deepDiveData["upcomingEvents"] = eventsArray
+
+        // Savings goals
+        var goalsArray: [[String: Any]] = []
+        for goal in planInput.savingsGoals {
+            goalsArray.append([
+                "name": goal.name,
+                "target": goal.target,
+                "current": goal.current,
+                "priority": goal.priority
+            ])
+        }
+        deepDiveData["savingsGoals"] = goalsArray
+
+        // Spending preferences
+        deepDiveData["spendingPreferences"] = [
+            "spendingStyle": planInput.spendingPreferences.spendingStyle,
+            "priorities": planInput.spendingPreferences.priorities,
+            "strictness": planInput.spendingPreferences.strictness
+        ]
+
+        let body: [String: Any] = [
+            "userId": userId,
+            "deepDiveData": deepDiveData
+        ]
+
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw APIError.invalidResponse
+        }
+
+        guard httpResponse.statusCode == 200 else {
+            throw APIError.serverError(statusCode: httpResponse.statusCode)
+        }
+
+        let decoder = JSONDecoder()
+        return try decoder.decode(SpendingPlanResponse.self, from: data)
+    }
+
+    /// Gets the user's most recent spending plan
+    /// - Parameter userId: The authenticated user's ID
+    /// - Returns: A GetPlanResponse with the plan if it exists
+    func getPlan(userId: Int) async throws -> GetPlanResponse {
+        let url = baseURL.appendingPathComponent("get-plan/\(userId)")
+
+        let (data, response) = try await URLSession.shared.data(from: url)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw APIError.invalidResponse
+        }
+
+        guard httpResponse.statusCode == 200 else {
+            throw APIError.serverError(statusCode: httpResponse.statusCode)
+        }
+
+        let decoder = JSONDecoder()
+        return try decoder.decode(GetPlanResponse.self, from: data)
+    }
 }
 
 // MARK: - Errors

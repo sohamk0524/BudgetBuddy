@@ -16,7 +16,7 @@ struct ChatView: View {
     var body: some View {
         ZStack(alignment: .top) {
             // Background
-            Color.background
+            Color.appBackground
                 .ignoresSafeArea()
 
             VStack(spacing: 0) {

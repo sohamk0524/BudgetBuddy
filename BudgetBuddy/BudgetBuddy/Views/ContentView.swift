@@ -2,7 +2,7 @@
 //  ContentView.swift
 //  BudgetBuddy
 //
-//  Root view with auth routing and TabView for Chat and Wallet
+//  Root view with auth routing and TabView for Chat, Wallet, and Plan
 //
 
 import SwiftUI
@@ -10,6 +10,7 @@ import SwiftUI
 struct ContentView: View {
     @State private var authManager = AuthManager.shared
     @State private var selectedTab = 0
+    @State private var planViewModel = SpendingPlanViewModel()
 
     var body: some View {
         Group {
@@ -41,6 +42,13 @@ struct ContentView: View {
                     Label("Wallet", systemImage: "wallet.pass.fill")
                 }
                 .tag(1)
+
+            // Tab 3: Plan (Spending Plan)
+            PlanView(viewModel: planViewModel)
+                .tabItem {
+                    Label("Plan", systemImage: "doc.text.fill")
+                }
+                .tag(2)
         }
         .tint(Color.accent)
         .onAppear {

@@ -4,9 +4,10 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 from werkzeug.security import generate_password_hash, check_password_hash
 
-from db_models import db, User, FinancialProfile, SavedStatement
+from db_models import db, User, FinancialProfile, BudgetPlan, SavedStatement
 from services.orchestrator import process_message
 from services.statement_analyzer import analyze_statement
+from services.plan_generator import generate_plan, save_plan_to_db
 
 app = Flask(__name__)
 
@@ -133,7 +134,12 @@ def onboarding():
         "income": 5000.0,
         "expenses": 2000.0,
         "goalName": "Car",
-        "goalTarget": 10000.0
+        "goalTarget": 10000.0,
+        "incomeFrequency": "monthly",
+        "housingSituation": "rent",
+        "debtTypes": ["student_loans", "credit_cards"],
+        "financialPersonality": "balanced",
+        "primaryGoal": "emergency_fund"
     }
 
     Returns:
@@ -152,6 +158,17 @@ def onboarding():
     goal_name = data.get("goalName", "")
     goal_target = data.get("goalTarget", 0.0)
 
+    # New fields
+    income_frequency = data.get("incomeFrequency", "monthly")
+    housing_situation = data.get("housingSituation", "rent")
+    debt_types = data.get("debtTypes", [])
+    financial_personality = data.get("financialPersonality", "balanced")
+    primary_goal = data.get("primaryGoal", "stability")
+
+    # Convert debt_types list to JSON string for storage
+    import json
+    debt_types_json = json.dumps(debt_types) if isinstance(debt_types, list) else debt_types
+
     if not user_id:
         return jsonify({"error": "userId is required"}), 400
 
@@ -167,6 +184,11 @@ def onboarding():
         user.profile.fixed_expenses = expenses
         user.profile.savings_goal_name = goal_name
         user.profile.savings_goal_target = goal_target
+        user.profile.income_frequency = income_frequency
+        user.profile.housing_situation = housing_situation
+        user.profile.debt_types = debt_types_json
+        user.profile.financial_personality = financial_personality
+        user.profile.primary_goal = primary_goal
     else:
         # Create new profile
         profile = FinancialProfile(
@@ -174,13 +196,110 @@ def onboarding():
             monthly_income=income,
             fixed_expenses=expenses,
             savings_goal_name=goal_name,
-            savings_goal_target=goal_target
+            savings_goal_target=goal_target,
+            income_frequency=income_frequency,
+            housing_situation=housing_situation,
+            debt_types=debt_types_json,
+            financial_personality=financial_personality,
+            primary_goal=primary_goal
         )
         db.session.add(profile)
 
     db.session.commit()
 
     return jsonify({"status": "success"})
+
+
+@app.route("/generate-plan", methods=["POST"])
+def generate_spending_plan():
+    """
+    Generate a personalized spending plan.
+
+    Expected request body:
+    {
+        "userId": 1,
+        "deepDiveData": {
+            "fixedExpenses": {
+                "rent": 1200,
+                "utilities": 150,
+                "subscriptions": [{"name": "Netflix", "amount": 15}]
+            },
+            "variableSpending": {
+                "groceries": 400,
+                "transportation": {"type": "car", "gas": 150, "insurance": 100},
+                "diningEntertainment": 200
+            },
+            "upcomingEvents": [
+                {"name": "Wedding", "date": "2026-06-15", "cost": 800, "saveGradually": true}
+            ],
+            "savingsGoals": [
+                {"name": "Emergency fund", "target": 1000, "current": 150, "priority": 1}
+            ],
+            "spendingPreferences": {
+                "spendingStyle": 0.3,
+                "priorities": ["savings", "security"],
+                "strictness": "moderate"
+            }
+        }
+    }
+
+    Returns:
+    {
+        "textMessage": "Your personalized plan is ready!",
+        "plan": { ... },
+        "visualPayload": { ... }
+    }
+    """
+    data = request.get_json()
+
+    if not data:
+        return jsonify({"error": "Request body must be JSON"}), 400
+
+    user_id = data.get("userId")
+    deep_dive_data = data.get("deepDiveData", {})
+
+    if not user_id:
+        return jsonify({"error": "userId is required"}), 400
+
+    # Verify user exists
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
+    # Generate the plan
+    result = generate_plan(user_id, deep_dive_data)
+
+    # Save the plan if generated successfully
+    if result.get("plan"):
+        save_plan_to_db(user_id, result["plan"])
+
+    return jsonify(result)
+
+
+@app.route("/get-plan/<int:user_id>", methods=["GET"])
+def get_user_plan(user_id):
+    """
+    Get the user's most recent spending plan.
+    """
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
+    # Get the most recent plan
+    plan_record = BudgetPlan.query.filter_by(user_id=user_id).order_by(BudgetPlan.created_at.desc()).first()
+
+    if not plan_record:
+        return jsonify({"hasPlan": False, "plan": None})
+
+    import json
+    plan_data = json.loads(plan_record.plan_json)
+
+    return jsonify({
+        "hasPlan": True,
+        "plan": plan_data,
+        "createdAt": plan_record.created_at.isoformat() if plan_record.created_at else None,
+        "monthYear": plan_record.month_year
+    })
 
 
 @app.route("/chat", methods=["POST"])
