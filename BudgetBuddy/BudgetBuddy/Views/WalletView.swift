@@ -8,6 +8,8 @@
 import SwiftUI
 
 struct WalletView: View {
+    @State private var viewModel = WalletViewModel()
+    @State private var showingStatementUpload = false
 
     var body: some View {
         NavigationStack {
@@ -19,10 +21,21 @@ struct WalletView: View {
                         .foregroundStyle(Color.textSecondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
 
-                    // Top Row: Large + Medium cards
+                    // Top Row: Net Worth + Safe to Spend
                     HStack(spacing: 16) {
-                        NetWorthCard()
-                        UpcomingBillsCard()
+                        NetWorthCard(amount: viewModel.netWorth, hasStatement: viewModel.hasStatement)
+                        WalletSafeToSpendCard(amount: viewModel.safeToSpend, hasStatement: viewModel.hasStatement)
+                    }
+
+                    // Statement Info Card (if statement exists) or Upload Prompt
+                    if viewModel.hasStatement {
+                        LinkedStatementCard(
+                            statementInfo: viewModel.statementInfo,
+                            spendingBreakdown: viewModel.spendingBreakdown,
+                            onUploadNew: { showingStatementUpload = true }
+                        )
+                    } else {
+                        UploadStatementPromptCard(onUpload: { showingStatementUpload = true })
                     }
 
                     // Bottom Row: Small cards
@@ -61,13 +74,60 @@ struct WalletView: View {
                     }
                 }
             }
+            .task {
+                await viewModel.fetchFinancialSummary()
+            }
+            .refreshable {
+                await viewModel.refresh()
+            }
+            .fileImporter(
+                isPresented: $showingStatementUpload,
+                allowedContentTypes: [.pdf, .commaSeparatedText],
+                allowsMultipleSelection: false
+            ) { result in
+                handleFileSelection(result)
+            }
+        }
+    }
+
+    private func handleFileSelection(_ result: Result<[URL], Error>) {
+        switch result {
+        case .success(let urls):
+            guard let fileURL = urls.first else { return }
+            Task {
+                await uploadStatement(fileURL: fileURL)
+            }
+        case .failure(let error):
+            print("File selection error: \(error)")
+        }
+    }
+
+    private func uploadStatement(fileURL: URL) async {
+        guard let userId = AuthManager.shared.authToken else { return }
+
+        // Access security-scoped resource
+        guard fileURL.startAccessingSecurityScopedResource() else {
+            print("Failed to access security-scoped resource")
+            return
+        }
+        defer { fileURL.stopAccessingSecurityScopedResource() }
+
+        do {
+            _ = try await APIService.shared.uploadStatement(fileURL: fileURL, userId: userId)
+            // Refresh wallet data after successful upload
+            await viewModel.refresh()
+        } catch {
+            print("Upload error: \(error)")
         }
     }
 }
 
-// MARK: - Legacy Cards (kept for no-plan state)
+// MARK: - Net Worth Card
 
 struct NetWorthCard: View {
+    let amount: Double
+    let hasStatement: Bool
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
@@ -80,68 +140,193 @@ struct NetWorthCard: View {
 
             Spacer()
 
-            Text("$24,850")
-                .font(.system(size: 28, weight: .bold, design: .rounded))
-                .monospacedDigit()
-                .foregroundStyle(Color.textPrimary)
-
-            HStack(spacing: 4) {
-                Image(systemName: "arrow.up.right")
-                    .font(.caption)
-                Text("+$1,240")
-                    .font(.roundedCaption)
+            if hasStatement {
+                Text(formatCurrency(amount))
+                    .font(.system(size: 28, weight: .bold, design: .rounded))
                     .monospacedDigit()
-                Text("this month")
+                    .foregroundStyle(Color.textPrimary)
+            } else {
+                Text("--")
+                    .font(.system(size: 28, weight: .bold, design: .rounded))
+                    .foregroundStyle(Color.textSecondary)
+
+                Text("Upload statement")
                     .font(.roundedCaption)
+                    .foregroundStyle(Color.textSecondary)
             }
-            .foregroundStyle(Color.accent)
         }
         .padding()
-        .frame(maxWidth: .infinity, minHeight: 160, alignment: .leading)
+        .frame(maxWidth: .infinity, minHeight: 140, alignment: .leading)
         .background(Color.surface)
         .clipShape(RoundedRectangle(cornerRadius: 16))
     }
+
+    private func formatCurrency(_ value: Double) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .currency
+        formatter.currencyCode = "USD"
+        formatter.maximumFractionDigits = 0
+        return formatter.string(from: NSNumber(value: value)) ?? "$0"
+    }
 }
 
-struct UpcomingBillsCard: View {
+// MARK: - Wallet Safe to Spend Card
+
+struct WalletSafeToSpendCard: View {
+    let amount: Double
+    let hasStatement: Bool
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Image(systemName: "calendar.badge.clock")
-                    .foregroundStyle(Color.danger)
-                Text("Upcoming")
+                Image(systemName: "creditcard.fill")
+                    .foregroundStyle(Color.accent)
+                Text("Safe to Spend")
                     .font(.roundedCaption)
                     .foregroundStyle(Color.textSecondary)
             }
 
             Spacer()
 
-            VStack(alignment: .leading, spacing: 4) {
-                Text("$1,200")
-                    .font(.system(size: 24, weight: .bold, design: .rounded))
+            if hasStatement {
+                Text(formatCurrency(amount))
+                    .font(.system(size: 28, weight: .bold, design: .rounded))
                     .monospacedDigit()
-                    .foregroundStyle(Color.textPrimary)
+                    .foregroundStyle(amount > 0 ? Color.accent : Color.danger)
+            } else {
+                Text("--")
+                    .font(.system(size: 28, weight: .bold, design: .rounded))
+                    .foregroundStyle(Color.textSecondary)
 
-                Text("Rent due in 5 days")
+                Text("Upload statement")
                     .font(.roundedCaption)
                     .foregroundStyle(Color.textSecondary)
             }
-
-            GeometryReader { geometry in
-                ZStack(alignment: .leading) {
-                    RoundedRectangle(cornerRadius: 2)
-                        .fill(Color.appBackground)
-                        .frame(height: 4)
-
-                    RoundedRectangle(cornerRadius: 2)
-                        .fill(Color.danger)
-                        .frame(width: geometry.size.width * 0.8, height: 4)
-                }
-            }
-            .frame(height: 4)
         }
         .padding()
-        .frame(maxWidth: .infinity, minHeight: 160, alignment: .leading)
+        .frame(maxWidth: .infinity, minHeight: 140, alignment: .leading)
+        .background(Color.surface)
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+    }
+
+    private func formatCurrency(_ value: Double) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .currency
+        formatter.currencyCode = "USD"
+        formatter.maximumFractionDigits = 0
+        return formatter.string(from: NSNumber(value: value)) ?? "$0"
+    }
+}
+
+// MARK: - Linked Statement Card
+
+struct LinkedStatementCard: View {
+    let statementInfo: StatementInfo?
+    let spendingBreakdown: [SpendingCategory]
+    let onUploadNew: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            // Header
+            HStack {
+                Image(systemName: "doc.text.fill")
+                    .foregroundStyle(Color.accent)
+                Text("Linked Statement")
+                    .font(.roundedCaption)
+                    .foregroundStyle(Color.textSecondary)
+                Spacer()
+                Button(action: onUploadNew) {
+                    Text("Update")
+                        .font(.roundedCaption)
+                        .foregroundStyle(Color.accent)
+                }
+            }
+
+            // Statement info
+            if let info = statementInfo {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(info.filename)
+                        .font(.system(.subheadline, design: .rounded, weight: .medium))
+                        .foregroundStyle(Color.textPrimary)
+                        .lineLimit(1)
+
+                    if let period = info.statementPeriod {
+                        Text(period)
+                            .font(.roundedCaption)
+                            .foregroundStyle(Color.textSecondary)
+                    }
+                }
+            }
+
+            // Spending breakdown (top 3 categories)
+            if !spendingBreakdown.isEmpty {
+                Divider()
+                    .background(Color.textSecondary.opacity(0.3))
+
+                VStack(spacing: 8) {
+                    ForEach(spendingBreakdown.prefix(3)) { category in
+                        HStack {
+                            Text(category.category)
+                                .font(.roundedCaption)
+                                .foregroundStyle(Color.textSecondary)
+                            Spacer()
+                            Text(formatCurrency(category.amount))
+                                .font(.system(.caption, design: .rounded, weight: .medium))
+                                .monospacedDigit()
+                                .foregroundStyle(Color.textPrimary)
+                        }
+                    }
+                }
+            }
+        }
+        .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.surface)
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+    }
+
+    private func formatCurrency(_ value: Double) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .currency
+        formatter.currencyCode = "USD"
+        formatter.maximumFractionDigits = 0
+        return formatter.string(from: NSNumber(value: value)) ?? "$0"
+    }
+}
+
+// MARK: - Upload Statement Prompt Card
+
+struct UploadStatementPromptCard: View {
+    let onUpload: () -> Void
+
+    var body: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "doc.badge.plus")
+                .font(.system(size: 32))
+                .foregroundStyle(Color.accent)
+
+            Text("Link Your Bank Statement")
+                .font(.system(.headline, design: .rounded))
+                .foregroundStyle(Color.textPrimary)
+
+            Text("Upload a PDF or CSV statement to see your Net Worth and Safe to Spend")
+                .font(.roundedCaption)
+                .foregroundStyle(Color.textSecondary)
+                .multilineTextAlignment(.center)
+
+            Button(action: onUpload) {
+                Text("Upload Statement")
+                    .font(.system(.subheadline, design: .rounded, weight: .semibold))
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 10)
+                    .background(Color.accent)
+                    .clipShape(Capsule())
+            }
+            .padding(.top, 4)
+        }
+        .padding(.vertical, 24)
+        .padding(.horizontal)
+        .frame(maxWidth: .infinity)
         .background(Color.surface)
         .clipShape(RoundedRectangle(cornerRadius: 16))
     }
