@@ -24,7 +24,7 @@ struct WalletView: View {
                     // Top Row: Net Worth + Safe to Spend
                     HStack(spacing: 16) {
                         NetWorthCard(amount: viewModel.netWorth, hasStatement: viewModel.hasStatement)
-                        SafeToSpendCard(amount: viewModel.safeToSpend, hasStatement: viewModel.hasStatement)
+                        WalletSafeToSpendCard(amount: viewModel.safeToSpend, hasStatement: viewModel.hasStatement)
                     }
 
                     // Statement Info Card (if statement exists) or Upload Prompt
@@ -170,9 +170,9 @@ struct NetWorthCard: View {
     }
 }
 
-// MARK: - Safe to Spend Card
+// MARK: - Wallet Safe to Spend Card
 
-struct SafeToSpendCard: View {
+struct WalletSafeToSpendCard: View {
     let amount: Double
     let hasStatement: Bool
 
@@ -317,7 +317,6 @@ struct UploadStatementPromptCard: View {
             Button(action: onUpload) {
                 Text("Upload Statement")
                     .font(.system(.subheadline, design: .rounded, weight: .semibold))
-                    .foregroundStyle(Color.background)
                     .padding(.horizontal, 20)
                     .padding(.vertical, 10)
                     .background(Color.accent)
