@@ -8,6 +8,7 @@
 import SwiftUI
 
 struct WalletView: View {
+    @Bindable var viewModel: SpendingPlanViewModel
 
     var body: some View {
         NavigationStack {
@@ -21,14 +22,14 @@ struct WalletView: View {
 
                     // Top Row: Large + Medium cards
                     HStack(spacing: 16) {
-                        NetWorthCard()
-                        UpcomingBillsCard()
+                        NetWorthCard(plan: viewModel.currentPlan)
+                        UpcomingBillsCard(events: viewModel.planInput.upcomingEvents)
                     }
 
                     // Bottom Row: Small cards
                     HStack(spacing: 16) {
-                        AnomaliesCard()
-                        GoalProgressCard()
+                        AnomaliesCard(warnings: viewModel.currentPlan?.warnings ?? [])
+                        GoalProgressCard(goals: viewModel.planInput.savingsGoals)
                     }
 
                     // Hint to check Plan tab
@@ -68,33 +69,54 @@ struct WalletView: View {
 // MARK: - Legacy Cards (kept for no-plan state)
 
 struct NetWorthCard: View {
+    let plan: SpendingPlan?
+
+    private var netPosition: Double {
+        guard let plan = plan else { return 0 }
+        return plan.totalIncome - plan.totalExpenses
+    }
+
+    private var savingsAmount: Double {
+        plan?.totalSavings ?? 0
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Image(systemName: "chart.line.uptrend.xyaxis")
                     .foregroundStyle(Color.accent)
-                Text("Net Worth")
+                Text("Monthly Net")
                     .font(.roundedCaption)
                     .foregroundStyle(Color.textSecondary)
             }
 
             Spacer()
 
-            Text("$24,850")
-                .font(.system(size: 28, weight: .bold, design: .rounded))
-                .monospacedDigit()
-                .foregroundStyle(Color.textPrimary)
-
-            HStack(spacing: 4) {
-                Image(systemName: "arrow.up.right")
-                    .font(.caption)
-                Text("+$1,240")
-                    .font(.roundedCaption)
+            if let plan = plan {
+                Text(netPosition.formatted(.currency(code: "USD")))
+                    .font(.system(size: 28, weight: .bold, design: .rounded))
                     .monospacedDigit()
-                Text("this month")
+                    .foregroundStyle(Color.textPrimary)
+
+                HStack(spacing: 4) {
+                    Image(systemName: savingsAmount >= 0 ? "arrow.up.right" : "arrow.down.right")
+                        .font(.caption)
+                    Text(savingsAmount.formatted(.currency(code: "USD")))
+                        .font(.roundedCaption)
+                        .monospacedDigit()
+                    Text("to savings")
+                        .font(.roundedCaption)
+                }
+                .foregroundStyle(savingsAmount >= 0 ? Color.accent : Color.danger)
+            } else {
+                Text("--")
+                    .font(.system(size: 28, weight: .bold, design: .rounded))
+                    .foregroundStyle(Color.textSecondary)
+
+                Text("Create a plan to see data")
                     .font(.roundedCaption)
+                    .foregroundStyle(Color.textSecondary)
             }
-            .foregroundStyle(Color.accent)
         }
         .padding()
         .frame(maxWidth: .infinity, minHeight: 160, alignment: .leading)
@@ -104,6 +126,26 @@ struct NetWorthCard: View {
 }
 
 struct UpcomingBillsCard: View {
+    let events: [UpcomingEvent]
+
+    private var nextEvent: UpcomingEvent? {
+        events
+            .filter { $0.date >= Date() }
+            .sorted { $0.date < $1.date }
+            .first
+    }
+
+    private var daysUntilEvent: Int {
+        guard let event = nextEvent else { return 0 }
+        return Calendar.current.dateComponents([.day], from: Date(), to: event.date).day ?? 0
+    }
+
+    private var urgencyProgress: Double {
+        guard nextEvent != nil else { return 0 }
+        let maxDays = 30.0
+        return min(1.0, max(0, 1.0 - Double(daysUntilEvent) / maxDays))
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
@@ -116,29 +158,42 @@ struct UpcomingBillsCard: View {
 
             Spacer()
 
-            VStack(alignment: .leading, spacing: 4) {
-                Text("$1,200")
-                    .font(.system(size: 24, weight: .bold, design: .rounded))
-                    .monospacedDigit()
-                    .foregroundStyle(Color.textPrimary)
+            if let event = nextEvent {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(event.cost.formatted(.currency(code: "USD")))
+                        .font(.system(size: 24, weight: .bold, design: .rounded))
+                        .monospacedDigit()
+                        .foregroundStyle(Color.textPrimary)
 
-                Text("Rent due in 5 days")
-                    .font(.roundedCaption)
-                    .foregroundStyle(Color.textSecondary)
-            }
+                    Text("\(event.name) in \(daysUntilEvent) days")
+                        .font(.roundedCaption)
+                        .foregroundStyle(Color.textSecondary)
+                        .lineLimit(1)
+                }
 
-            GeometryReader { geometry in
-                ZStack(alignment: .leading) {
-                    RoundedRectangle(cornerRadius: 2)
-                        .fill(Color.appBackground)
-                        .frame(height: 4)
+                GeometryReader { geometry in
+                    ZStack(alignment: .leading) {
+                        RoundedRectangle(cornerRadius: 2)
+                            .fill(Color.appBackground)
+                            .frame(height: 4)
 
-                    RoundedRectangle(cornerRadius: 2)
-                        .fill(Color.danger)
-                        .frame(width: geometry.size.width * 0.8, height: 4)
+                        RoundedRectangle(cornerRadius: 2)
+                            .fill(Color.danger)
+                            .frame(width: geometry.size.width * urgencyProgress, height: 4)
+                    }
+                }
+                .frame(height: 4)
+            } else {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("--")
+                        .font(.system(size: 24, weight: .bold, design: .rounded))
+                        .foregroundStyle(Color.textSecondary)
+
+                    Text("No upcoming events")
+                        .font(.roundedCaption)
+                        .foregroundStyle(Color.textSecondary)
                 }
             }
-            .frame(height: 4)
         }
         .padding()
         .frame(maxWidth: .infinity, minHeight: 160, alignment: .leading)
@@ -148,27 +203,44 @@ struct UpcomingBillsCard: View {
 }
 
 struct AnomaliesCard: View {
+    let warnings: [String]
+
+    private var warningCount: Int {
+        warnings.count
+    }
+
+    private var firstWarning: String? {
+        warnings.first
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .foregroundStyle(Color.danger)
+                Image(systemName: warningCount > 0 ? "exclamationmark.triangle.fill" : "checkmark.circle.fill")
+                    .foregroundStyle(warningCount > 0 ? Color.danger : Color.accent)
                 Spacer()
-                Text("2")
+                Text("\(warningCount)")
                     .font(.roundedHeadline)
-                    .foregroundStyle(Color.danger)
+                    .foregroundStyle(warningCount > 0 ? Color.danger : Color.accent)
             }
 
             Spacer()
 
-            Text("Anomalies")
+            Text(warningCount > 0 ? "Warnings" : "All Good")
                 .font(.roundedCaption)
                 .foregroundStyle(Color.textSecondary)
 
-            Text("Unusual spending detected")
-                .font(.system(.caption2, design: .rounded))
-                .foregroundStyle(Color.textSecondary)
-                .lineLimit(2)
+            if let warning = firstWarning {
+                Text(warning)
+                    .font(.system(.caption2, design: .rounded))
+                    .foregroundStyle(Color.textSecondary)
+                    .lineLimit(2)
+            } else {
+                Text("No budget warnings")
+                    .font(.system(.caption2, design: .rounded))
+                    .foregroundStyle(Color.textSecondary)
+                    .lineLimit(2)
+            }
         }
         .padding()
         .frame(maxWidth: .infinity, minHeight: 120, alignment: .leading)
@@ -178,7 +250,20 @@ struct AnomaliesCard: View {
 }
 
 struct GoalProgressCard: View {
-    private let progress: Double = 0.65
+    let goals: [SavingsGoal]
+
+    private var primaryGoal: SavingsGoal? {
+        goals.sorted { $0.priority < $1.priority }.first
+    }
+
+    private var progress: Double {
+        guard let goal = primaryGoal, goal.target > 0 else { return 0 }
+        return min(1.0, goal.current / goal.target)
+    }
+
+    private var progressPercent: Int {
+        Int(progress * 100)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -186,7 +271,7 @@ struct GoalProgressCard: View {
                 Image(systemName: "target")
                     .foregroundStyle(Color.accent)
                 Spacer()
-                Text("65%")
+                Text("\(progressPercent)%")
                     .font(.roundedHeadline)
                     .monospacedDigit()
                     .foregroundStyle(Color.accent)
@@ -194,22 +279,33 @@ struct GoalProgressCard: View {
 
             Spacer()
 
-            Text("Vacation Fund")
-                .font(.roundedCaption)
-                .foregroundStyle(Color.textSecondary)
+            if let goal = primaryGoal {
+                Text(goal.name.isEmpty ? "Savings Goal" : goal.name)
+                    .font(.roundedCaption)
+                    .foregroundStyle(Color.textSecondary)
+                    .lineLimit(1)
 
-            GeometryReader { geometry in
-                ZStack(alignment: .leading) {
-                    RoundedRectangle(cornerRadius: 2)
-                        .fill(Color.appBackground)
-                        .frame(height: 4)
+                GeometryReader { geometry in
+                    ZStack(alignment: .leading) {
+                        RoundedRectangle(cornerRadius: 2)
+                            .fill(Color.appBackground)
+                            .frame(height: 4)
 
-                    RoundedRectangle(cornerRadius: 2)
-                        .fill(Color.accent)
-                        .frame(width: geometry.size.width * progress, height: 4)
+                        RoundedRectangle(cornerRadius: 2)
+                            .fill(Color.accent)
+                            .frame(width: geometry.size.width * progress, height: 4)
+                    }
                 }
+                .frame(height: 4)
+            } else {
+                Text("No goals set")
+                    .font(.roundedCaption)
+                    .foregroundStyle(Color.textSecondary)
+
+                Text("Add goals in your plan")
+                    .font(.system(.caption2, design: .rounded))
+                    .foregroundStyle(Color.textSecondary)
             }
-            .frame(height: 4)
         }
         .padding()
         .frame(maxWidth: .infinity, minHeight: 120, alignment: .leading)
@@ -221,5 +317,5 @@ struct GoalProgressCard: View {
 // MARK: - Preview
 
 #Preview {
-    WalletView()
+    WalletView(viewModel: SpendingPlanViewModel())
 }

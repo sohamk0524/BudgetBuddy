@@ -37,7 +37,7 @@ struct ContentView: View {
                 .tag(0)
 
             // Tab 2: Wallet (Dashboard)
-            WalletView()
+            WalletView(viewModel: planViewModel)
                 .tabItem {
                     Label("Wallet", systemImage: "wallet.pass.fill")
                 }
