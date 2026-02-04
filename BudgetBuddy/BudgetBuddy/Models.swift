@@ -124,6 +124,8 @@ struct SankeyNode: Codable, Equatable, Identifiable {
 // MARK: - Spending Plan Models
 
 struct SpendingPlanInput: Codable {
+    var housingSituation: String  // "rent", "own", "family"
+    var debtTypes: [String]  // ["student_loans", "credit_cards", "car", "none"]
     var fixedExpenses: FixedExpenses
     var variableSpending: VariableSpending
     var upcomingEvents: [UpcomingEvent]
@@ -131,6 +133,8 @@ struct SpendingPlanInput: Codable {
     var spendingPreferences: SpendingPreferences
 
     init() {
+        self.housingSituation = "rent"
+        self.debtTypes = []
         self.fixedExpenses = FixedExpenses()
         self.variableSpending = VariableSpending()
         self.upcomingEvents = []

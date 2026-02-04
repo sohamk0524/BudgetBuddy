@@ -9,24 +9,21 @@ import SwiftUI
 
 struct OnboardingWizardView: View {
     @State private var currentPage = 0
-    @State private var monthlyIncome: String = ""
-    @State private var fixedExpenses: String = ""
-    @State private var savingsGoalName: String = ""
-    @State private var savingsGoalTarget: String = ""
 
-    // New profile fields
+    // General profile fields
+    @State private var age: String = ""
+    @State private var occupation: String = ""
+    @State private var monthlyIncome: String = ""
     @State private var incomeFrequency: String = "monthly"
-    @State private var housingSituation: String = "rent"
-    @State private var selectedDebtTypes: Set<String> = []
     @State private var financialPersonality: String = "balanced"
     @State private var primaryGoal: String = "stability"
 
     var authManager = AuthManager.shared
 
-    private let totalPages = 8
+    private let totalPages = 6
 
     private var canFinish: Bool {
-        !monthlyIncome.isEmpty && !fixedExpenses.isEmpty
+        !monthlyIncome.isEmpty
     }
 
     var body: some View {
@@ -61,7 +58,15 @@ struct OnboardingWizardView: View {
 
                 // Pages
                 TabView(selection: $currentPage) {
-                    // Page 1: Monthly Income
+                    // Page 1: Age
+                    AgePage(age: $age)
+                        .tag(0)
+
+                    // Page 2: Occupation
+                    OccupationPage(occupation: $occupation)
+                        .tag(1)
+
+                    // Page 3: Monthly Income
                     OnboardingPage(
                         icon: "dollarsign.circle.fill",
                         title: "Monthly Income",
@@ -70,45 +75,19 @@ struct OnboardingWizardView: View {
                         text: $monthlyIncome,
                         keyboardType: .decimalPad
                     )
-                    .tag(0)
+                    .tag(2)
 
-                    // Page 2: Income Frequency
+                    // Page 4: Income Frequency
                     IncomeFrequencyPage(selectedFrequency: $incomeFrequency)
-                        .tag(1)
+                        .tag(3)
 
-                    // Page 3: Housing Situation
-                    HousingSituationPage(selectedSituation: $housingSituation)
-                        .tag(2)
-
-                    // Page 4: Fixed Expenses
-                    OnboardingPage(
-                        icon: "house.fill",
-                        title: "Fixed Expenses",
-                        subtitle: "Rent, utilities, subscriptions, and other recurring bills",
-                        placeholder: "e.g., 2000",
-                        text: $fixedExpenses,
-                        keyboardType: .decimalPad
-                    )
-                    .tag(3)
-
-                    // Page 5: Debt Obligations
-                    DebtTypesPage(selectedDebtTypes: $selectedDebtTypes)
+                    // Page 5: Financial Personality
+                    FinancialPersonalityPage(selectedPersonality: $financialPersonality)
                         .tag(4)
 
-                    // Page 6: Financial Personality
-                    FinancialPersonalityPage(selectedPersonality: $financialPersonality)
-                        .tag(5)
-
-                    // Page 7: Primary Goal
+                    // Page 6: Primary Goal
                     PrimaryGoalPage(selectedGoal: $primaryGoal)
-                        .tag(6)
-
-                    // Page 8: Savings Goal
-                    SavingsGoalPage(
-                        goalName: $savingsGoalName,
-                        goalTarget: $savingsGoalTarget
-                    )
-                    .tag(7)
+                        .tag(5)
                 }
                 .tabViewStyle(.page(indexDisplayMode: .never))
 
@@ -177,18 +156,14 @@ struct OnboardingWizardView: View {
 
     private func finishOnboarding() {
         let income = Double(monthlyIncome) ?? 0.0
-        let expenses = Double(fixedExpenses) ?? 0.0
-        let goalTarget = Double(savingsGoalTarget) ?? 0.0
+        let ageInt = Int(age) ?? 0
 
         Task {
             await authManager.completeOnboarding(
+                age: ageInt,
+                occupation: occupation,
                 income: income,
-                expenses: expenses,
-                goalName: savingsGoalName,
-                goalTarget: goalTarget,
                 incomeFrequency: incomeFrequency,
-                housingSituation: housingSituation,
-                debtTypes: Array(selectedDebtTypes),
                 financialPersonality: financialPersonality,
                 primaryGoal: primaryGoal
             )
@@ -241,6 +216,88 @@ struct OnboardingPage: View {
             .background(Color.surface)
             .clipShape(RoundedRectangle(cornerRadius: 16))
             .padding(.horizontal, 48)
+
+            Spacer()
+        }
+        .padding(.top, 24)
+    }
+}
+
+// MARK: - Age Page
+
+struct AgePage: View {
+    @Binding var age: String
+
+    var body: some View {
+        VStack(spacing: 24) {
+            Image(systemName: "person.fill")
+                .font(.system(size: 56))
+                .foregroundStyle(Color.accent)
+
+            Text("Your Age")
+                .font(.roundedHeadline)
+                .foregroundStyle(Color.textPrimary)
+
+            Text("This helps us tailor advice for your life stage")
+                .font(.roundedBody)
+                .foregroundStyle(Color.textSecondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 32)
+
+            TextField("e.g., 25", text: $age)
+                .font(.roundedTitle)
+                .foregroundStyle(Color.textPrimary)
+                .keyboardType(.numberPad)
+                .multilineTextAlignment(.center)
+                .padding()
+                .background(Color.surface)
+                .clipShape(RoundedRectangle(cornerRadius: 16))
+                .padding(.horizontal, 48)
+
+            Spacer()
+        }
+        .padding(.top, 24)
+    }
+}
+
+// MARK: - Occupation Page
+
+struct OccupationPage: View {
+    @Binding var occupation: String
+
+    private let options = [
+        ("student", "Student", "Currently in school or university"),
+        ("employed", "Employed", "Working full-time or part-time"),
+        ("self_employed", "Self-Employed", "Freelancer or business owner"),
+        ("retired", "Retired", "No longer working")
+    ]
+
+    var body: some View {
+        VStack(spacing: 24) {
+            Image(systemName: "briefcase.fill")
+                .font(.system(size: 56))
+                .foregroundStyle(Color.accent)
+
+            Text("Your Occupation")
+                .font(.roundedHeadline)
+                .foregroundStyle(Color.textPrimary)
+
+            Text("What best describes your work situation?")
+                .font(.roundedBody)
+                .foregroundStyle(Color.textSecondary)
+
+            VStack(spacing: 12) {
+                ForEach(options, id: \.0) { value, title, subtitle in
+                    SelectableOptionCard(
+                        title: title,
+                        subtitle: subtitle,
+                        isSelected: occupation == value
+                    ) {
+                        occupation = value
+                    }
+                }
+            }
+            .padding(.horizontal, 24)
 
             Spacer()
         }
@@ -404,7 +461,7 @@ struct FinancialPersonalityPage: View {
     private let options = [
         ("aggressive_saver", "Aggressive Saver", "I prioritize saving over spending"),
         ("balanced", "Balanced", "I maintain a healthy balance"),
-        ("paycheck_to_paycheck", "Living Paycheck-to-Paycheck", "Most of my income goes to expenses")
+        ("relaxed", "Relaxed", "Most of my income goes to expenses")
     ]
 
     var body: some View {
@@ -482,72 +539,6 @@ struct PrimaryGoalPage: View {
                 }
             }
             .padding(.horizontal, 24)
-
-            Spacer()
-        }
-        .padding(.top, 24)
-    }
-}
-
-// MARK: - Savings Goal Page
-
-struct SavingsGoalPage: View {
-    @Binding var goalName: String
-    @Binding var goalTarget: String
-
-    var body: some View {
-        VStack(spacing: 24) {
-            // Icon
-            Image(systemName: "target")
-                .font(.system(size: 56))
-                .foregroundStyle(Color.accent)
-
-            // Title
-            Text("Savings Goal")
-                .font(.roundedHeadline)
-                .foregroundStyle(Color.textPrimary)
-
-            // Subtitle
-            Text("What are you saving for? (Optional)")
-                .font(.roundedBody)
-                .foregroundStyle(Color.textSecondary)
-
-            // Goal Name
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Goal Name")
-                    .font(.roundedCaption)
-                    .foregroundStyle(Color.textSecondary)
-
-                TextField("e.g., Vacation, Car, Emergency Fund", text: $goalName)
-                    .font(.roundedBody)
-                    .foregroundStyle(Color.textPrimary)
-                    .padding()
-                    .background(Color.surface)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-            }
-            .padding(.horizontal, 32)
-
-            // Goal Amount
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Target Amount")
-                    .font(.roundedCaption)
-                    .foregroundStyle(Color.textSecondary)
-
-                HStack {
-                    Text("$")
-                        .font(.roundedBody)
-                        .foregroundStyle(Color.textSecondary)
-
-                    TextField("e.g., 10000", text: $goalTarget)
-                        .font(.roundedBody)
-                        .foregroundStyle(Color.textPrimary)
-                        .keyboardType(.decimalPad)
-                }
-                .padding()
-                .background(Color.surface)
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-            }
-            .padding(.horizontal, 32)
 
             Spacer()
         }

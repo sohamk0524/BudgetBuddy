@@ -42,11 +42,30 @@ final class SpendingPlanViewModel {
             case savingsGoals
             case transportationType
             case multiSelect(options: [(String, String)])
+            case housingSituation
+            case debtTypes
         }
     }
 
     var questions: [Question] {
         var qs: [Question] = []
+
+        // Housing & Debt (moved from onboarding)
+        qs.append(Question(
+            id: "housing",
+            category: "Your Situation",
+            title: "Housing Situation",
+            subtitle: "What's your current living arrangement?",
+            type: .housingSituation
+        ))
+
+        qs.append(Question(
+            id: "debt",
+            category: "Your Situation",
+            title: "Debt Obligations",
+            subtitle: "Select all that apply",
+            type: .debtTypes
+        ))
 
         // Fixed Expenses
         qs.append(Question(
