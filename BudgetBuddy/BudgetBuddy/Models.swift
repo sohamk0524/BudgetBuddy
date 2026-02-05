@@ -23,6 +23,13 @@ enum VisualComponent: Codable, Equatable {
     case burndownChart(spent: Double, budget: Double, idealPace: Double)
     case budgetSlider(category: String, current: Double, max: Double)
     case spendingPlan(safeToSpend: Double, categories: [BudgetCategory])
+    // Phase 2: New visual payload types
+    case comparisonChart(data: ComparisonChartData)
+    case goalProgress(data: GoalProgressData)
+    case transactionList(data: TransactionListData)
+    case actionCard(data: ActionCardData)
+    case categoryBreakdown(data: CategoryBreakdownData)
+    case insightCard(data: InsightCardData)
 
     // Custom coding for complex associated values
     enum CodingKeys: String, CodingKey {
@@ -37,6 +44,27 @@ enum VisualComponent: Codable, Equatable {
         case idealPace
         case safeToSpend
         case categories
+        // Phase 2 keys
+        case currentPeriod
+        case previousPeriod
+        case changePercent
+        case goals
+        case totalCurrent
+        case totalTarget
+        case overallProgress
+        case transactions
+        case filters
+        case summary
+        case title
+        case message
+        case actions
+        case icon
+        case severity
+        case total
+        case insight
+        case dataPoints
+        case trend
+        case recommendation
     }
 
     init(from decoder: Decoder) throws {
@@ -69,8 +97,27 @@ enum VisualComponent: Codable, Equatable {
             let safeToSpend = try container.decode(Double.self, forKey: .safeToSpend)
             let categories = try container.decode([BudgetCategory].self, forKey: .categories)
             self = .spendingPlan(safeToSpend: safeToSpend, categories: categories)
+        // Phase 2: New visual types
+        case "comparisonChart":
+            let data = try ComparisonChartData(from: decoder)
+            self = .comparisonChart(data: data)
+        case "goalProgress":
+            let data = try GoalProgressData(from: decoder)
+            self = .goalProgress(data: data)
+        case "transactionList":
+            let data = try TransactionListData(from: decoder)
+            self = .transactionList(data: data)
+        case "actionCard":
+            let data = try ActionCardData(from: decoder)
+            self = .actionCard(data: data)
+        case "categoryBreakdown":
+            let data = try CategoryBreakdownData(from: decoder)
+            self = .categoryBreakdown(data: data)
+        case "insightCard":
+            let data = try InsightCardData(from: decoder)
+            self = .insightCard(data: data)
         default:
-            throw DecodingError.dataCorruptedError(forKey: .type, in: container, debugDescription: "Unknown type")
+            throw DecodingError.dataCorruptedError(forKey: .type, in: container, debugDescription: "Unknown type: \(type)")
         }
     }
 
@@ -103,6 +150,25 @@ enum VisualComponent: Codable, Equatable {
             try container.encode("spendingPlan", forKey: .type)
             try container.encode(safeToSpend, forKey: .safeToSpend)
             try container.encode(categories, forKey: .categories)
+        // Phase 2: Encode new visual types
+        case .comparisonChart(let data):
+            try container.encode("comparisonChart", forKey: .type)
+            try data.encode(to: encoder)
+        case .goalProgress(let data):
+            try container.encode("goalProgress", forKey: .type)
+            try data.encode(to: encoder)
+        case .transactionList(let data):
+            try container.encode("transactionList", forKey: .type)
+            try data.encode(to: encoder)
+        case .actionCard(let data):
+            try container.encode("actionCard", forKey: .type)
+            try data.encode(to: encoder)
+        case .categoryBreakdown(let data):
+            try container.encode("categoryBreakdown", forKey: .type)
+            try data.encode(to: encoder)
+        case .insightCard(let data):
+            try container.encode("insightCard", forKey: .type)
+            try data.encode(to: encoder)
         }
     }
 }
@@ -119,6 +185,157 @@ struct SankeyNode: Codable, Equatable, Identifiable {
     let id: String
     let name: String
     let value: Double
+}
+
+// MARK: - Phase 2 Visual Data Structures
+
+struct ComparisonChartData: Codable, Equatable {
+    let currentPeriod: PeriodData
+    let previousPeriod: PeriodData
+    let categories: [CategoryComparison]?
+    let changePercent: Double
+
+    enum CodingKeys: String, CodingKey {
+        case currentPeriod
+        case previousPeriod
+        case categories
+        case changePercent
+    }
+}
+
+struct PeriodData: Codable, Equatable {
+    let label: String
+    let total: Double
+    let startDate: String?
+    let endDate: String?
+}
+
+struct CategoryComparison: Codable, Equatable, Identifiable {
+    var id: String { name }
+    let name: String
+    let current: Double
+    let previous: Double
+}
+
+struct GoalProgressData: Codable, Equatable {
+    let goals: [GoalProgressItem]
+    let totalCurrent: Double
+    let totalTarget: Double
+    let overallProgress: Double
+}
+
+struct GoalProgressItem: Codable, Equatable, Identifiable {
+    var id: String { name }
+    let name: String
+    let current: Double
+    let target: Double
+    let progressPercent: Double
+    let remaining: Double
+    let icon: String?
+    let color: String?
+}
+
+struct TransactionListData: Codable, Equatable {
+    let transactions: [TransactionItem]
+    let filters: TransactionFilters?
+    let summary: TransactionSummary
+}
+
+struct TransactionItem: Codable, Equatable, Identifiable {
+    let id: String
+    let description: String
+    let amount: Double
+    let isExpense: Bool
+    let category: String
+    let date: String?
+    let merchant: String?
+    let icon: String?
+}
+
+struct TransactionFilters: Codable, Equatable {
+    let category: String?
+    let dateRange: DateRange?
+    let amountRange: AmountRange?
+}
+
+struct DateRange: Codable, Equatable {
+    let start: String?
+    let end: String?
+}
+
+struct AmountRange: Codable, Equatable {
+    let min: Double?
+    let max: Double?
+}
+
+struct TransactionSummary: Codable, Equatable {
+    let totalIncome: Double
+    let totalExpenses: Double
+    let count: Int
+}
+
+struct ActionCardData: Codable, Equatable {
+    let title: String
+    let message: String
+    let actions: [ActionButton]
+    let icon: String?
+    let severity: String
+}
+
+struct ActionButton: Codable, Equatable, Identifiable {
+    var id: String { label + action }
+    let label: String
+    let action: String
+    let style: String
+    let data: [String: String]?
+
+    enum CodingKeys: String, CodingKey {
+        case label, action, style, data
+    }
+
+    // Memberwise initializer for creating instances in code
+    init(label: String, action: String, style: String = "primary", data: [String: String]? = nil) {
+        self.label = label
+        self.action = action
+        self.style = style
+        self.data = data
+    }
+
+    // Decoder initializer for JSON parsing
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        label = try container.decode(String.self, forKey: .label)
+        action = try container.decode(String.self, forKey: .action)
+        style = try container.decodeIfPresent(String.self, forKey: .style) ?? "primary"
+        data = try container.decodeIfPresent([String: String].self, forKey: .data)
+    }
+}
+
+struct CategoryBreakdownData: Codable, Equatable {
+    let categories: [CategoryBreakdownItem]
+    let total: Double
+}
+
+struct CategoryBreakdownItem: Codable, Equatable, Identifiable {
+    var id: String { name }
+    let name: String
+    let amount: Double
+    let percent: Double
+    let color: String?
+}
+
+struct InsightCardData: Codable, Equatable {
+    let title: String
+    let insight: String
+    let dataPoints: [InsightDataPoint]?
+    let trend: String?
+    let recommendation: String?
+}
+
+struct InsightDataPoint: Codable, Equatable, Identifiable {
+    var id: String { label }
+    let label: String
+    let value: String
 }
 
 // MARK: - Spending Plan Models
