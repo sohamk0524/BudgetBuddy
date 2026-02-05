@@ -22,17 +22,21 @@ class FinancialProfile(db.Model):
     """User's financial profile from onboarding."""
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+
+    # General profile fields (from onboarding)
+    age = db.Column(db.Integer)  # User's age
+    occupation = db.Column(db.String(30))  # "student", "employed", "self_employed", "retired"
     monthly_income = db.Column(db.Float, default=0.0)
+    income_frequency = db.Column(db.String(20))  # "biweekly", "monthly", "irregular"
+    financial_personality = db.Column(db.String(30))  # "aggressive_saver", "balanced", "paycheck_to_paycheck"
+    primary_goal = db.Column(db.String(30))  # "emergency_fund", "pay_debt", "save_purchase", "stability"
+
+    # Legacy fields (kept for backward compatibility, now collected during plan creation)
     fixed_expenses = db.Column(db.Float, default=0.0)
     savings_goal_name = db.Column(db.String(100))
     savings_goal_target = db.Column(db.Float, default=0.0)
-
-    # New fields for expanded onboarding
-    income_frequency = db.Column(db.String(20))  # "biweekly", "monthly", "irregular"
     housing_situation = db.Column(db.String(20))  # "rent", "own", "family"
     debt_types = db.Column(db.String(200))  # JSON array: ["student_loans", "credit_cards", "car"]
-    financial_personality = db.Column(db.String(30))  # "aggressive_saver", "balanced", "paycheck_to_paycheck"
-    primary_goal = db.Column(db.String(30))  # "emergency_fund", "pay_debt", "save_purchase", "stability"
 
 
 class BudgetPlan(db.Model):

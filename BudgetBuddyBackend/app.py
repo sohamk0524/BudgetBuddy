@@ -126,18 +126,15 @@ def login():
 @app.route("/onboarding", methods=["POST"])
 def onboarding():
     """
-    Save user's financial profile from onboarding.
+    Save user's general profile from onboarding.
 
     Expected request body:
     {
         "userId": 1,
+        "age": 25,
+        "occupation": "employed",
         "income": 5000.0,
-        "expenses": 2000.0,
-        "goalName": "Car",
-        "goalTarget": 10000.0,
         "incomeFrequency": "monthly",
-        "housingSituation": "rent",
-        "debtTypes": ["student_loans", "credit_cards"],
         "financialPersonality": "balanced",
         "primaryGoal": "emergency_fund"
     }
@@ -153,21 +150,12 @@ def onboarding():
         return jsonify({"error": "Request body must be JSON"}), 400
 
     user_id = data.get("userId")
+    age = data.get("age", 0)
+    occupation = data.get("occupation", "")
     income = data.get("income", 0.0)
-    expenses = data.get("expenses", 0.0)
-    goal_name = data.get("goalName", "")
-    goal_target = data.get("goalTarget", 0.0)
-
-    # New fields
     income_frequency = data.get("incomeFrequency", "monthly")
-    housing_situation = data.get("housingSituation", "rent")
-    debt_types = data.get("debtTypes", [])
     financial_personality = data.get("financialPersonality", "balanced")
     primary_goal = data.get("primaryGoal", "stability")
-
-    # Convert debt_types list to JSON string for storage
-    import json
-    debt_types_json = json.dumps(debt_types) if isinstance(debt_types, list) else debt_types
 
     if not user_id:
         return jsonify({"error": "userId is required"}), 400
@@ -180,26 +168,20 @@ def onboarding():
     # Check if profile already exists
     if user.profile:
         # Update existing profile
+        user.profile.age = age
+        user.profile.occupation = occupation
         user.profile.monthly_income = income
-        user.profile.fixed_expenses = expenses
-        user.profile.savings_goal_name = goal_name
-        user.profile.savings_goal_target = goal_target
         user.profile.income_frequency = income_frequency
-        user.profile.housing_situation = housing_situation
-        user.profile.debt_types = debt_types_json
         user.profile.financial_personality = financial_personality
         user.profile.primary_goal = primary_goal
     else:
         # Create new profile
         profile = FinancialProfile(
             user_id=user_id,
+            age=age,
+            occupation=occupation,
             monthly_income=income,
-            fixed_expenses=expenses,
-            savings_goal_name=goal_name,
-            savings_goal_target=goal_target,
             income_frequency=income_frequency,
-            housing_situation=housing_situation,
-            debt_types=debt_types_json,
             financial_personality=financial_personality,
             primary_goal=primary_goal
         )

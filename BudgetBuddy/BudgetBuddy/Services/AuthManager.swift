@@ -148,13 +148,10 @@ class AuthManager {
     // MARK: - Complete Onboarding
 
     func completeOnboarding(
+        age: Int,
+        occupation: String,
         income: Double,
-        expenses: Double,
-        goalName: String,
-        goalTarget: Double,
         incomeFrequency: String = "monthly",
-        housingSituation: String = "rent",
-        debtTypes: [String] = [],
         financialPersonality: String = "balanced",
         primaryGoal: String = "stability"
     ) async {
@@ -173,13 +170,10 @@ class AuthManager {
 
             let body: [String: Any] = [
                 "userId": userId,
+                "age": age,
+                "occupation": occupation,
                 "income": income,
-                "expenses": expenses,
-                "goalName": goalName,
-                "goalTarget": goalTarget,
                 "incomeFrequency": incomeFrequency,
-                "housingSituation": housingSituation,
-                "debtTypes": debtTypes,
                 "financialPersonality": financialPersonality,
                 "primaryGoal": primaryGoal
             ]

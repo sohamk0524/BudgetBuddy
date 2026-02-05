@@ -12,15 +12,18 @@ from services.llm_service import BudgetBuddyAgent
 # System prompt for plan generation
 PLAN_GENERATION_PROMPT = """You are BudgetBuddy's financial planning assistant. Generate a personalized monthly spending plan based on the user's financial data.
 
-USER FINANCIAL PROFILE:
+USER PROFILE:
+- Age: {age}
+- Occupation: {occupation}
 - Monthly Income: ${monthly_income:,.2f}
 - Income Frequency: {income_frequency}
+- Financial Personality: {financial_personality}
+- Primary Goal: {primary_goal}
+
+FINANCIAL SITUATION:
 - Housing Situation: {housing_situation}
 - Fixed Expenses: ${fixed_expenses:,.2f}
 - Debt Types: {debt_types}
-- Financial Personality: {financial_personality}
-- Primary Goal: {primary_goal}
-- Savings Goal: {savings_goal_name} (${savings_goal_target:,.2f})
 
 DETAILED EXPENSES FROM DEEP DIVE:
 {detailed_expenses}
@@ -85,6 +88,8 @@ def get_full_user_profile(user_id: int) -> Optional[Dict[str, Any]]:
                     debt_types = []
 
             return {
+                "age": profile.age or 0,
+                "occupation": profile.occupation or "Not specified",
                 "monthly_income": profile.monthly_income or 0,
                 "fixed_expenses": profile.fixed_expenses or 0,
                 "savings_goal_name": profile.savings_goal_name or "",
@@ -212,17 +217,28 @@ def generate_plan(user_id: int, deep_dive_data: Dict[str, Any]) -> Dict[str, Any
             "plan": None
         }
 
+    # Get housing and debt from deep_dive_data (now collected during plan creation)
+    housing_situation = deep_dive_data.get("housingSituation", profile.get("housing_situation", "rent"))
+    debt_types = deep_dive_data.get("debtTypes", profile.get("debt_types", []))
+
+    # Calculate fixed expenses from deep dive data
+    fixed_expenses_data = deep_dive_data.get("fixedExpenses", {})
+    rent = fixed_expenses_data.get("rent", 0)
+    utilities = fixed_expenses_data.get("utilities", 0)
+    subscriptions = sum(s.get("amount", 0) for s in fixed_expenses_data.get("subscriptions", []))
+    calculated_fixed = rent + utilities + subscriptions
+
     # Format the prompt with user data
     prompt_data = {
+        "age": profile.get("age", 0) or "Not specified",
+        "occupation": (profile.get("occupation", "") or "Not specified").replace("_", " ").title(),
         "monthly_income": profile["monthly_income"],
         "income_frequency": profile["income_frequency"],
-        "housing_situation": profile["housing_situation"],
-        "fixed_expenses": profile["fixed_expenses"],
-        "debt_types": ", ".join(profile["debt_types"]) if profile["debt_types"] else "None",
+        "housing_situation": housing_situation.replace("_", " ").title(),
+        "fixed_expenses": calculated_fixed if calculated_fixed > 0 else profile.get("fixed_expenses", 0),
+        "debt_types": ", ".join(d.replace("_", " ").title() for d in debt_types) if debt_types else "None",
         "financial_personality": profile["financial_personality"].replace("_", " ").title(),
         "primary_goal": profile["primary_goal"].replace("_", " ").title(),
-        "savings_goal_name": profile["savings_goal_name"] or "Not specified",
-        "savings_goal_target": profile["savings_goal_target"],
         "detailed_expenses": format_deep_dive_data(deep_dive_data),
         "upcoming_events": format_upcoming_events(deep_dive_data.get("upcomingEvents", [])),
         "savings_goals": format_savings_goals(deep_dive_data.get("savingsGoals", [])),

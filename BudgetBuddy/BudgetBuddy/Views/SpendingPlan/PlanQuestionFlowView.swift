@@ -174,6 +174,16 @@ struct PlanQuestionFlowView: View {
 
         case .multiSelect:
             EmptyView() // Placeholder
+
+        case .housingSituation:
+            HousingSituationInputView(
+                selection: $viewModel.planInput.housingSituation
+            )
+
+        case .debtTypes:
+            DebtTypesInputView(
+                selectedTypes: $viewModel.planInput.debtTypes
+            )
         }
     }
 
@@ -656,6 +666,120 @@ struct SavingsGoalsInputView: View {
                 .padding()
                 .background(Color.surface)
                 .clipShape(RoundedRectangle(cornerRadius: 12))
+            }
+        }
+    }
+}
+
+// MARK: - Housing Situation Input
+
+struct HousingSituationInputView: View {
+    @Binding var selection: String
+
+    private let options = [
+        ("rent", "Renting", "I pay rent monthly"),
+        ("own", "Own Home", "I have a mortgage or own outright"),
+        ("family", "Living with Family", "No housing payment")
+    ]
+
+    var body: some View {
+        VStack(spacing: 12) {
+            ForEach(options, id: \.0) { value, title, subtitle in
+                Button {
+                    selection = value
+                } label: {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(title)
+                                .font(.roundedHeadline)
+                                .foregroundStyle(Color.textPrimary)
+
+                            Text(subtitle)
+                                .font(.roundedCaption)
+                                .foregroundStyle(Color.textSecondary)
+                        }
+
+                        Spacer()
+
+                        Image(systemName: selection == value ? "checkmark.circle.fill" : "circle")
+                            .font(.title2)
+                            .foregroundStyle(selection == value ? Color.accent : Color.textSecondary)
+                    }
+                    .padding()
+                    .background(selection == value ? Color.accent.opacity(0.15) : Color.surface)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(selection == value ? Color.accent : Color.clear, lineWidth: 2)
+                    )
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Debt Types Input
+
+struct DebtTypesInputView: View {
+    @Binding var selectedTypes: [String]
+
+    private let options = [
+        ("student_loans", "Student Loans", "Education debt"),
+        ("credit_cards", "Credit Cards", "Revolving credit"),
+        ("car", "Car Payment", "Auto loan"),
+        ("none", "No Debt", "Debt-free")
+    ]
+
+    var body: some View {
+        VStack(spacing: 12) {
+            ForEach(options, id: \.0) { value, title, subtitle in
+                Button {
+                    toggleSelection(value)
+                } label: {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(title)
+                                .font(.roundedHeadline)
+                                .foregroundStyle(Color.textPrimary)
+
+                            Text(subtitle)
+                                .font(.roundedCaption)
+                                .foregroundStyle(Color.textSecondary)
+                        }
+
+                        Spacer()
+
+                        Image(systemName: selectedTypes.contains(value) ? "checkmark.square.fill" : "square")
+                            .font(.title2)
+                            .foregroundStyle(selectedTypes.contains(value) ? Color.accent : Color.textSecondary)
+                    }
+                    .padding()
+                    .background(selectedTypes.contains(value) ? Color.accent.opacity(0.15) : Color.surface)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(selectedTypes.contains(value) ? Color.accent : Color.clear, lineWidth: 2)
+                    )
+                }
+            }
+        }
+    }
+
+    private func toggleSelection(_ value: String) {
+        if value == "none" {
+            // If "No Debt" is selected, clear all others
+            if selectedTypes.contains(value) {
+                selectedTypes.removeAll { $0 == value }
+            } else {
+                selectedTypes = [value]
+            }
+        } else {
+            // Remove "none" if selecting a debt type
+            selectedTypes.removeAll { $0 == "none" }
+            if selectedTypes.contains(value) {
+                selectedTypes.removeAll { $0 == value }
+            } else {
+                selectedTypes.append(value)
             }
         }
     }
