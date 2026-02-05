@@ -80,6 +80,21 @@ class VisualPayload:
             "max": max_val
         }
 
+    @staticmethod
+    def spending_plan(safe_to_spend: float, categories: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """
+        Create a spending plan payload showing budget categories.
+
+        Args:
+            safe_to_spend: Amount safe to spend this period
+            categories: List of category dicts with 'name', 'amount', etc.
+        """
+        return {
+            "type": "spendingPlan",
+            "safeToSpend": safe_to_spend,
+            "categories": categories
+        }
+
 
 @dataclass
 class AssistantResponse:

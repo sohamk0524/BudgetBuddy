@@ -27,7 +27,8 @@ class AuthManager {
         }
     }
 
-    private let baseURL = URL(string: "http://127.0.0.1:5000")!
+    /// For physical devices, change to your Mac's IP address (run: ipconfig getifaddr en0)
+    private let baseURL = URL(string: "http://localhost:5000")!
 
     init() {
         if let token = UserDefaults.standard.value(forKey: "authToken") as? Int {

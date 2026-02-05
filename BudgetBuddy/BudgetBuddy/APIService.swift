@@ -16,7 +16,8 @@ actor APIService {
     private let baseURL: URL
 
     /// Shared instance using localhost (for simulator)
-    static let shared = APIService(host: "127.0.0.1", port: 5000)
+    /// For physical devices, change to your Mac's IP address (run: ipconfig getifaddr en0)
+    static let shared = APIService(host: "localhost", port: 5000)
 
     // MARK: - Initialization
 
