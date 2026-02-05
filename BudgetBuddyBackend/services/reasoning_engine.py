@@ -123,7 +123,8 @@ class ReasoningEngine:
         if system_prompt is None:
             system_prompt = self._conversations.build_system_prompt(
                 user_profile=user_profile,
-                financial_summary=financial_summary
+                financial_summary=financial_summary,
+                user_id=user_id
             )
 
         # Build tool context
@@ -338,13 +339,25 @@ class ReasoningEngine:
         session_id: Optional[str]
     ) -> ToolContext:
         """Build tool context from user information."""
+        # Check if user has a budget plan
+        has_plan = False
+        has_statement = False
+        try:
+            from db_models import BudgetPlan, SavedStatement
+            plan = BudgetPlan.query.filter_by(user_id=user_id).first()
+            has_plan = plan is not None
+            statement = SavedStatement.query.filter_by(user_id=user_id).first()
+            has_statement = statement is not None
+        except Exception as e:
+            logger.debug(f"Could not check user plan/statement status: {e}")
+
         return ToolContext(
             user_id=user_id,
             session_id=session_id,
             is_authenticated=True,
             has_profile=user_profile is not None,
-            has_plan=False,  # TODO: Check from database
-            has_statement=False,  # TODO: Check from database
+            has_plan=has_plan,
+            has_statement=has_statement,
         )
 
     def _should_use_tools(self, text: str) -> bool:

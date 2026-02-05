@@ -153,9 +153,33 @@ def get_spending_status_data() -> Dict[str, Any]:
         status = "over_budget"
         status_message = "Heads up! You're spending faster than planned."
 
+    # Build detailed category analysis for LLM to use
+    category_analysis = []
+    for category, spent in CURRENT_MONTH_SPENDING.items():
+        budgeted = BUDGET_ALLOCATIONS.get(category, 0)
+        remaining = budgeted - spent
+        pct_used = (spent / budgeted * 100) if budgeted > 0 else 0
+        status_cat = "over_budget" if spent > budgeted else ("on_track" if pct_used > 70 else "under_budget")
+        category_analysis.append({
+            "category": category,
+            "spent": spent,
+            "budgeted": budgeted,
+            "remaining": remaining,
+            "percentUsed": round(pct_used, 1),
+            "status": status_cat
+        })
+
+    # Sort by spending amount (highest first) for easy identification of top spending areas
+    category_analysis.sort(key=lambda x: x["spent"], reverse=True)
+
+    # Identify top spending categories and potential savings opportunities
+    top_discretionary = [c for c in category_analysis if c["category"] in ["Dining Out", "Entertainment", "Shopping", "Subscriptions"] and c["spent"] > 0]
+    over_budget_categories = [c for c in category_analysis if c["status"] == "over_budget"]
+
     return {
         "spent": total_spent,
         "budget": total_budget,
+        "remaining": total_budget - total_spent,
         "idealPace": round(ideal_pace, 2),
         "dayOfMonth": day_of_month,
         "daysRemaining": days_remaining,
@@ -163,7 +187,14 @@ def get_spending_status_data() -> Dict[str, Any]:
         "projectedEndOfMonth": round(projected_end_of_month, 2),
         "status": status,
         "statusMessage": status_message,
-        "categoryBreakdown": CURRENT_MONTH_SPENDING.copy()
+        "categoryBreakdown": CURRENT_MONTH_SPENDING.copy(),
+        "categoryAnalysis": category_analysis,
+        "topDiscretionarySpending": top_discretionary[:3],
+        "overBudgetCategories": over_budget_categories,
+        "savingOpportunities": [
+            f"Reduce {c['category']} by ${min(50, c['spent'] * 0.2):.0f}/month"
+            for c in top_discretionary[:2] if c["spent"] > 50
+        ]
     }
 
 

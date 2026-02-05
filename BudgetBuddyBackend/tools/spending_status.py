@@ -55,7 +55,7 @@ class SpendingStatusTool(Tool):
             ),
         ],
 
-        requires=["authenticated"],
+        requires=["authenticated", "has_plan"],
         produces=["data:spending_status", "visual:burndownChart"],
         side_effects=[],
         confirmation_required=False,

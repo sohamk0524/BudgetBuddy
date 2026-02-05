@@ -53,7 +53,7 @@ class BudgetOverviewTool(Tool):
             ),
         ],
 
-        requires=["authenticated"],
+        requires=["authenticated", "has_plan"],
         produces=["data:budget_breakdown", "visual:sankeyFlow"],
         side_effects=[],
         confirmation_required=False,
