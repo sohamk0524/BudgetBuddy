@@ -56,6 +56,7 @@ enum QuickActionSubMenu: String, Identifiable {
 struct QuickActionSubMenuView: View {
     let menu: QuickActionSubMenu
     let onSendPrompt: (String) -> Void
+    let onPrefillType: ((String) -> Void)?
     @Environment(\.dismiss) private var dismiss
 
     // "I just spent..." state
@@ -109,34 +110,41 @@ struct QuickActionSubMenuView: View {
     private let cravingOptions = [
         ("Coffee", "CoHo / Peet's"),
         ("Boba", "Lazi Cow / Sharetea"),
-        ("Late Night", "In-N-Out / Ali Baba"),
+        ("Sandwiches", "Ike's / Subway"),
+        ("Asian Food", "Nobu Hachi / Thai Canteen"),
+        ("Halal", "Shah's / Ali Baba"),
+        ("Late Night", "In-N-Out / IHOP"),
     ]
 
     private var cravingSubMenuView: some View {
-        VStack(spacing: 12) {
-            ForEach(cravingOptions, id: \.0) { name, detail in
-                Button {
-                    send("I'm craving \(name)")
-                } label: {
-                    HStack {
-                        Text(name)
-                            .font(.roundedHeadline)
-                            .foregroundStyle(Color.textPrimary)
-                        Spacer()
-                        Text(detail)
-                            .font(.roundedCaption)
-                            .foregroundStyle(Color.textSecondary)
-                        Image(systemName: "chevron.right")
-                            .foregroundStyle(Color.textSecondary)
+        ScrollView {
+            VStack(spacing: 12) {
+                ForEach(cravingOptions, id: \.0) { name, detail in
+                    Button {
+                        send("I'm craving \(name)")
+                    } label: {
+                        HStack {
+                            Text(name)
+                                .font(.roundedHeadline)
+                                .foregroundStyle(Color.textPrimary)
+                            Spacer()
+                            Text(detail)
+                                .font(.roundedCaption)
+                                .foregroundStyle(Color.textSecondary)
+                            Image(systemName: "chevron.right")
+                                .foregroundStyle(Color.textSecondary)
+                        }
+                        .padding()
+                        .background(Color.surface)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
                     }
-                    .padding()
-                    .background(Color.surface)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
+
+                // Let me type fallback
+                typeOwnRow(prefill: "I'm craving ")
             }
-            Spacer()
+            .padding()
         }
-        .padding()
     }
 
     // MARK: - Go-To Sub-Menu
@@ -144,27 +152,31 @@ struct QuickActionSubMenuView: View {
     private let goToOptions = ["Downtown", "Sacramento", "Tahoe", "SF", "The ARC"]
 
     private var goToSubMenuView: some View {
-        VStack(spacing: 12) {
-            ForEach(goToOptions, id: \.self) { location in
-                Button {
-                    send("I want to go to \(location)")
-                } label: {
-                    HStack {
-                        Text(location)
-                            .font(.roundedHeadline)
-                            .foregroundStyle(Color.textPrimary)
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                            .foregroundStyle(Color.textSecondary)
+        ScrollView {
+            VStack(spacing: 12) {
+                ForEach(goToOptions, id: \.self) { location in
+                    Button {
+                        send("I want to go to \(location)")
+                    } label: {
+                        HStack {
+                            Text(location)
+                                .font(.roundedHeadline)
+                                .foregroundStyle(Color.textPrimary)
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .foregroundStyle(Color.textSecondary)
+                        }
+                        .padding()
+                        .background(Color.surface)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
                     }
-                    .padding()
-                    .background(Color.surface)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
+
+                // Let me type fallback
+                typeOwnRow(prefill: "I want to go to ")
             }
-            Spacer()
+            .padding()
         }
-        .padding()
     }
 
     // MARK: - "I just spent..." Input
@@ -291,11 +303,38 @@ struct QuickActionSubMenuView: View {
         dismiss()
         onSendPrompt(prompt)
     }
+
+    private func typeOwnRow(prefill: String) -> some View {
+        Button {
+            dismiss()
+            onPrefillType?(prefill)
+        } label: {
+            HStack {
+                Image(systemName: "keyboard")
+                    .foregroundStyle(Color.accent)
+                Text("Let me type...")
+                    .font(.roundedHeadline)
+                    .foregroundStyle(Color.textSecondary)
+                Spacer()
+            }
+            .padding()
+            .background(Color.surface.opacity(0.5))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(Color.textSecondary.opacity(0.3), lineWidth: 1)
+            )
+        }
+    }
 }
 
 #Preview {
     Color.appBackground
         .sheet(isPresented: .constant(true)) {
-            QuickActionSubMenuView(menu: .craving) { print($0) }
+            QuickActionSubMenuView(
+                menu: .craving,
+                onSendPrompt: { print($0) },
+                onPrefillType: { print("Prefill: \($0)") }
+            )
         }
 }

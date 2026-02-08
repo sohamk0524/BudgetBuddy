@@ -91,10 +91,21 @@ struct ChatView: View {
             }
         }
         .sheet(item: $showingSubMenu) { menu in
-            QuickActionSubMenuView(menu: menu) { prompt in
-                showingSubMenu = nil
-                sendQuickPrompt(prompt)
-            }
+            QuickActionSubMenuView(
+                menu: menu,
+                onSendPrompt: { prompt in
+                    showingSubMenu = nil
+                    sendQuickPrompt(prompt)
+                },
+                onPrefillType: { prefill in
+                    showingSubMenu = nil
+                    viewModel.inputText = prefill
+                    isTypingMode = true
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        isInputFocused = true
+                    }
+                }
+            )
         }
         .fileImporter(
             isPresented: $showingFilePicker,
