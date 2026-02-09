@@ -12,6 +12,8 @@ struct ChatView: View {
     @State private var viewModel = ChatViewModel()
     @FocusState private var isInputFocused: Bool
     @State private var showingFilePicker = false
+    @State private var isTypingMode = false
+    @State private var showingSubMenu: QuickActionSubMenu?
 
     var body: some View {
         ZStack(alignment: .top) {
@@ -43,7 +45,7 @@ struct ChatView: View {
                             }
                         }
                         .padding()
-                        .padding(.bottom, 80) // Space for input bar
+                        .padding(.bottom, 160) // Space for quick-action grid
                     }
                     .onChange(of: viewModel.messages.count) { _, _ in
                         scrollToBottom(proxy: proxy)
@@ -63,20 +65,47 @@ struct ChatView: View {
                 }
             }
 
-            // Input Bar (Bottom overlay with blur)
+            // Input Area (Bottom overlay)
             VStack {
                 Spacer()
-                InputBarView(
-                    text: $viewModel.inputText,
-                    isLoading: viewModel.isLoading,
-                    isFocused: $isInputFocused,
-                    onAttach: { showingFilePicker = true }
-                ) {
-                    Task {
-                        await viewModel.sendMessage()
+                if isTypingMode {
+                    InputBarView(
+                        text: $viewModel.inputText,
+                        isLoading: viewModel.isLoading,
+                        isFocused: $isInputFocused,
+                        onAttach: { showingFilePicker = true },
+                        onDismiss: {
+                            isTypingMode = false
+                            isInputFocused = false
+                        }
+                    ) {
+                        Task {
+                            await viewModel.sendMessage()
+                        }
+                    }
+                } else {
+                    QuickActionGridView(isLoading: viewModel.isLoading) { action in
+                        handleQuickAction(action)
                     }
                 }
             }
+        }
+        .sheet(item: $showingSubMenu) { menu in
+            QuickActionSubMenuView(
+                menu: menu,
+                onSendPrompt: { prompt in
+                    showingSubMenu = nil
+                    sendQuickPrompt(prompt)
+                },
+                onPrefillType: { prefill in
+                    showingSubMenu = nil
+                    viewModel.inputText = prefill
+                    isTypingMode = true
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        isInputFocused = true
+                    }
+                }
+            )
         }
         .fileImporter(
             isPresented: $showingFilePicker,
@@ -122,6 +151,33 @@ struct ChatView: View {
             } else if let lastMessage = viewModel.messages.last {
                 proxy.scrollTo(lastMessage.id, anchor: .bottom)
             }
+        }
+    }
+
+    private func handleQuickAction(_ action: QuickActionOption) {
+        switch action {
+        case .craving:
+            showingSubMenu = .craving
+        case .goTo:
+            showingSubMenu = .goTo
+        case .onTrack:
+            sendQuickPrompt("Am I on track?")
+        case .justSpent:
+            showingSubMenu = .justSpent
+        case .canAfford:
+            showingSubMenu = .canAfford
+        case .typeOwn:
+            isTypingMode = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                isInputFocused = true
+            }
+        }
+    }
+
+    private func sendQuickPrompt(_ prompt: String) {
+        viewModel.inputText = prompt
+        Task {
+            await viewModel.sendMessage()
         }
     }
 }
@@ -238,10 +294,18 @@ private struct InputBarView: View {
     let isLoading: Bool
     var isFocused: FocusState<Bool>.Binding
     let onAttach: () -> Void
+    let onDismiss: () -> Void
     let onSend: () -> Void
 
     var body: some View {
         HStack(spacing: 12) {
+            // Close typing mode button
+            Button(action: onDismiss) {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.title2)
+                    .foregroundStyle(Color.textSecondary)
+            }
+
             // Attachment button
             Button(action: onAttach) {
                 Image(systemName: "paperclip")
@@ -287,6 +351,47 @@ private struct InputBarView: View {
 
     private var canSend: Bool {
         !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !isLoading
+    }
+}
+
+// MARK: - Quick Action Grid View (Primary input - always visible)
+
+private struct QuickActionGridView: View {
+    let isLoading: Bool
+    let onAction: (QuickActionOption) -> Void
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // Divider
+            Rectangle()
+                .frame(height: 1)
+                .foregroundStyle(Color.textSecondary.opacity(0.2))
+
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+                ForEach(QuickActionOption.allCases) { option in
+                    Button {
+                        onAction(option)
+                    } label: {
+                        VStack(spacing: 6) {
+                            Image(systemName: option.icon)
+                                .font(.title3)
+                            Text(option.rawValue)
+                                .font(.system(.caption2, design: .rounded))
+                                .multilineTextAlignment(.center)
+                                .lineLimit(2)
+                        }
+                        .frame(maxWidth: .infinity, minHeight: 60)
+                        .foregroundStyle(Color.textPrimary)
+                        .background(Color.surface)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                    }
+                    .disabled(isLoading)
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+        }
+        .background(Color.appBackground)
     }
 }
 
