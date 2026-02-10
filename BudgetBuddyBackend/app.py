@@ -1,10 +1,11 @@
 import json
-from datetime import datetime, date
+import random
+import string
+from datetime import datetime, date, timedelta
 from flask import Flask, jsonify, request
 from flask_cors import CORS
-from werkzeug.security import generate_password_hash, check_password_hash
 
-from db_models import db, User, FinancialProfile, BudgetPlan, SavedStatement
+from db_models import db, User, FinancialProfile, BudgetPlan, SavedStatement, OTPCode
 from services.orchestrator import process_message
 from services.statement_analyzer import analyze_statement
 from services.plan_generator import generate_plan, save_plan_to_db
@@ -37,20 +38,29 @@ def health():
     return jsonify({"status": "ok"})
 
 
-@app.route("/register", methods=["POST"])
-def register():
+def send_via_twilio(phone_number: str, code: str):
     """
-    Register a new user account.
+    Placeholder for Twilio SMS integration.
+    In production, this would send the SMS via Twilio API.
+    For development, we just print to console.
+    """
+    print(f"\n{'='*50}")
+    print(f"SMS to {phone_number}: Your BudgetBuddy code is {code}")
+    print(f"{'='*50}\n")
+
+
+@app.route("/v1/send_sms_code", methods=["POST"])
+def send_sms_code():
+    """
+    Send an SMS verification code to the provided phone number.
 
     Expected request body:
     {
-        "email": "user@example.com",
-        "password": "password123"
+        "phone_number": "+14155551234"
     }
 
     Returns:
     {
-        "token": user_id,
         "status": "success"
     }
     """
@@ -59,39 +69,48 @@ def register():
     if not data:
         return jsonify({"error": "Request body must be JSON"}), 400
 
-    email = data.get("email", "").strip().lower()
-    password = data.get("password", "")
+    phone_number = data.get("phone_number", "").strip()
 
-    if not email or not password:
-        return jsonify({"error": "Email and password are required"}), 400
+    if not phone_number:
+        return jsonify({"error": "Phone number is required"}), 400
 
-    # Check if email already exists
-    existing_user = User.query.filter_by(email=email).first()
-    if existing_user:
-        return jsonify({"error": "Email already registered"}), 409
+    # Basic E.164 validation (starts with + and has 10-15 digits)
+    if not phone_number.startswith("+") or not (10 <= len(phone_number) <= 16):
+        return jsonify({"error": "Invalid phone number format. Use E.164 format (e.g., +14155551234)"}), 400
 
-    # Create new user with hashed password
-    password_hash = generate_password_hash(password)
-    new_user = User(email=email, password_hash=password_hash)
+    # Generate 6-digit code
+    code = ''.join(random.choices(string.digits, k=6))
 
-    db.session.add(new_user)
+    # Set expiry to 5 minutes from now
+    expires_at = datetime.utcnow() + timedelta(minutes=5)
+
+    # Invalidate any existing unused codes for this phone
+    OTPCode.query.filter_by(phone_number=phone_number, verified=False).delete()
+
+    # Create new OTP record
+    otp = OTPCode(
+        phone_number=phone_number,
+        code=code,
+        expires_at=expires_at
+    )
+    db.session.add(otp)
     db.session.commit()
 
-    return jsonify({
-        "token": new_user.id,
-        "status": "success"
-    })
+    # Send via Twilio (placeholder)
+    send_via_twilio(phone_number, code)
+
+    return jsonify({"status": "success"})
 
 
-@app.route("/login", methods=["POST"])
-def login():
+@app.route("/v1/verify_code", methods=["POST"])
+def verify_code():
     """
-    Authenticate a user.
+    Verify the SMS code and authenticate the user.
 
     Expected request body:
     {
-        "email": "user@example.com",
-        "password": "password123"
+        "phone_number": "+14155551234",
+        "code": "123456"
     }
 
     Returns:
@@ -105,22 +124,79 @@ def login():
     if not data:
         return jsonify({"error": "Request body must be JSON"}), 400
 
-    email = data.get("email", "").strip().lower()
-    password = data.get("password", "")
+    phone_number = data.get("phone_number", "").strip()
+    code = data.get("code", "").strip()
 
-    if not email or not password:
-        return jsonify({"error": "Email and password are required"}), 400
+    if not phone_number or not code:
+        return jsonify({"error": "Phone number and code are required"}), 400
 
-    # Find user by email
-    user = User.query.filter_by(email=email).first()
+    # Find the most recent unverified OTP for this phone
+    otp = OTPCode.query.filter_by(
+        phone_number=phone_number,
+        verified=False
+    ).order_by(OTPCode.created_at.desc()).first()
 
-    if not user or not check_password_hash(user.password_hash, password):
-        return jsonify({"error": "Invalid email or password"}), 401
+    if not otp:
+        return jsonify({"error": "No verification code found. Please request a new one."}), 400
+
+    # Check if code is expired
+    if datetime.utcnow() > otp.expires_at:
+        return jsonify({"error": "Verification code has expired. Please request a new one."}), 400
+
+    # Check if code matches
+    if otp.code != code:
+        return jsonify({"error": "Invalid verification code"}), 401
+
+    # Mark OTP as verified
+    otp.verified = True
+    db.session.commit()
+
+    # Find or create user
+    user = User.query.filter_by(phone_number=phone_number).first()
+
+    if not user:
+        # Auto-create new user
+        user = User(phone_number=phone_number)
+        db.session.add(user)
+        db.session.commit()
 
     return jsonify({
         "token": user.id,
         "hasProfile": user.profile is not None
     })
+
+
+@app.route("/v1/user", methods=["DELETE"])
+def delete_user():
+    """
+    Delete a user and all associated data (App Store compliance).
+
+    Query params:
+        userId: int - the user's ID
+
+    Returns: 204 No Content on success
+    """
+    user_id = request.args.get("userId")
+
+    if not user_id:
+        return jsonify({"error": "userId is required"}), 400
+
+    try:
+        user_id = int(user_id)
+    except ValueError:
+        return jsonify({"error": "Invalid userId"}), 400
+
+    user = User.query.get(user_id)
+
+    if user:
+        # Delete associated OTP codes
+        OTPCode.query.filter_by(phone_number=user.phone_number).delete()
+
+        # Delete user (cascade will handle profile, statement, plans)
+        db.session.delete(user)
+        db.session.commit()
+
+    return "", 204
 
 
 @app.route("/onboarding", methods=["POST"])

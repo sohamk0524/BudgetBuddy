@@ -7,6 +7,10 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		E1SMS0012F3C000000000001 /* EnterPhoneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1SMS0002F3C000000000001 /* EnterPhoneView.swift */; };
+		E1SMS0032F3C000000000002 /* OTPView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1SMS0022F3C000000000002 /* OTPView.swift */; };
+		E1SMS0052F3C000000000003 /* PhoneNumberKit in Frameworks */ = {isa = PBXBuildFile; productRef = E1SMS0042F3C000000000003 /* PhoneNumberKit */; };
+		E111F9C72F3B08CB00CAA26C /* QuickActionModalView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E111F9C62F3B08CB00CAA26C /* QuickActionModalView.swift */; };
 		E19C73082F349E9F00087EE4 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = E19C73072F349E9F00087EE4 /* Assets.xcassets */; };
 		E19C73332F349F5100087EE4 /* ChatBubbleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E19C73122F349F5000087EE4 /* ChatBubbleView.swift */; };
 		E19C73342F349F5100087EE4 /* BurndownChartView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E19C73132F349F5000087EE4 /* BurndownChartView.swift */; };
@@ -34,6 +38,9 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		E1SMS0002F3C000000000001 /* EnterPhoneView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnterPhoneView.swift; sourceTree = "<group>"; };
+		E1SMS0022F3C000000000002 /* OTPView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OTPView.swift; sourceTree = "<group>"; };
+		E111F9C62F3B08CB00CAA26C /* QuickActionModalView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = QuickActionModalView.swift; sourceTree = "<group>"; };
 		E19C73002F349E9C00087EE4 /* BudgetBuddy.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BudgetBuddy.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		E19C73072F349E9F00087EE4 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		E19C73122F349F5000087EE4 /* ChatBubbleView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ChatBubbleView.swift; sourceTree = "<group>"; };
@@ -68,6 +75,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				E1SMS0052F3C000000000003 /* PhoneNumberKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -157,6 +165,8 @@
 			isa = PBXGroup;
 			children = (
 				E19C731E2F349F5000087EE4 /* LoginView.swift */,
+				E1SMS0002F3C000000000001 /* EnterPhoneView.swift */,
+				E1SMS0022F3C000000000002 /* OTPView.swift */,
 			);
 			path = Auth;
 			sourceTree = "<group>";
@@ -164,6 +174,7 @@
 		E19C73202F349F5000087EE4 /* Components */ = {
 			isa = PBXGroup;
 			children = (
+				E111F9C62F3B08CB00CAA26C /* QuickActionModalView.swift */,
 				E19C73212F349F5000087EE4 /* GenerativeWidgetView.swift */,
 				E19C73222F349F5000087EE4 /* BurndownWidgetView.swift */,
 				E19C73232F349F5000087EE4 /* PulseHeaderView.swift */,
@@ -211,6 +222,9 @@
 			dependencies = (
 			);
 			name = BudgetBuddy;
+			packageProductDependencies = (
+				E1SMS0042F3C000000000003 /* PhoneNumberKit */,
+			);
 			productName = BudgetBuddy;
 			productReference = E19C73002F349E9C00087EE4 /* BudgetBuddy.app */;
 			productType = "com.apple.product-type.application";
@@ -240,6 +254,9 @@
 				Base,
 			);
 			mainGroup = E19C72F72F349E9C00087EE4;
+			packageReferences = (
+				E1SMS0062F3C000000000004 /* XCRemoteSwiftPackageReference "PhoneNumberKit" */,
+			);
 			productRefGroup = E19C73012F349E9C00087EE4 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -268,6 +285,7 @@
 			files = (
 				E19C73362F349F5100087EE4 /* BudgetBuddyApp.swift in Sources */,
 				E19C73492F349F5200087EE4 /* APIService.swift in Sources */,
+				E111F9C72F3B08CB00CAA26C /* QuickActionModalView.swift in Sources */,
 				E19C733D2F349F5200087EE4 /* BurndownWidgetView.swift in Sources */,
 				E19C733A2F349F5200087EE4 /* LoginView.swift in Sources */,
 				E19C73412F349F5200087EE4 /* WalletView.swift in Sources */,
@@ -288,6 +306,8 @@
 				E19C733B2F349F5200087EE4 /* PlanView.swift in Sources */,
 				E19C73442F349F5200087EE4 /* Theme.swift in Sources */,
 				E19C73482F349F5200087EE4 /* Models.swift in Sources */,
+				E1SMS0012F3C000000000001 /* EnterPhoneView.swift in Sources */,
+				E1SMS0032F3C000000000002 /* OTPView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -500,6 +520,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		E1SMS0062F3C000000000004 /* XCRemoteSwiftPackageReference "PhoneNumberKit" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/marmelroy/PhoneNumberKit";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 3.7.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		E1SMS0042F3C000000000003 /* PhoneNumberKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E1SMS0062F3C000000000004 /* XCRemoteSwiftPackageReference "PhoneNumberKit" */;
+			productName = PhoneNumberKit;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = E19C72F82F349E9C00087EE4 /* Project object */;
 }

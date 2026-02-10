@@ -13,9 +13,10 @@ import UniformTypeIdentifiers
 // MARK: - Wallet View
 
 struct WalletView: View {
-    @State private var walletViewModel = WalletViewModel()
+    @State private var walletViewModel = MainActor.assumeIsolated { WalletViewModel() }
     @Bindable var planViewModel: SpendingPlanViewModel
     @State private var showingStatementUpload = false
+    @State private var showingDeleteConfirmation = false
 
     var body: some View {
         NavigationStack {
@@ -86,13 +87,37 @@ struct WalletView: View {
             .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button {
-                        AuthManager.shared.signOut()
+                    Menu {
+                        Button(role: .destructive) {
+                            showingDeleteConfirmation = true
+                        } label: {
+                            Label("Delete Account", systemImage: "trash")
+                        }
+
+                        Button {
+                            AuthManager.shared.signOut()
+                        } label: {
+                            Label("Sign Out", systemImage: "rectangle.portrait.and.arrow.right")
+                        }
                     } label: {
-                        Image(systemName: "rectangle.portrait.and.arrow.right")
+                        Image(systemName: "gearshape.fill")
                             .foregroundStyle(Color.textSecondary)
                     }
                 }
+            }
+            .confirmationDialog(
+                "Delete Account",
+                isPresented: $showingDeleteConfirmation,
+                titleVisibility: .visible
+            ) {
+                Button("Delete Account", role: .destructive) {
+                    Task {
+                        await AuthManager.shared.deleteAccount()
+                    }
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("This will permanently delete your account and all associated data. This action cannot be undone.")
             }
             .task {
                 await walletViewModel.fetchFinancialSummary()
