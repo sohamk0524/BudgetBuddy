@@ -5,12 +5,13 @@ Pytest configuration and fixtures for BudgetBuddy tests.
 import pytest
 import sys
 import os
+from unittest.mock import patch, MagicMock
 
 # Add parent directory to path to import app modules
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from app import app as flask_app
-from db_models import db, User, FinancialProfile, BudgetPlan
+from db_models import db, User, FinancialProfile, BudgetPlan, PlaidItem, PlaidAccount, Transaction
 
 
 @pytest.fixture
@@ -153,3 +154,135 @@ def sample_csv_content():
 2024-01-04,Gas Station,-45.00,Transportation
 2024-01-05,Restaurant,-35.00,Dining
 """
+
+
+# =============================================================================
+# Plaid Integration Fixtures
+# =============================================================================
+
+@pytest.fixture
+def sample_user_for_plaid(app):
+    """Create a sample user for Plaid integration tests."""
+    from werkzeug.security import generate_password_hash
+
+    with app.app_context():
+        user = User(
+            email="plaid_test@example.com",
+            password_hash=generate_password_hash("password123")
+        )
+        db.session.add(user)
+        db.session.commit()
+        user_id = user.id
+
+    return user_id
+
+
+@pytest.fixture
+def mock_plaid_exchange(app):
+    """Mock Plaid token exchange and related API calls."""
+    # Set up environment variables for encryption
+    with patch.dict('os.environ', {
+        'FERNET_KEY': 'VGhpcyBpcyBhIDMyIGJ5dGUga2V5IGZvciB0ZXN0cyE=',
+        'PLAID_CLIENT_ID': 'test_client_id',
+        'PLAID_SECRET': 'test_secret',
+        'PLAID_ENV': 'sandbox'
+    }):
+        with patch('services.plaid_service.get_plaid_client') as mock_client:
+            # Mock token exchange
+            mock_exchange_response = MagicMock()
+            mock_exchange_response.access_token = "access-sandbox-test-token"
+            mock_exchange_response.item_id = "test-item-id"
+            mock_client.return_value.item_public_token_exchange.return_value = mock_exchange_response
+
+            # Mock accounts get
+            mock_account = MagicMock()
+            mock_account.account_id = "test-account-id"
+            mock_account.name = "Test Checking"
+            mock_account.official_name = "Test Official Checking"
+            mock_account.type = MagicMock(value="depository")
+            mock_account.subtype = MagicMock(value="checking")
+            mock_account.mask = "1234"
+            mock_account.balances.available = 1000.0
+            mock_account.balances.current = 1200.0
+            mock_account.balances.limit = None
+
+            mock_accounts_response = MagicMock()
+            mock_accounts_response.accounts = [mock_account]
+            mock_accounts_response.item.item_id = "test-item-id"
+            mock_accounts_response.item.institution_id = "ins_109508"
+            mock_accounts_response.request_id = "test-request-id"
+            mock_client.return_value.accounts_get.return_value = mock_accounts_response
+
+            # Mock transactions get (historical)
+            mock_txn = MagicMock()
+            mock_txn.transaction_id = "test-txn-1"
+            mock_txn.account_id = "test-account-id"
+            mock_txn.amount = 50.0
+            mock_txn.date = MagicMock()
+            mock_txn.date.isoformat.return_value = "2026-01-15"
+            mock_txn.authorized_date = None
+            mock_txn.name = "Coffee Shop"
+            mock_txn.merchant_name = "Starbucks"
+            mock_txn.personal_finance_category = MagicMock()
+            mock_txn.personal_finance_category.primary = "FOOD_AND_DRINK"
+            mock_txn.personal_finance_category.detailed = "COFFEE_SHOPS"
+            mock_txn.personal_finance_category.confidence_level = "HIGH"
+            mock_txn.pending = False
+            mock_txn.payment_channel = MagicMock(value="in_store")
+
+            mock_txns_response = MagicMock()
+            mock_txns_response.transactions = [mock_txn]
+            mock_txns_response.total_transactions = 1
+            mock_client.return_value.transactions_get.return_value = mock_txns_response
+
+            yield mock_client
+
+
+@pytest.fixture
+def sample_plaid_item(app, sample_user_for_plaid):
+    """Create a sample PlaidItem with accounts and transactions."""
+    with app.app_context():
+        # Create encrypted token (mock)
+        encrypted_token = b'mock_encrypted_token'
+
+        plaid_item = PlaidItem(
+            user_id=sample_user_for_plaid,
+            item_id="test-item-id",
+            access_token_encrypted=encrypted_token,
+            institution_id="ins_109508",
+            institution_name="First Platypus Bank",
+            status="active"
+        )
+        db.session.add(plaid_item)
+        db.session.flush()
+
+        account = PlaidAccount(
+            plaid_item_id=plaid_item.id,
+            account_id="test-account-id",
+            name="Test Checking",
+            account_type="depository",
+            account_subtype="checking",
+            balance_available=1000.0,
+            balance_current=1200.0,
+            mask="1234"
+        )
+        db.session.add(account)
+        db.session.flush()
+
+        from datetime import date
+        transaction = Transaction(
+            plaid_account_id=account.id,
+            transaction_id="test-txn-1",
+            amount=50.0,
+            date=date(2026, 1, 15),
+            name="Coffee Shop",
+            merchant_name="Starbucks",
+            category_primary="FOOD_AND_DRINK",
+            pending=False
+        )
+        db.session.add(transaction)
+        db.session.commit()
+
+        item_id = plaid_item.id
+
+    return item_id

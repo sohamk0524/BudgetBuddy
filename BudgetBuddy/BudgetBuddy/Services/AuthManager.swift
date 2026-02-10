@@ -190,6 +190,9 @@ class AuthManager {
                 await MainActor.run {
                     self.needsOnboarding = false
                     self.isLoading = false
+
+                    // Post notification that onboarding completed
+                    NotificationCenter.default.post(name: .onboardingCompleted, object: nil)
                 }
             } else {
                 let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
