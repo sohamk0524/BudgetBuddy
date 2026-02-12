@@ -327,3 +327,89 @@ struct SpendingCategory: Codable, Identifiable {
     let category: String
     let amount: Double
 }
+
+// MARK: - Plaid Integration Models
+
+struct PlaidLinkTokenResponse: Codable {
+    let linkToken: String
+    let expiration: String
+}
+
+struct PlaidExchangeRequest: Codable {
+    let userId: Int
+    let publicToken: String
+    let institutionId: String?
+    let institutionName: String?
+}
+
+struct PlaidExchangeResponse: Codable {
+    let success: Bool
+    let itemId: String
+    let accounts: [PlaidAccountInfo]
+    let transactionCount: Int
+}
+
+struct PlaidAccountInfo: Codable, Identifiable {
+    var id: String { accountId }
+    let accountId: String
+    let name: String
+    let type: String?
+    let subtype: String?
+    let mask: String?
+    let balanceCurrent: Double?
+    let balanceAvailable: Double?
+}
+
+struct PlaidAccountsResponse: Codable {
+    let items: [PlaidItemInfo]
+}
+
+struct PlaidItemInfo: Codable, Identifiable {
+    var id: String { itemId }
+    let itemId: String
+    let institutionId: String?
+    let institutionName: String?
+    let status: String
+    let createdAt: String?
+    let accounts: [PlaidAccountDetail]
+}
+
+struct PlaidAccountDetail: Codable, Identifiable {
+    var id: String { accountId }
+    let accountId: String
+    let name: String
+    let officialName: String?
+    let type: String?
+    let subtype: String?
+    let mask: String?
+    let balanceAvailable: Double?
+    let balanceCurrent: Double?
+    let balanceLimit: Double?
+}
+
+struct PlaidTransaction: Codable, Identifiable {
+    var id: String { transactionId }
+    let transactionId: String
+    let accountId: String
+    let amount: Double
+    let date: String?
+    let authorizedDate: String?
+    let name: String
+    let merchantName: String?
+    let categoryPrimary: String?
+    let categoryDetailed: String?
+    let pending: Bool
+    let paymentChannel: String?
+}
+
+struct PlaidTransactionsResponse: Codable {
+    let transactions: [PlaidTransaction]
+    let total: Int
+    let hasMore: Bool
+}
+
+struct PlaidSyncResponse: Codable {
+    let added: Int
+    let modified: Int
+    let removed: Int
+}
