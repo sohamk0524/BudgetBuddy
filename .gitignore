@@ -17,6 +17,7 @@ DerivedData/
 *.xcodeproj/project.xcworkspace/xcuserdata/
 *.xcodeproj/xcuserdata/
 *.xcworkspace/xcuserdata/
+BudgetBuddy/BudgetBuddy.xcodeproj/project.xcworkspace/xcuserdata/sohamkolhatkar.xcuserdatad/UserInterfaceState.xcuserstate
 
 # Xcode user settings
 *.xcuserstate
