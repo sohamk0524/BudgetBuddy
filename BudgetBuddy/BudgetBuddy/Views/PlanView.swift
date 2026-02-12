@@ -9,6 +9,7 @@ import SwiftUI
 
 struct PlanView: View {
     @Bindable var viewModel: SpendingPlanViewModel
+    @Bindable var walletViewModel: WalletViewModel
 
     var body: some View {
         NavigationStack {
@@ -44,8 +45,26 @@ struct PlanView: View {
             .sheet(isPresented: $viewModel.showQuestionFlow) {
                 PlanQuestionFlowView(viewModel: viewModel)
             }
+            .sheet(isPresented: $viewModel.showAddGoalSheet) {
+                AddSavingsGoalSheet { name, target in
+                    viewModel.addUserSavingsGoal(name: name, target: target)
+                }
+            }
+            .sheet(item: $viewModel.selectedGoal) { goal in
+                UpdateSavedAmountSheet(
+                    goal: goal,
+                    onSave: { id, amount in
+                        viewModel.updateSavedAmount(id: id, additionalAmount: amount)
+                    },
+                    onDelete: { id in
+                        viewModel.deleteUserSavingsGoal(id: id)
+                    }
+                )
+            }
             .task {
+                viewModel.loadSavingsGoals()
                 await viewModel.loadExistingPlan()
+                await walletViewModel.fetchFinancialSummary()
             }
             .onChange(of: viewModel.showQuestionFlow) { oldValue, newValue in
                 // Refresh plan when question flow is dismissed (after generating)
@@ -126,6 +145,32 @@ struct PlanView: View {
         let amountSpent = (plan.budgetUsedPercent / 100) * disposableIncome
 
         VStack(spacing: 16) {
+
+            // ── SECTION 1: Spending Summary ──
+
+            // Weekly Spending Heatmap
+            WeeklySpendingHeatmap(data: viewModel.weeklySpendingData)
+
+            // Income/Expense Waterfall
+            IncomeExpenseWaterfall(
+                totalIncome: plan.totalIncome,
+                categories: plan.categoryAllocations
+            )
+
+            // Month-to-Month Spending Delta
+            MonthSpendingDeltaView(
+                thisMonthData: thisMonthSpendingData(plan: plan),
+                lastMonthData: viewModel.lastMonthSpending
+            )
+
+            // Semester Overview
+            SemesterOverviewChart(data: viewModel.semesterMonthlyTotals)
+
+            // Semester Cost Breakdown
+            SemesterCostBreakdownCard(data: viewModel.semesterCostBreakdown)
+
+            // ── SECTION 2: Budget Performance ──
+
             // Spending Progress Bar (Hero)
             SpendingProgressCard(
                 disposableIncome: disposableIncome,
@@ -150,8 +195,32 @@ struct PlanView: View {
                 totalIncome: plan.totalIncome
             )
 
-            // Savings Progress
-            SavingsProgressCard(plan: plan)
+            // Actual vs Planned
+            ActualVsPlannedChart(
+                plannedCategories: plan.categoryAllocations,
+                actualSpending: walletViewModel.spendingBreakdown
+            )
+
+            // User Savings Goals
+            UserSavingsGoalsCard(goals: viewModel.userSavingsGoals) { goal in
+                viewModel.selectedGoal = goal
+            }
+
+            // Add Savings Goal button
+            Button {
+                viewModel.showAddGoalSheet = true
+            } label: {
+                HStack {
+                    Image(systemName: "plus.circle.fill")
+                    Text("Add Savings Goal")
+                }
+                .font(.roundedHeadline)
+                .foregroundStyle(Color.accent)
+                .frame(maxWidth: .infinity)
+                .padding()
+            }
+            .background(Color.accent.opacity(0.1))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
 
             // Recommendations
             if !plan.recommendations.isEmpty {
@@ -182,10 +251,28 @@ struct PlanView: View {
             }
         }
     }
+
+    // MARK: - This Month Spending Data
+
+    /// Uses wallet spending breakdown if available, otherwise falls back to plan allocations
+    private func thisMonthSpendingData(plan: SpendingPlan) -> [(category: String, amount: Double)] {
+        if !walletViewModel.spendingBreakdown.isEmpty {
+            return walletViewModel.spendingBreakdown.map { ($0.category, $0.amount) }
+        }
+        // Fallback: use plan category allocations
+        return plan.categoryAllocations
+            .filter { $0.amount > 0 }
+            .flatMap { category -> [(category: String, amount: Double)] in
+                if let items = category.items, !items.isEmpty {
+                    return items.filter { $0.amount > 0 }.map { ($0.name, $0.amount) }
+                }
+                return [(category.name, category.amount)]
+            }
+    }
 }
 
 // MARK: - Preview
 
 #Preview {
-    PlanView(viewModel: SpendingPlanViewModel())
+    PlanView(viewModel: SpendingPlanViewModel(), walletViewModel: WalletViewModel())
 }
