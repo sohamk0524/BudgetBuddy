@@ -35,7 +35,7 @@ struct PlanView: View {
                         Button {
                             viewModel.startQuestionFlow()
                         } label: {
-                            Image(systemName: "arrow.clockwise")
+                            Image(systemName: "pencil")
                                 .foregroundStyle(Color.textSecondary)
                         }
                     }
@@ -116,12 +116,21 @@ struct PlanView: View {
 
     @ViewBuilder
     private func planDashboard(plan: SpendingPlan) -> some View {
+        // Calculate disposable income (income minus fixed expenses)
+        let fixedExpenses = plan.categoryAllocations.first(where: { $0.id == "fixed" })?.amount ?? 0
+        let savingsAmount = plan.categoryAllocations.first(where: { $0.id == "savings" })?.amount ?? 0
+        let eventsAmount = plan.categoryAllocations.first(where: { $0.id == "events" })?.amount ?? 0
+        let disposableIncome = plan.totalIncome - fixedExpenses - savingsAmount - eventsAmount
+
+        // Calculate amount spent based on budget used percent
+        let amountSpent = (plan.budgetUsedPercent / 100) * disposableIncome
+
         VStack(spacing: 16) {
-            // Hero: Safe to Spend
-            SafeToSpendCard(
-                amount: plan.safeToSpend,
-                daysRemaining: plan.daysRemaining,
-                budgetUsedPercent: plan.budgetUsedPercent
+            // Spending Progress Bar (Hero)
+            SpendingProgressCard(
+                disposableIncome: disposableIncome,
+                amountSpent: amountSpent,
+                daysRemaining: plan.daysRemaining
             )
 
             // Summary text
@@ -171,22 +180,6 @@ struct PlanView: View {
                 .background(Color.danger.opacity(0.1))
                 .clipShape(RoundedRectangle(cornerRadius: 16))
             }
-
-            // Edit button
-            Button {
-                viewModel.startQuestionFlow()
-            } label: {
-                HStack {
-                    Image(systemName: "pencil")
-                    Text("Update Your Plan")
-                }
-                .font(.roundedBody)
-                .foregroundStyle(Color.accent)
-                .frame(maxWidth: .infinity)
-                .padding()
-            }
-            .background(Color.surface)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
         }
     }
 }
