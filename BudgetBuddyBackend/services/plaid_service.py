@@ -24,15 +24,24 @@ from plaid.model.country_code import CountryCode
 from services.encryption_service import encrypt_token, decrypt_token
 
 
-def _get_plaid_env() -> plaid.Environment:
-    """Get the Plaid environment from environment variable."""
+def _get_enum_value(obj) -> Optional[str]:
+    """Safely extract value from enum or return string directly."""
+    if obj is None:
+        return None
+    if hasattr(obj, 'value'):
+        return obj.value
+    return str(obj)
+
+
+def _get_plaid_host() -> str:
+    """Get the Plaid API host URL from environment variable."""
     env = os.environ.get("PLAID_ENV", "sandbox").lower()
     env_map = {
-        "sandbox": plaid.Environment.Sandbox,
-        "development": plaid.Environment.Development,
-        "production": plaid.Environment.Production,
+        "sandbox": "https://sandbox.plaid.com",
+        "development": "https://development.plaid.com",
+        "production": "https://production.plaid.com",
     }
-    return env_map.get(env, plaid.Environment.Sandbox)
+    return env_map.get(env, "https://sandbox.plaid.com")
 
 
 def get_plaid_client() -> plaid_api.PlaidApi:
@@ -57,7 +66,7 @@ def get_plaid_client() -> plaid_api.PlaidApi:
         raise ValueError("PLAID_CLIENT_ID and PLAID_SECRET environment variables must be set")
 
     configuration = plaid.Configuration(
-        host=_get_plaid_env(),
+        host=_get_plaid_host(),
         api_key={
             "clientId": client_id,
             "secret": secret,
@@ -164,8 +173,8 @@ def get_accounts(encrypted_access_token: bytes) -> Dict[str, Any]:
             "account_id": account.account_id,
             "name": account.name,
             "official_name": account.official_name,
-            "type": account.type.value if account.type else None,
-            "subtype": account.subtype.value if account.subtype else None,
+            "type": _get_enum_value(account.type),
+            "subtype": _get_enum_value(account.subtype),
             "mask": account.mask,
             "balances": {
                 "available": account.balances.available,
@@ -234,7 +243,7 @@ def sync_transactions(
             "category_detailed": txn.personal_finance_category.detailed if txn.personal_finance_category else None,
             "category_confidence": txn.personal_finance_category.confidence_level if txn.personal_finance_category else None,
             "pending": txn.pending,
-            "payment_channel": txn.payment_channel.value if txn.payment_channel else None,
+            "payment_channel": _get_enum_value(txn.payment_channel),
         }
 
     return {
@@ -304,7 +313,7 @@ def fetch_historical_transactions(
                 "category_detailed": txn.personal_finance_category.detailed if txn.personal_finance_category else None,
                 "category_confidence": txn.personal_finance_category.confidence_level if txn.personal_finance_category else None,
                 "pending": txn.pending,
-                "payment_channel": txn.payment_channel.value if txn.payment_channel else None,
+                "payment_channel": _get_enum_value(txn.payment_channel),
             })
 
         offset += len(response.transactions)
