@@ -6,10 +6,6 @@
 	objectVersion = 70;
 	objects = {
 
-/* Begin PBXBuildFile section */
-		E1SMS0052F3C000000000003 /* PhoneNumberKit in Frameworks */ = {isa = PBXBuildFile; productRef = E1SMS0042F3C000000000003 /* PhoneNumberKit */; };
-/* End PBXBuildFile section */
-
 /* Begin PBXFileReference section */
 		ACEBD1B42F2BE42700FA1D26 /* BudgetBuddy.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BudgetBuddy.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -33,7 +29,6 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				E1SMS0052F3C000000000003 /* PhoneNumberKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -76,7 +71,6 @@
 			);
 			name = BudgetBuddy;
 			packageProductDependencies = (
-				E1SMS0042F3C000000000003 /* PhoneNumberKit */,
 			);
 			productName = BudgetBuddy;
 			productReference = ACEBD1B42F2BE42700FA1D26 /* BudgetBuddy.app */;
@@ -107,9 +101,6 @@
 			);
 			mainGroup = ACEBD1AB2F2BE42700FA1D26;
 			minimizedProjectReferenceProxies = 1;
-			packageReferences = (
-				E1SMS0062F3C000000000004 /* XCRemoteSwiftPackageReference "PhoneNumberKit" */,
-			);
 			productRefGroup = ACEBD1B52F2BE42700FA1D26 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -347,25 +338,6 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
-
-/* Begin XCRemoteSwiftPackageReference section */
-		E1SMS0062F3C000000000004 /* XCRemoteSwiftPackageReference "PhoneNumberKit" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/marmelroy/PhoneNumberKit";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 3.7.0;
-			};
-		};
-/* End XCRemoteSwiftPackageReference section */
-
-/* Begin XCSwiftPackageProductDependency section */
-		E1SMS0042F3C000000000003 /* PhoneNumberKit */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = E1SMS0062F3C000000000004 /* XCRemoteSwiftPackageReference "PhoneNumberKit" */;
-			productName = PhoneNumberKit;
-		};
-/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = ACEBD1AC2F2BE42700FA1D26 /* Project object */;
 }
