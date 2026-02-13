@@ -14,8 +14,20 @@ class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     email = db.Column(db.String(120), unique=True, nullable=False)
     password_hash = db.Column(db.String(256))
+    name = db.Column(db.String(100), nullable=True)
     profile = db.relationship('FinancialProfile', backref='user', uselist=False)
     statement = db.relationship('SavedStatement', backref='user', uselist=False)
+
+
+class UserCategoryPreference(db.Model):
+    """User's pinned category preferences for the homepage."""
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    category_name = db.Column(db.String(100), nullable=False)
+    display_order = db.Column(db.Integer, default=0)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    user = db.relationship('User', backref='category_preferences')
 
 
 class FinancialProfile(db.Model):

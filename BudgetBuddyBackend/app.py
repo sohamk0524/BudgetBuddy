@@ -1,6 +1,6 @@
 import json
 import os
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 # Load environment variables from .env file
 load_dotenv()
 
-from db_models import db, User, FinancialProfile, BudgetPlan, SavedStatement, PlaidItem, PlaidAccount, Transaction
+from db_models import db, User, FinancialProfile, BudgetPlan, SavedStatement, PlaidItem, PlaidAccount, Transaction, UserCategoryPreference
 from services.orchestrator import process_message
 from services.statement_analyzer import analyze_statement
 from services.plan_generator import generate_plan, save_plan_to_db
@@ -28,9 +28,22 @@ db.init_app(app)
 with app.app_context():
     db.create_all()
 
+    # Migrate: add 'name' column to User table if it doesn't exist (SQLite)
+    import sqlite3
+    db_path = os.path.join(app.instance_path, 'budgetbuddy.db')
+    if os.path.exists(db_path):
+        conn = sqlite3.connect(db_path)
+        cursor = conn.execute("PRAGMA table_info(user)")
+        columns = [row[1] for row in cursor.fetchall()]
+        if 'name' not in columns:
+            conn.execute("ALTER TABLE user ADD COLUMN name VARCHAR(100)")
+            conn.commit()
+            print("Migration: added 'name' column to user table")
+        conn.close()
+
 # Enable CORS for iOS simulator to communicate with localhost
 # Allow all origins and methods for development
-CORS(app, resources={r"/*": {"origins": "*", "methods": ["GET", "POST", "DELETE", "OPTIONS"]}})
+CORS(app, resources={r"/*": {"origins": "*", "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"]}})
 
 
 @app.route("/")
@@ -78,7 +91,8 @@ def register():
 
     # Create new user with hashed password
     password_hash = generate_password_hash(password)
-    new_user = User(email=email, password_hash=password_hash)
+    name = data.get("name", "").strip() or None
+    new_user = User(email=email, password_hash=password_hash, name=name)
 
     db.session.add(new_user)
     db.session.commit()
@@ -125,7 +139,8 @@ def login():
 
     return jsonify({
         "token": user.id,
-        "hasProfile": user.profile is not None
+        "hasProfile": user.profile is not None,
+        "name": user.name
     })
 
 
@@ -156,6 +171,7 @@ def onboarding():
         return jsonify({"error": "Request body must be JSON"}), 400
 
     user_id = data.get("userId")
+    name = data.get("name", "").strip() or None
     age = data.get("age", 0)
     occupation = data.get("occupation", "")
     income = data.get("income", 0.0)
@@ -170,6 +186,10 @@ def onboarding():
     user = User.query.get(user_id)
     if not user:
         return jsonify({"error": "User not found"}), 404
+
+    # Update name if provided
+    if name:
+        user.name = name
 
     # Check if profile already exists
     if user.profile:
@@ -1063,6 +1083,248 @@ def unlink_plaid_item(user_id, item_id):
     db.session.commit()
 
     return jsonify({"success": True})
+
+
+# =============================================================================
+# User Profile Endpoints
+# =============================================================================
+
+@app.route("/user/profile/<int:user_id>", methods=["GET"])
+def get_user_profile(user_id):
+    """
+    Fetch user profile including name, email, financial profile, and linked Plaid accounts.
+    """
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
+    profile_data = None
+    if user.profile:
+        profile_data = {
+            "age": user.profile.age,
+            "occupation": user.profile.occupation,
+            "monthlyIncome": user.profile.monthly_income,
+            "incomeFrequency": user.profile.income_frequency,
+            "financialPersonality": user.profile.financial_personality,
+            "primaryGoal": user.profile.primary_goal
+        }
+
+    plaid_items_data = []
+    for item in user.plaid_items:
+        accounts = [{
+            "accountId": acc.account_id,
+            "name": acc.name,
+            "type": acc.account_type,
+            "subtype": acc.account_subtype,
+            "mask": acc.mask,
+            "balanceCurrent": acc.balance_current
+        } for acc in item.accounts]
+
+        plaid_items_data.append({
+            "itemId": item.item_id,
+            "institutionName": item.institution_name,
+            "status": item.status,
+            "accounts": accounts
+        })
+
+    return jsonify({
+        "name": user.name,
+        "email": user.email,
+        "profile": profile_data,
+        "plaidItems": plaid_items_data
+    })
+
+
+@app.route("/user/profile/<int:user_id>", methods=["PUT"])
+def update_user_profile(user_id):
+    """
+    Update user profile fields (partial update).
+    Accepts any subset of: name, age, occupation, monthlyIncome,
+    incomeFrequency, financialPersonality, primaryGoal.
+    """
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "Request body must be JSON"}), 400
+
+    # Update user-level fields
+    if "name" in data:
+        user.name = data["name"]
+
+    # Update profile fields
+    if user.profile:
+        if "age" in data:
+            user.profile.age = data["age"]
+        if "occupation" in data:
+            user.profile.occupation = data["occupation"]
+        if "monthlyIncome" in data:
+            user.profile.monthly_income = data["monthlyIncome"]
+        if "incomeFrequency" in data:
+            user.profile.income_frequency = data["incomeFrequency"]
+        if "financialPersonality" in data:
+            user.profile.financial_personality = data["financialPersonality"]
+        if "primaryGoal" in data:
+            user.profile.primary_goal = data["primaryGoal"]
+
+    db.session.commit()
+
+    return jsonify({"status": "success"})
+
+
+@app.route("/user/top-expenses/<int:user_id>", methods=["GET"])
+def get_top_expenses(user_id):
+    """
+    Aggregate top spending categories from Plaid transactions (fallback: statement).
+
+    Query params:
+        days: int (optional, default 30)
+
+    Returns:
+    {
+        "source": "plaid" | "statement",
+        "topExpenses": [{ "category": str, "amount": float, "transactionCount": int }],
+        "totalSpending": float,
+        "period": int
+    }
+    """
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
+    days = request.args.get("days", 30, type=int)
+
+    # Try Plaid transactions first
+    plaid_items = PlaidItem.query.filter_by(user_id=user_id, status="active").all()
+    account_ids = []
+    for item in plaid_items:
+        for account in item.accounts:
+            account_ids.append(account.id)
+
+    if account_ids:
+        start_date = (datetime.now() - timedelta(days=days)).date()
+        transactions = Transaction.query.filter(
+            Transaction.plaid_account_id.in_(account_ids),
+            Transaction.date >= start_date
+        ).all()
+
+        category_data = {}
+        for txn in transactions:
+            if txn.amount > 0:
+                cat = txn.category_primary or "Uncategorized"
+                if cat not in category_data:
+                    category_data[cat] = {"amount": 0, "count": 0}
+                category_data[cat]["amount"] += txn.amount
+                category_data[cat]["count"] += 1
+
+        sorted_cats = sorted(category_data.items(), key=lambda x: x[1]["amount"], reverse=True)
+        total = sum(v["amount"] for v in category_data.values())
+
+        return jsonify({
+            "source": "plaid",
+            "topExpenses": [
+                {"category": cat, "amount": round(data["amount"], 2), "transactionCount": data["count"]}
+                for cat, data in sorted_cats[:5]
+            ],
+            "totalSpending": round(total, 2),
+            "period": days
+        })
+
+    # Fallback to statement
+    statement = SavedStatement.query.filter_by(user_id=user_id).first()
+    if statement and statement.llm_analysis:
+        try:
+            analysis = json.loads(statement.llm_analysis)
+            top_categories = analysis.get("top_categories", [])
+            expenses = [
+                {"category": cat.get("category", "Other"), "amount": float(cat.get("amount", 0)), "transactionCount": 0}
+                for cat in top_categories[:5]
+            ]
+            total = sum(e["amount"] for e in expenses)
+            return jsonify({
+                "source": "statement",
+                "topExpenses": expenses,
+                "totalSpending": round(total, 2),
+                "period": days
+            })
+        except (json.JSONDecodeError, TypeError):
+            pass
+
+    return jsonify({
+        "source": "none",
+        "topExpenses": [],
+        "totalSpending": 0,
+        "period": days
+    })
+
+
+@app.route("/user/category-preferences/<int:user_id>", methods=["GET"])
+def get_category_preferences(user_id):
+    """Get user's pinned category preferences."""
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
+    prefs = UserCategoryPreference.query.filter_by(user_id=user_id).order_by(
+        UserCategoryPreference.display_order
+    ).all()
+
+    return jsonify({
+        "categories": [
+            {"id": p.id, "categoryName": p.category_name, "displayOrder": p.display_order}
+            for p in prefs
+        ]
+    })
+
+
+@app.route("/user/category-preferences/<int:user_id>", methods=["PUT"])
+def update_category_preferences(user_id):
+    """
+    Set pinned categories.
+
+    Expected body:
+    { "categories": ["FOOD_AND_DRINK", "TRANSPORTATION", "SHOPPING"] }
+    """
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
+    data = request.get_json()
+    if not data or "categories" not in data:
+        return jsonify({"error": "categories field is required"}), 400
+
+    # Delete existing preferences
+    UserCategoryPreference.query.filter_by(user_id=user_id).delete()
+
+    # Insert new ones
+    for i, cat_name in enumerate(data["categories"]):
+        pref = UserCategoryPreference(
+            user_id=user_id,
+            category_name=cat_name,
+            display_order=i
+        )
+        db.session.add(pref)
+
+    db.session.commit()
+
+    return jsonify({"status": "success"})
+
+
+@app.route("/user/nudges/<int:user_id>", methods=["GET"])
+def get_nudges(user_id):
+    """
+    Get rules-based smart nudges (actual vs. budget comparison).
+    """
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
+    from services.nudge_generator import generate_nudges
+    nudges = generate_nudges(user_id)
+
+    return jsonify({"nudges": nudges})
 
 
 if __name__ == "__main__":
