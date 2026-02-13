@@ -55,7 +55,7 @@ struct TopExpensesCard: View {
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 8)
             } else {
-                ForEach(topExpenses.prefix(3)) { expense in
+                ForEach(topExpenses) { expense in
                     TopExpenseRow(expense: expense, maxAmount: maxAmount)
                 }
             }
@@ -149,7 +149,7 @@ struct CategoryEditorSheet: View {
 
                         Spacer()
 
-                        Image(systemName: localSelection.contains(category) ? "checkmark.circle.fill" : "circle")
+                        Image(systemName: localSelection.contains(category) ? "checkmark.square.fill" : "square")
                             .foregroundStyle(localSelection.contains(category) ? Color.accent : Color.textSecondary)
                     }
                     .contentShape(Rectangle())

@@ -31,6 +31,16 @@ struct WalletView: View {
         return formatter.string(from: Date())
     }
 
+    /// Top expenses filtered by user's custom category preferences.
+    /// Shows 3 by default; shows however many the user picked when customized.
+    private var filteredTopExpenses: [TopExpense] {
+        let prefs = walletViewModel.customCategories
+        if prefs.isEmpty {
+            return Array(walletViewModel.topExpenses.prefix(3))
+        }
+        return walletViewModel.topExpenses.filter { prefs.contains($0.category) }
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -63,7 +73,7 @@ struct WalletView: View {
 
                     // MARK: - Top Expenses
                     TopExpensesCard(
-                        topExpenses: walletViewModel.topExpenses,
+                        topExpenses: filteredTopExpenses,
                         source: walletViewModel.expenseSource,
                         onCustomize: { showCategoryEditor = true }
                     )
@@ -115,6 +125,7 @@ struct WalletView: View {
                     onSave: { categories in
                         Task {
                             await walletViewModel.updateCategoryPreferences(categories)
+                            await walletViewModel.fetchTopExpenses()
                         }
                     }
                 )
@@ -231,7 +242,14 @@ struct ProgressBar: View {
 }
 
 private func format(_ value: Double) -> String {
-    value.formatted(.currency(code: "USD"))
+    let abs = abs(value)
+    let sign = value < 0 ? "-" : ""
+    if abs >= 1_000_000 {
+        return "\(sign)$\(String(format: "%.1fM", abs / 1_000_000))"
+    } else if abs >= 10_000 {
+        return "\(sign)$\(String(format: "%.1fk", abs / 1_000))"
+    }
+    return value.formatted(.currency(code: "USD"))
 }
 
 private func card(
@@ -246,8 +264,6 @@ private func card(
             .font(.roundedCaption)
             .foregroundStyle(Color.textSecondary)
 
-        Spacer()
-
         Text(value)
             .font(.system(size: 28, weight: .bold, design: .rounded))
             .foregroundStyle(valueColor)
@@ -260,7 +276,7 @@ private func card(
                 .foregroundStyle(Color.textSecondary)
         }
     }
-    .walletCard(minHeight: 140)
+    .walletCard()
 }
 
 extension View {

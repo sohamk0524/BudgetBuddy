@@ -106,6 +106,14 @@ struct ProfileView: View {
                     .foregroundStyle(Color.textPrimary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 48)
+                    .padding(.vertical, 6)
+                    .background(Color.surface)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10)
+                            .stroke(Color.accent.opacity(0.4), lineWidth: 1)
+                    )
+                    .padding(.horizontal, 32)
             } else {
                 Text(viewModel.name.isEmpty ? "BudgetBuddy User" : viewModel.name)
                     .font(.roundedTitle)
@@ -139,6 +147,8 @@ struct ProfileView: View {
                 profileRow(label: "Age", value: viewModel.age.map { "\($0)" } ?? "--") {
                     TextField("Age", value: $viewModel.age, format: .number)
                         .keyboardType(.numberPad)
+                        .multilineTextAlignment(.trailing)
+                        .tint(Color.accent)
                 }
 
                 profileRow(label: "Occupation", value: formatOccupation(viewModel.occupation)) {
@@ -155,6 +165,8 @@ struct ProfileView: View {
                 profileRow(label: "Monthly Income", value: viewModel.monthlyIncome.map { "$\(Int($0))" } ?? "--") {
                     TextField("Income", value: $viewModel.monthlyIncome, format: .number)
                         .keyboardType(.decimalPad)
+                        .multilineTextAlignment(.trailing)
+                        .tint(Color.accent)
                 }
 
                 profileRow(label: "Pay Frequency", value: formatFrequency(viewModel.incomeFrequency)) {
@@ -210,7 +222,7 @@ struct ProfileView: View {
             if viewModel.isEditing {
                 editView()
                     .font(.roundedBody)
-                    .foregroundStyle(Color.textPrimary)
+                    .foregroundStyle(Color.accent)
             } else {
                 Text(value)
                     .font(.roundedBody)

@@ -116,8 +116,9 @@ class WalletViewModel {
         async let summary: () = fetchFinancialSummary()
         async let expenses: () = fetchTopExpenses()
         async let nudgesData: () = fetchNudges()
+        async let prefs: () = loadCategoryPreferences()
 
-        _ = await (summary, expenses, nudgesData)
+        _ = await (summary, expenses, nudgesData, prefs)
     }
 
     /// Deletes the user's saved statement
