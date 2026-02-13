@@ -3,318 +3,201 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 56;
+	objectVersion = 70;
 	objects = {
 
-/* Begin PBXBuildFile section */
-		E1SMS0012F3C000000000001 /* EnterPhoneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1SMS0002F3C000000000001 /* EnterPhoneView.swift */; };
-		E1SMS0032F3C000000000002 /* OTPView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1SMS0022F3C000000000002 /* OTPView.swift */; };
-		E1SMS0052F3C000000000003 /* PhoneNumberKit in Frameworks */ = {isa = PBXBuildFile; productRef = E1SMS0042F3C000000000003 /* PhoneNumberKit */; };
-		E111F9C72F3B08CB00CAA26C /* QuickActionModalView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E111F9C62F3B08CB00CAA26C /* QuickActionModalView.swift */; };
-		E19C73082F349E9F00087EE4 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = E19C73072F349E9F00087EE4 /* Assets.xcassets */; };
-		E19C73332F349F5100087EE4 /* ChatBubbleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E19C73122F349F5000087EE4 /* ChatBubbleView.swift */; };
-		E19C73342F349F5100087EE4 /* BurndownChartView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E19C73132F349F5000087EE4 /* BurndownChartView.swift */; };
-		E19C73362F349F5100087EE4 /* BudgetBuddyApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = E19C73162F349F5000087EE4 /* BudgetBuddyApp.swift */; };
-		E19C73372F349F5100087EE4 /* ChatViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = E19C73172F349F5000087EE4 /* ChatViewModel.swift */; };
-		E19C73382F349F5100087EE4 /* AuthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = E19C73192F349F5000087EE4 /* AuthManager.swift */; };
-		E19C73392F349F5200087EE4 /* PlanQuestionFlowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E19C731C2F349F5000087EE4 /* PlanQuestionFlowView.swift */; };
-		E19C733A2F349F5200087EE4 /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E19C731E2F349F5000087EE4 /* LoginView.swift */; };
-		E19C733B2F349F5200087EE4 /* PlanView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E19C731F2F349F5000087EE4 /* PlanView.swift */; };
-		E19C733C2F349F5200087EE4 /* GenerativeWidgetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E19C73212F349F5000087EE4 /* GenerativeWidgetView.swift */; };
-		E19C733D2F349F5200087EE4 /* BurndownWidgetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E19C73222F349F5000087EE4 /* BurndownWidgetView.swift */; };
-		E19C733E2F349F5200087EE4 /* PulseHeaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E19C73232F349F5000087EE4 /* PulseHeaderView.swift */; };
-		E19C733F2F349F5200087EE4 /* PlanDashboardCards.swift in Sources */ = {isa = PBXBuildFile; fileRef = E19C73252F349F5000087EE4 /* PlanDashboardCards.swift */; };
-		E19C73402F349F5200087EE4 /* ChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E19C73262F349F5000087EE4 /* ChatView.swift */; };
-		E19C73412F349F5200087EE4 /* WalletView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E19C73272F349F5000087EE4 /* WalletView.swift */; };
-		E19C73422F349F5200087EE4 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E19C73282F349F5000087EE4 /* ContentView.swift */; };
-		E19C73432F349F5200087EE4 /* OnboardingWizardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E19C732A2F349F5000087EE4 /* OnboardingWizardView.swift */; };
-		E19C73442F349F5200087EE4 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = E19C732C2F349F5100087EE4 /* Theme.swift */; };
-		E19C73452F349F5200087EE4 /* WalletViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = E19C732D2F349F5100087EE4 /* WalletViewModel.swift */; };
-		E19C73462F349F5200087EE4 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = E19C732E2F349F5100087EE4 /* Assets.xcassets */; };
-		E19C73472F349F5200087EE4 /* SpendingPlanViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = E19C732F2F349F5100087EE4 /* SpendingPlanViewModel.swift */; };
-		E19C73482F349F5200087EE4 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = E19C73302F349F5100087EE4 /* Models.swift */; };
-		E19C73492F349F5200087EE4 /* APIService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E19C73312F349F5100087EE4 /* APIService.swift */; };
-		E19C734A2F349F5200087EE4 /* MockService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E19C73322F349F5100087EE4 /* MockService.swift */; };
-/* End PBXBuildFile section */
-
 /* Begin PBXFileReference section */
-		E1SMS0002F3C000000000001 /* EnterPhoneView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnterPhoneView.swift; sourceTree = "<group>"; };
-		E1SMS0022F3C000000000002 /* OTPView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OTPView.swift; sourceTree = "<group>"; };
-		E111F9C62F3B08CB00CAA26C /* QuickActionModalView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = QuickActionModalView.swift; sourceTree = "<group>"; };
-		E19C73002F349E9C00087EE4 /* BudgetBuddy.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BudgetBuddy.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		E19C73072F349E9F00087EE4 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		E19C73122F349F5000087EE4 /* ChatBubbleView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ChatBubbleView.swift; sourceTree = "<group>"; };
-		E19C73132F349F5000087EE4 /* BurndownChartView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BurndownChartView.swift; sourceTree = "<group>"; };
-		E19C73142F349F5000087EE4 /* BudgetBuddy.entitlements */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.entitlements; path = BudgetBuddy.entitlements; sourceTree = "<group>"; };
-		E19C73152F349F5000087EE4 /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		E19C73162F349F5000087EE4 /* BudgetBuddyApp.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BudgetBuddyApp.swift; sourceTree = "<group>"; };
-		E19C73172F349F5000087EE4 /* ChatViewModel.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ChatViewModel.swift; sourceTree = "<group>"; };
-		E19C73192F349F5000087EE4 /* AuthManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AuthManager.swift; sourceTree = "<group>"; };
-		E19C731C2F349F5000087EE4 /* PlanQuestionFlowView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PlanQuestionFlowView.swift; sourceTree = "<group>"; };
-		E19C731E2F349F5000087EE4 /* LoginView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
-		E19C731F2F349F5000087EE4 /* PlanView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PlanView.swift; sourceTree = "<group>"; };
-		E19C73212F349F5000087EE4 /* GenerativeWidgetView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = GenerativeWidgetView.swift; sourceTree = "<group>"; };
-		E19C73222F349F5000087EE4 /* BurndownWidgetView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BurndownWidgetView.swift; sourceTree = "<group>"; };
-		E19C73232F349F5000087EE4 /* PulseHeaderView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PulseHeaderView.swift; sourceTree = "<group>"; };
-		E19C73252F349F5000087EE4 /* PlanDashboardCards.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PlanDashboardCards.swift; sourceTree = "<group>"; };
-		E19C73262F349F5000087EE4 /* ChatView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ChatView.swift; sourceTree = "<group>"; };
-		E19C73272F349F5000087EE4 /* WalletView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = WalletView.swift; sourceTree = "<group>"; };
-		E19C73282F349F5000087EE4 /* ContentView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
-		E19C732A2F349F5000087EE4 /* OnboardingWizardView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = OnboardingWizardView.swift; sourceTree = "<group>"; };
-		E19C732C2F349F5100087EE4 /* Theme.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
-		E19C732D2F349F5100087EE4 /* WalletViewModel.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = WalletViewModel.swift; sourceTree = "<group>"; };
-		E19C732E2F349F5100087EE4 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		E19C732F2F349F5100087EE4 /* SpendingPlanViewModel.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SpendingPlanViewModel.swift; sourceTree = "<group>"; };
-		E19C73302F349F5100087EE4 /* Models.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
-		E19C73312F349F5100087EE4 /* APIService.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = APIService.swift; sourceTree = "<group>"; };
-		E19C73322F349F5100087EE4 /* MockService.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = MockService.swift; sourceTree = "<group>"; };
+		ACEBD1B42F2BE42700FA1D26 /* BudgetBuddy.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BudgetBuddy.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		ACEBD1C12F2BE42A00FA1D26 /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = ACEBD1B32F2BE42700FA1D26 /* BudgetBuddy */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		ACEBD1B62F2BE42700FA1D26 /* BudgetBuddy */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (ACEBD1C12F2BE42A00FA1D26 /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = BudgetBuddy; sourceTree = "<group>"; };
+/* End PBXFileSystemSynchronizedRootGroup section */
+
 /* Begin PBXFrameworksBuildPhase section */
-		E19C72FD2F349E9C00087EE4 /* Frameworks */ = {
+		ACEBD1B12F2BE42700FA1D26 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				E1SMS0052F3C000000000003 /* PhoneNumberKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		E19C72F72F349E9C00087EE4 = {
+		ACEBD1AB2F2BE42700FA1D26 = {
 			isa = PBXGroup;
 			children = (
-				E19C73022F349E9C00087EE4 /* BudgetBuddy */,
-				E19C73012F349E9C00087EE4 /* Products */,
+				ACEBD1B62F2BE42700FA1D26 /* BudgetBuddy */,
+				ACEBD1B52F2BE42700FA1D26 /* Products */,
 			);
 			sourceTree = "<group>";
 		};
-		E19C73012F349E9C00087EE4 /* Products */ = {
+		ACEBD1B52F2BE42700FA1D26 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				E19C73002F349E9C00087EE4 /* BudgetBuddy.app */,
+				ACEBD1B42F2BE42700FA1D26 /* BudgetBuddy.app */,
 			);
 			name = Products;
-			sourceTree = "<group>";
-		};
-		E19C73022F349E9C00087EE4 /* BudgetBuddy */ = {
-			isa = PBXGroup;
-			children = (
-				E19C73312F349F5100087EE4 /* APIService.swift */,
-				E19C732E2F349F5100087EE4 /* Assets.xcassets */,
-				E19C73142F349F5000087EE4 /* BudgetBuddy.entitlements */,
-				E19C73162F349F5000087EE4 /* BudgetBuddyApp.swift */,
-				E19C73172F349F5000087EE4 /* ChatViewModel.swift */,
-				E19C73112F349F5000087EE4 /* Components */,
-				E19C732B2F349F5100087EE4 /* Design */,
-				E19C73152F349F5000087EE4 /* Info.plist */,
-				E19C73322F349F5100087EE4 /* MockService.swift */,
-				E19C73302F349F5100087EE4 /* Models.swift */,
-				E19C73182F349F5000087EE4 /* Services */,
-				E19C732F2F349F5100087EE4 /* SpendingPlanViewModel.swift */,
-				E19C731A2F349F5000087EE4 /* Views */,
-				E19C732D2F349F5100087EE4 /* WalletViewModel.swift */,
-				E19C73072F349E9F00087EE4 /* Assets.xcassets */,
-			);
-			path = BudgetBuddy;
-			sourceTree = "<group>";
-		};
-		E19C73112F349F5000087EE4 /* Components */ = {
-			isa = PBXGroup;
-			children = (
-				E19C73122F349F5000087EE4 /* ChatBubbleView.swift */,
-				E19C73132F349F5000087EE4 /* BurndownChartView.swift */,
-			);
-			path = Components;
-			sourceTree = "<group>";
-		};
-		E19C73182F349F5000087EE4 /* Services */ = {
-			isa = PBXGroup;
-			children = (
-				E19C73192F349F5000087EE4 /* AuthManager.swift */,
-			);
-			path = Services;
-			sourceTree = "<group>";
-		};
-		E19C731A2F349F5000087EE4 /* Views */ = {
-			isa = PBXGroup;
-			children = (
-				E19C731B2F349F5000087EE4 /* SpendingPlan */,
-				E19C731D2F349F5000087EE4 /* Auth */,
-				E19C731F2F349F5000087EE4 /* PlanView.swift */,
-				E19C73202F349F5000087EE4 /* Components */,
-				E19C73242F349F5000087EE4 /* Wallet */,
-				E19C73262F349F5000087EE4 /* ChatView.swift */,
-				E19C73272F349F5000087EE4 /* WalletView.swift */,
-				E19C73282F349F5000087EE4 /* ContentView.swift */,
-				E19C73292F349F5000087EE4 /* Onboarding */,
-			);
-			path = Views;
-			sourceTree = "<group>";
-		};
-		E19C731B2F349F5000087EE4 /* SpendingPlan */ = {
-			isa = PBXGroup;
-			children = (
-				E19C731C2F349F5000087EE4 /* PlanQuestionFlowView.swift */,
-			);
-			path = SpendingPlan;
-			sourceTree = "<group>";
-		};
-		E19C731D2F349F5000087EE4 /* Auth */ = {
-			isa = PBXGroup;
-			children = (
-				E19C731E2F349F5000087EE4 /* LoginView.swift */,
-				E1SMS0002F3C000000000001 /* EnterPhoneView.swift */,
-				E1SMS0022F3C000000000002 /* OTPView.swift */,
-			);
-			path = Auth;
-			sourceTree = "<group>";
-		};
-		E19C73202F349F5000087EE4 /* Components */ = {
-			isa = PBXGroup;
-			children = (
-				E111F9C62F3B08CB00CAA26C /* QuickActionModalView.swift */,
-				E19C73212F349F5000087EE4 /* GenerativeWidgetView.swift */,
-				E19C73222F349F5000087EE4 /* BurndownWidgetView.swift */,
-				E19C73232F349F5000087EE4 /* PulseHeaderView.swift */,
-			);
-			path = Components;
-			sourceTree = "<group>";
-		};
-		E19C73242F349F5000087EE4 /* Wallet */ = {
-			isa = PBXGroup;
-			children = (
-				E19C73252F349F5000087EE4 /* PlanDashboardCards.swift */,
-			);
-			path = Wallet;
-			sourceTree = "<group>";
-		};
-		E19C73292F349F5000087EE4 /* Onboarding */ = {
-			isa = PBXGroup;
-			children = (
-				E19C732A2F349F5000087EE4 /* OnboardingWizardView.swift */,
-			);
-			path = Onboarding;
-			sourceTree = "<group>";
-		};
-		E19C732B2F349F5100087EE4 /* Design */ = {
-			isa = PBXGroup;
-			children = (
-				E19C732C2F349F5100087EE4 /* Theme.swift */,
-			);
-			path = Design;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		E19C72FF2F349E9C00087EE4 /* BudgetBuddy */ = {
+		ACEBD1B32F2BE42700FA1D26 /* BudgetBuddy */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = E19C730E2F349E9F00087EE4 /* Build configuration list for PBXNativeTarget "BudgetBuddy" */;
+			buildConfigurationList = ACEBD1C22F2BE42A00FA1D26 /* Build configuration list for PBXNativeTarget "BudgetBuddy" */;
 			buildPhases = (
-				E19C72FC2F349E9C00087EE4 /* Sources */,
-				E19C72FD2F349E9C00087EE4 /* Frameworks */,
-				E19C72FE2F349E9C00087EE4 /* Resources */,
+				ACEBD1B02F2BE42700FA1D26 /* Sources */,
+				ACEBD1B12F2BE42700FA1D26 /* Frameworks */,
+				ACEBD1B22F2BE42700FA1D26 /* Resources */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 			);
+			fileSystemSynchronizedGroups = (
+				ACEBD1B62F2BE42700FA1D26 /* BudgetBuddy */,
+			);
 			name = BudgetBuddy;
 			packageProductDependencies = (
-				E1SMS0042F3C000000000003 /* PhoneNumberKit */,
 			);
 			productName = BudgetBuddy;
-			productReference = E19C73002F349E9C00087EE4 /* BudgetBuddy.app */;
+			productReference = ACEBD1B42F2BE42700FA1D26 /* BudgetBuddy.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
-		E19C72F82F349E9C00087EE4 /* Project object */ = {
+		ACEBD1AC2F2BE42700FA1D26 /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
-				LastSwiftUpdateCheck = 1520;
-				LastUpgradeCheck = 1520;
+				LastSwiftUpdateCheck = 2620;
+				LastUpgradeCheck = 2620;
 				TargetAttributes = {
-					E19C72FF2F349E9C00087EE4 = {
-						CreatedOnToolsVersion = 15.2;
-						LastSwiftMigration = 1520;
+					ACEBD1B32F2BE42700FA1D26 = {
+						CreatedOnToolsVersion = 26.2;
 					};
 				};
 			};
-			buildConfigurationList = E19C72FB2F349E9C00087EE4 /* Build configuration list for PBXProject "BudgetBuddy" */;
-			compatibilityVersion = "Xcode 14.0";
+			buildConfigurationList = ACEBD1AF2F2BE42700FA1D26 /* Build configuration list for PBXProject "BudgetBuddy" */;
+			compatibilityVersion = "Xcode 15.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
 				en,
 				Base,
 			);
-			mainGroup = E19C72F72F349E9C00087EE4;
-			packageReferences = (
-				E1SMS0062F3C000000000004 /* XCRemoteSwiftPackageReference "PhoneNumberKit" */,
-			);
-			productRefGroup = E19C73012F349E9C00087EE4 /* Products */;
+			mainGroup = ACEBD1AB2F2BE42700FA1D26;
+			minimizedProjectReferenceProxies = 1;
+			productRefGroup = ACEBD1B52F2BE42700FA1D26 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				E19C72FF2F349E9C00087EE4 /* BudgetBuddy */,
+				ACEBD1B32F2BE42700FA1D26 /* BudgetBuddy */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-		E19C72FE2F349E9C00087EE4 /* Resources */ = {
+		ACEBD1B22F2BE42700FA1D26 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				E19C73462F349F5200087EE4 /* Assets.xcassets in Resources */,
-				E19C73082F349E9F00087EE4 /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-		E19C72FC2F349E9C00087EE4 /* Sources */ = {
+		ACEBD1B02F2BE42700FA1D26 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				E19C73362F349F5100087EE4 /* BudgetBuddyApp.swift in Sources */,
-				E19C73492F349F5200087EE4 /* APIService.swift in Sources */,
-				E111F9C72F3B08CB00CAA26C /* QuickActionModalView.swift in Sources */,
-				E19C733D2F349F5200087EE4 /* BurndownWidgetView.swift in Sources */,
-				E19C733A2F349F5200087EE4 /* LoginView.swift in Sources */,
-				E19C73412F349F5200087EE4 /* WalletView.swift in Sources */,
-				E19C73432F349F5200087EE4 /* OnboardingWizardView.swift in Sources */,
-				E19C733F2F349F5200087EE4 /* PlanDashboardCards.swift in Sources */,
-				E19C73342F349F5100087EE4 /* BurndownChartView.swift in Sources */,
-				E19C73472F349F5200087EE4 /* SpendingPlanViewModel.swift in Sources */,
-				E19C73372F349F5100087EE4 /* ChatViewModel.swift in Sources */,
-				E19C73402F349F5200087EE4 /* ChatView.swift in Sources */,
-				E19C73332F349F5100087EE4 /* ChatBubbleView.swift in Sources */,
-				E19C733E2F349F5200087EE4 /* PulseHeaderView.swift in Sources */,
-				E19C733C2F349F5200087EE4 /* GenerativeWidgetView.swift in Sources */,
-				E19C73422F349F5200087EE4 /* ContentView.swift in Sources */,
-				E19C734A2F349F5200087EE4 /* MockService.swift in Sources */,
-				E19C73382F349F5100087EE4 /* AuthManager.swift in Sources */,
-				E19C73392F349F5200087EE4 /* PlanQuestionFlowView.swift in Sources */,
-				E19C73452F349F5200087EE4 /* WalletViewModel.swift in Sources */,
-				E19C733B2F349F5200087EE4 /* PlanView.swift in Sources */,
-				E19C73442F349F5200087EE4 /* Theme.swift in Sources */,
-				E19C73482F349F5200087EE4 /* Models.swift in Sources */,
-				E1SMS0012F3C000000000001 /* EnterPhoneView.swift in Sources */,
-				E1SMS0032F3C000000000002 /* OTPView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin XCBuildConfiguration section */
-		E19C730C2F349E9F00087EE4 /* Debug */ = {
+		ACEBD1C32F2BE42A00FA1D26 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = BudgetBuddy/BudgetBuddy.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = BudgetBuddy/Info.plist;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = sample.BudgetBuddy;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		ACEBD1C42F2BE42A00FA1D26 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = BudgetBuddy/BudgetBuddy.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = BudgetBuddy/Info.plist;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = sample.BudgetBuddy;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		ACEBD1C52F2BE42A00FA1D26 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -366,7 +249,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 17.2;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
@@ -377,7 +260,7 @@
 			};
 			name = Debug;
 		};
-		E19C730D2F349E9F00087EE4 /* Release */ = {
+		ACEBD1C62F2BE42A00FA1D26 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -423,7 +306,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 17.2;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
@@ -433,112 +316,28 @@
 			};
 			name = Release;
 		};
-		E19C730F2F349E9F00087EE4 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CLANG_ENABLE_MODULES = YES;
-				CODE_SIGN_ENTITLEMENTS = BudgetBuddy/BudgetBuddy.entitlements;
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_ASSET_PATHS = "";
-				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = BudgetBuddy/Info.plist;
-				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
-				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-				);
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = sample.BudgetBuddy;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-			};
-			name = Debug;
-		};
-		E19C73102F349E9F00087EE4 /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CLANG_ENABLE_MODULES = YES;
-				CODE_SIGN_ENTITLEMENTS = BudgetBuddy/BudgetBuddy.entitlements;
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_ASSET_PATHS = "";
-				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = BudgetBuddy/Info.plist;
-				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
-				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-				);
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = sample.BudgetBuddy;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-			};
-			name = Release;
-		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		E19C72FB2F349E9C00087EE4 /* Build configuration list for PBXProject "BudgetBuddy" */ = {
+		ACEBD1AF2F2BE42700FA1D26 /* Build configuration list for PBXProject "BudgetBuddy" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				E19C730C2F349E9F00087EE4 /* Debug */,
-				E19C730D2F349E9F00087EE4 /* Release */,
+				ACEBD1C52F2BE42A00FA1D26 /* Debug */,
+				ACEBD1C62F2BE42A00FA1D26 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		E19C730E2F349E9F00087EE4 /* Build configuration list for PBXNativeTarget "BudgetBuddy" */ = {
+		ACEBD1C22F2BE42A00FA1D26 /* Build configuration list for PBXNativeTarget "BudgetBuddy" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				E19C730F2F349E9F00087EE4 /* Debug */,
-				E19C73102F349E9F00087EE4 /* Release */,
+				ACEBD1C32F2BE42A00FA1D26 /* Debug */,
+				ACEBD1C42F2BE42A00FA1D26 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
-
-/* Begin XCRemoteSwiftPackageReference section */
-		E1SMS0062F3C000000000004 /* XCRemoteSwiftPackageReference "PhoneNumberKit" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/marmelroy/PhoneNumberKit";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 3.7.0;
-			};
-		};
-/* End XCRemoteSwiftPackageReference section */
-
-/* Begin XCSwiftPackageProductDependency section */
-		E1SMS0042F3C000000000003 /* PhoneNumberKit */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = E1SMS0062F3C000000000004 /* XCRemoteSwiftPackageReference "PhoneNumberKit" */;
-			productName = PhoneNumberKit;
-		};
-/* End XCSwiftPackageProductDependency section */
 	};
-	rootObject = E19C72F82F349E9C00087EE4 /* Project object */;
+	rootObject = ACEBD1AC2F2BE42700FA1D26 /* Project object */;
 }
