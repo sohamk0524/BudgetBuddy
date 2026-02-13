@@ -27,6 +27,16 @@ class AuthManager {
         }
     }
 
+    var userName: String? {
+        didSet {
+            if let name = userName {
+                UserDefaults.standard.setValue(name, forKey: "userName")
+            } else {
+                UserDefaults.standard.removeObject(forKey: "userName")
+            }
+        }
+    }
+
     /// For physical devices, change to your Mac's IP address (run: ipconfig getifaddr en0)
     private let baseURL = URL(string: "http://localhost:5000")!
 
@@ -34,6 +44,9 @@ class AuthManager {
         if let token = UserDefaults.standard.value(forKey: "authToken") as? Int {
             self.authToken = token
             self.isAuthenticated = true
+        }
+        if let name = UserDefaults.standard.string(forKey: "userName") {
+            self.userName = name
         }
     }
 
@@ -71,8 +84,11 @@ class AuthManager {
                     throw AuthError.invalidResponse
                 }
 
+                let name = json?["name"] as? String
+
                 await MainActor.run {
                     self.authToken = token
+                    self.userName = name
                     self.isAuthenticated = true
                     self.needsOnboarding = !hasProfile
                     self.isLoading = false
@@ -149,6 +165,7 @@ class AuthManager {
     // MARK: - Complete Onboarding
 
     func completeOnboarding(
+        name: String = "",
         age: Int,
         occupation: String,
         income: Double,
@@ -169,7 +186,7 @@ class AuthManager {
             request.httpMethod = "POST"
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
-            let body: [String: Any] = [
+            var body: [String: Any] = [
                 "userId": userId,
                 "age": age,
                 "occupation": occupation,
@@ -178,6 +195,9 @@ class AuthManager {
                 "financialPersonality": financialPersonality,
                 "primaryGoal": primaryGoal
             ]
+            if !name.isEmpty {
+                body["name"] = name
+            }
             request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
             let (data, response) = try await URLSession.shared.data(for: request)
@@ -188,6 +208,9 @@ class AuthManager {
 
             if httpResponse.statusCode == 200 {
                 await MainActor.run {
+                    if !name.isEmpty {
+                        self.userName = name
+                    }
                     self.needsOnboarding = false
                     self.isLoading = false
 
@@ -216,6 +239,7 @@ class AuthManager {
         isAuthenticated = false
         needsOnboarding = false
         authToken = nil
+        userName = nil
         errorMessage = nil
     }
 }
