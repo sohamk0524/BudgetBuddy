@@ -43,11 +43,15 @@ struct ProfileView: View {
             .padding()
         }
         .background(Color.appBackground)
-        .navigationTitle("Profile")
-        .navigationBarTitleDisplayMode(.large)
+        .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(Color.appBackground, for: .navigationBar)
         .toolbarColorScheme(.dark, for: .navigationBar)
         .toolbar {
+            ToolbarItem(placement: .principal) {
+                Text("Profile")
+                    .font(.system(size: 22, weight: .bold, design: .rounded))
+                    .foregroundStyle(Color.textPrimary)
+            }
             if viewModel.isEditing {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Save") {
@@ -216,18 +220,22 @@ struct ProfileView: View {
             Text(label)
                 .font(.roundedBody)
                 .foregroundStyle(Color.textSecondary)
+                .layoutPriority(1)
 
-            Spacer()
+            Spacer(minLength: 8)
 
-            if viewModel.isEditing {
-                editView()
-                    .font(.roundedBody)
-                    .foregroundStyle(Color.accent)
-            } else {
-                Text(value)
-                    .font(.roundedBody)
-                    .foregroundStyle(Color.textPrimary)
+            Group {
+                if viewModel.isEditing {
+                    editView()
+                        .font(.roundedBody)
+                        .foregroundStyle(Color.accent)
+                } else {
+                    Text(value)
+                        .font(.roundedBody)
+                        .foregroundStyle(Color.textPrimary)
+                }
             }
+            .frame(width: 160, alignment: .trailing)
         }
         .padding(.vertical, 4)
     }

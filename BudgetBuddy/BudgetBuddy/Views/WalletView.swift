@@ -98,11 +98,15 @@ struct WalletView: View {
                 .padding()
             }
             .background(Color.appBackground)
-            .navigationTitle("Wallet")
-            .navigationBarTitleDisplayMode(.large)
+            .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(Color.appBackground, for: .navigationBar)
             .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Text("Wallet")
+                        .font(.system(size: 22, weight: .bold, design: .rounded))
+                        .foregroundStyle(Color.textPrimary)
+                }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     NavigationLink {
                         ProfileView()
