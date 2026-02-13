@@ -41,6 +41,10 @@ struct ContentView: View {
                 mainTabView
             }
         }
+        .task {
+            // Validate persisted session with the backend on launch
+            await authManager.restoreSession()
+        }
         .onReceive(NotificationCenter.default.publisher(for: .onboardingCompleted)) { _ in
             // Show Plaid Link after onboarding completes
             showPlaidLink = true

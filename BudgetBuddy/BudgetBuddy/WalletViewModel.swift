@@ -16,8 +16,8 @@ class WalletViewModel {
     var isLoading = false
     var errorMessage: String?
 
-    // Financial summary from saved statement
-    var hasStatement = false
+    // Financial summary
+    var hasData = false
     var netWorth: Double = 0.0
     var safeToSpend: Double = 0.0
     var statementInfo: StatementInfo?
@@ -141,7 +141,7 @@ class WalletViewModel {
     // MARK: - Private Methods
 
     private func updateFromSummary(_ summary: FinancialSummary) {
-        hasStatement = summary.hasStatement
+        hasData = summary.hasData
         netWorth = summary.netWorth ?? 0.0
         safeToSpend = summary.safeToSpend ?? 0.0
         statementInfo = summary.statementInfo
@@ -149,7 +149,7 @@ class WalletViewModel {
     }
 
     private func clearData() {
-        hasStatement = false
+        hasData = false
         netWorth = 0.0
         safeToSpend = 0.0
         statementInfo = nil

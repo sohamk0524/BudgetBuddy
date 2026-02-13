@@ -306,10 +306,11 @@ struct ChatMessage: Identifiable, Equatable {
     }
 }
 
-// MARK: - Financial Summary (from saved statement)
+// MARK: - Financial Summary (from Plaid or saved statement)
 
 struct FinancialSummary: Codable {
-    let hasStatement: Bool
+    let hasData: Bool
+    let source: String?
     let netWorth: Double?
     let safeToSpend: Double?
     let statementInfo: StatementInfo?

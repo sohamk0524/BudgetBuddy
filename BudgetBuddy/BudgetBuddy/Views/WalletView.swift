@@ -3,7 +3,7 @@
 //  BudgetBuddy
 //
 //  Unified Wallet Dashboard
-//  - Statement drives numbers
+//  - Plaid/Statement drives numbers
 //  - Plan drives goals, warnings, upcoming events
 //
 
@@ -48,16 +48,16 @@ struct WalletView: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
 
-                    // MARK: - Top Row (Statement-driven)
+                    // MARK: - Top Row
                     HStack(spacing: 16) {
                         NetWorthCard(
                             amount: walletViewModel.netWorth,
-                            hasStatement: walletViewModel.hasStatement
+                            hasData: walletViewModel.hasData
                         )
 
                         WalletSafeToSpendCard(
                             amount: walletViewModel.safeToSpend,
-                            hasStatement: walletViewModel.hasStatement
+                            hasData: walletViewModel.hasData
                         )
                     }
 
@@ -164,29 +164,29 @@ struct WalletView: View {
 
 struct NetWorthCard: View {
     let amount: Double
-    let hasStatement: Bool
+    let hasData: Bool
 
     var body: some View {
         card(
             title: "Net Worth",
             icon: "chart.line.uptrend.xyaxis",
-            value: hasStatement ? format(amount) : "--",
-            subtitle: hasStatement ? nil : "Upload statement"
+            value: hasData ? format(amount) : "--",
+            subtitle: hasData ? nil : "Link bank account"
         )
     }
 }
 
 struct WalletSafeToSpendCard: View {
     let amount: Double
-    let hasStatement: Bool
+    let hasData: Bool
 
     var body: some View {
         card(
             title: "Safe to Spend",
             icon: "creditcard.fill",
-            value: hasStatement ? format(amount) : "--",
+            value: hasData ? format(amount) : "--",
             valueColor: amount >= 0 ? Color.accent : Color.danger,
-            subtitle: hasStatement ? nil : "Upload statement"
+            subtitle: hasData ? nil : "Link bank account"
         )
     }
 }
@@ -251,6 +251,8 @@ private func card(
         Text(value)
             .font(.system(size: 28, weight: .bold, design: .rounded))
             .foregroundStyle(valueColor)
+            .lineLimit(1)
+            .minimumScaleFactor(0.5)
 
         if let subtitle {
             Text(subtitle)

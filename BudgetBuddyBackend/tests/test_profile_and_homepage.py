@@ -6,7 +6,7 @@ nudges endpoint, and name support in auth/onboarding.
 import pytest
 import json
 from datetime import date, timedelta
-from db_models import db, User, UserCategoryPreference
+from db_models import db, User, UserCategoryPreference, SavedStatement, PlaidItem, PlaidAccount, BudgetPlan, FinancialProfile
 
 
 # =============================================================================
@@ -254,8 +254,8 @@ class TestTopExpensesEndpoint:
         assert "amount" in expense
         assert "transactionCount" in expense
 
-        # FOOD_AND_DRINK should be the highest
-        assert data["topExpenses"][0]["category"] == "FOOD_AND_DRINK"
+        # FOOD_AND_DRINK should be the highest (displayed as "Food & Drink")
+        assert data["topExpenses"][0]["category"] == "Food & Drink"
         assert data["topExpenses"][0]["amount"] == 450.0
 
     def test_top_expenses_no_data(self, client, sample_user):
@@ -404,8 +404,8 @@ class TestNudgesEndpoint:
         # FOOD_AND_DRINK: spent 450 on 300 budget = over budget
         assert "spending_reduction" in types
 
-        # Find the food nudge
-        food_nudges = [n for n in data["nudges"] if n.get("category") == "FOOD_AND_DRINK"]
+        # Find the food nudge (displayed as "Food & Drink")
+        food_nudges = [n for n in data["nudges"] if n.get("category") == "Food & Drink"]
         assert len(food_nudges) > 0
         assert food_nudges[0]["potentialSavings"] == 150.0
 
@@ -648,3 +648,148 @@ class TestUserCategoryPreferenceModel:
 
             saved_user = User.query.get(user.id)
             assert len(saved_user.category_preferences) == 3
+
+
+# =============================================================================
+# Financial Summary Endpoint
+# =============================================================================
+
+@pytest.mark.integration
+class TestFinancialSummaryEndpoint:
+    """Tests for GET /user/financial-summary with Plaid-first logic."""
+
+    def test_plaid_user_net_worth(self, client, app):
+        """Plaid-linked user: net worth = assets - liabilities."""
+        from werkzeug.security import generate_password_hash
+
+        with app.app_context():
+            user = User(email="fs_plaid@test.com", password_hash=generate_password_hash("pass"))
+            db.session.add(user)
+            db.session.flush()
+
+            item = PlaidItem(
+                user_id=user.id, item_id="fs-item-1",
+                access_token_encrypted=b'tok', institution_name="Bank", status="active"
+            )
+            db.session.add(item)
+            db.session.flush()
+
+            # Depository (asset): 5000
+            db.session.add(PlaidAccount(
+                plaid_item_id=item.id, account_id="fs-acct-chk",
+                name="Checking", account_type="depository", account_subtype="checking",
+                balance_current=3000.0, balance_available=2800.0
+            ))
+            # Investment (asset): 10000
+            db.session.add(PlaidAccount(
+                plaid_item_id=item.id, account_id="fs-acct-inv",
+                name="Brokerage", account_type="investment",
+                balance_current=10000.0
+            ))
+            # Credit (liability): 1500
+            db.session.add(PlaidAccount(
+                plaid_item_id=item.id, account_id="fs-acct-cc",
+                name="Credit Card", account_type="credit", account_subtype="credit card",
+                balance_current=1500.0
+            ))
+            db.session.commit()
+            uid = user.id
+
+        response = client.get(f"/user/financial-summary?userId={uid}")
+        assert response.status_code == 200
+        data = json.loads(response.data)
+
+        assert data["hasData"] is True
+        assert data["source"] == "plaid"
+        # 3000 + 10000 - 1500 = 11500
+        assert data["netWorth"] == 11500.0
+        assert data["statementInfo"] is None
+
+    def test_plaid_user_safe_to_spend_from_plan(self, client, sample_user_with_plaid_and_plan):
+        """Plaid user with budget plan: safe to spend from plan's safeToSpend."""
+        response = client.get(f"/user/financial-summary?userId={sample_user_with_plaid_and_plan}")
+
+        assert response.status_code == 200
+        data = json.loads(response.data)
+
+        assert data["hasData"] is True
+        assert data["source"] == "plaid"
+        assert data["safeToSpend"] == 1500.0
+
+    def test_plaid_user_safe_to_spend_no_plan(self, client, app):
+        """Plaid user without plan: safe to spend = sum of depository balance_available."""
+        from werkzeug.security import generate_password_hash
+
+        with app.app_context():
+            user = User(email="fs_noplan@test.com", password_hash=generate_password_hash("pass"))
+            db.session.add(user)
+            db.session.flush()
+
+            item = PlaidItem(
+                user_id=user.id, item_id="fs-item-noplan",
+                access_token_encrypted=b'tok', institution_name="Bank", status="active"
+            )
+            db.session.add(item)
+            db.session.flush()
+
+            db.session.add(PlaidAccount(
+                plaid_item_id=item.id, account_id="fs-acct-noplan-chk",
+                name="Checking", account_type="depository", account_subtype="checking",
+                balance_current=2000.0, balance_available=1800.0
+            ))
+            db.session.add(PlaidAccount(
+                plaid_item_id=item.id, account_id="fs-acct-noplan-sav",
+                name="Savings", account_type="depository", account_subtype="savings",
+                balance_current=5000.0, balance_available=5000.0
+            ))
+            db.session.commit()
+            uid = user.id
+
+        response = client.get(f"/user/financial-summary?userId={uid}")
+        data = json.loads(response.data)
+
+        assert data["source"] == "plaid"
+        # 1800 + 5000 = 6800
+        assert data["safeToSpend"] == 6800.0
+
+    def test_statement_fallback(self, client, app):
+        """Statement-only user: fallback to statement logic, source='statement'."""
+        from werkzeug.security import generate_password_hash
+
+        with app.app_context():
+            user = User(email="fs_stmt@test.com", password_hash=generate_password_hash("pass"))
+            db.session.add(user)
+            db.session.flush()
+
+            stmt = SavedStatement(
+                user_id=user.id, filename="jan.pdf", file_type="pdf",
+                raw_file=b'pdf-bytes', ending_balance=10000.0,
+                total_income=5000.0, total_expenses=3000.0
+            )
+            db.session.add(stmt)
+            db.session.commit()
+            uid = user.id
+
+        response = client.get(f"/user/financial-summary?userId={uid}")
+        data = json.loads(response.data)
+
+        assert data["hasData"] is True
+        assert data["source"] == "statement"
+        assert data["netWorth"] == 10000.0
+        assert data["safeToSpend"] == 800.0  # 0.08 * 10000
+        assert data["statementInfo"] is not None
+        assert data["statementInfo"]["filename"] == "jan.pdf"
+
+    def test_no_data_user(self, client, sample_user):
+        """User with neither Plaid nor statement: hasData=false, nulls."""
+        response = client.get(f"/user/financial-summary?userId={sample_user}")
+
+        assert response.status_code == 200
+        data = json.loads(response.data)
+
+        assert data["hasData"] is False
+        assert data["source"] == "none"
+        assert data["netWorth"] is None
+        assert data["safeToSpend"] is None
+        assert data["statementInfo"] is None
+        assert data["spendingBreakdown"] is None

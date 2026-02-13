@@ -24,7 +24,7 @@ final class ChatViewModel {
 
     // Financial summary state (for PulseHeader)
     var safeToSpend: Double = 0.0
-    var hasStatement: Bool = false
+    var hasData: Bool = false
 
     // MARK: - Dependencies
 
@@ -46,14 +46,14 @@ final class ChatViewModel {
     @MainActor
     func fetchFinancialSummary() async {
         guard let userId = AuthManager.shared.authToken else {
-            hasStatement = false
+            hasData = false
             safeToSpend = 0.0
             return
         }
 
         do {
             let summary = try await apiService.getFinancialSummary(userId: userId)
-            hasStatement = summary.hasStatement
+            hasData = summary.hasData
             safeToSpend = summary.safeToSpend ?? 0.0
         } catch {
             print("Failed to fetch financial summary: \(error)")

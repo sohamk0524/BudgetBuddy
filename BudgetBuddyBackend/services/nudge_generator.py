@@ -9,6 +9,15 @@ from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
 
 
+def _display_name(raw_name: str) -> str:
+    """Convert a Plaid category code to a human-readable display name."""
+    try:
+        from app import format_category_name
+        return format_category_name(raw_name)
+    except ImportError:
+        return raw_name.replace("_", " ").title().replace(" And ", " & ")
+
+
 def generate_nudges(user_id: int) -> List[Dict[str, Any]]:
     """
     Generate smart nudges by comparing actual spending vs. budget plan.
@@ -142,20 +151,22 @@ def _compare_spending(
 
         if ratio > 1.1:  # Over budget by >10%
             overspend = actual_amount - plan_amount
+            display = _display_name(plan_name)
             nudges.append({
                 "type": "spending_reduction",
-                "title": f"{plan_name} Over Budget",
-                "message": f"You've spent ${actual_amount:.0f} of your ${plan_amount:.0f} {plan_name} budget. Consider cutting back ${overspend:.0f} this month.",
-                "category": plan_name,
+                "title": f"{display} Over Budget",
+                "message": f"You've spent ${actual_amount:.0f} of your ${plan_amount:.0f} {display} budget. Consider cutting back ${overspend:.0f} this month.",
+                "category": display,
                 "potentialSavings": round(overspend, 2)
             })
         elif ratio < 0.7:  # Under budget by >30%
             saved = plan_amount - actual_amount
+            display = _display_name(plan_name)
             nudges.append({
                 "type": "positive_reinforcement",
-                "title": f"Great job on {plan_name}!",
-                "message": f"You're ${saved:.0f} under your {plan_name} budget. Keep it up!",
-                "category": plan_name,
+                "title": f"Great job on {display}!",
+                "message": f"You're ${saved:.0f} under your {display} budget. Keep it up!",
+                "category": display,
                 "potentialSavings": 0
             })
 

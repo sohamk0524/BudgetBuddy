@@ -125,6 +125,9 @@ struct PlaidLinkView: View {
                     .frame(height: 40)
             }
         }
+        .onAppear {
+            plaidManager.reset()
+        }
         .sheet(isPresented: Binding(
             get: { plaidManager.isLinkActive },
             set: { _ in }

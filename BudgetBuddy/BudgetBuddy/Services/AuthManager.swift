@@ -41,12 +41,50 @@ class AuthManager {
     private let baseURL = URL(string: "http://localhost:5000")!
 
     init() {
+        // Restore cached values for immediate UI — restoreSession() validates with backend
         if let token = UserDefaults.standard.value(forKey: "authToken") as? Int {
             self.authToken = token
             self.isAuthenticated = true
         }
         if let name = UserDefaults.standard.string(forKey: "userName") {
             self.userName = name
+        }
+    }
+
+    // MARK: - Session Restore
+
+    /// Validates the saved token against the backend and refreshes user state.
+    /// Call once on app launch when a persisted token exists.
+    func restoreSession() async {
+        guard let userId = authToken else { return }
+
+        do {
+            let url = baseURL.appendingPathComponent("user/profile/\(userId)")
+            let (data, response) = try await URLSession.shared.data(from: url)
+
+            guard let httpResponse = response as? HTTPURLResponse else {
+                throw AuthError.invalidResponse
+            }
+
+            if httpResponse.statusCode == 200 {
+                let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+                let name = json?["name"] as? String
+                let hasProfile = json?["profile"] != nil && !(json?["profile"] is NSNull)
+
+                await MainActor.run {
+                    self.userName = name
+                    self.needsOnboarding = !hasProfile
+                    self.isAuthenticated = true
+                }
+            } else {
+                // User no longer exists on backend — clear local session
+                await MainActor.run {
+                    self.signOut()
+                }
+            }
+        } catch {
+            // Network error — keep existing session so the app is usable offline
+            print("Session restore failed: \(error)")
         }
     }
 
@@ -241,6 +279,7 @@ class AuthManager {
         authToken = nil
         userName = nil
         errorMessage = nil
+        PlaidLinkManager.shared.reset()
     }
 }
 
