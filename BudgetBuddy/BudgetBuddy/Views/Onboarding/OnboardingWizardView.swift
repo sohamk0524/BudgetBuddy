@@ -11,6 +11,7 @@ struct OnboardingWizardView: View {
     @State private var currentPage = 0
 
     // General profile fields
+    @State private var name: String = ""
     @State private var age: String = ""
     @State private var occupation: String = ""
     @State private var monthlyIncome: String = ""
@@ -20,7 +21,7 @@ struct OnboardingWizardView: View {
 
     var authManager = AuthManager.shared
 
-    private let totalPages = 6
+    private let totalPages = 7
 
     private var canFinish: Bool {
         !monthlyIncome.isEmpty
@@ -58,13 +59,17 @@ struct OnboardingWizardView: View {
 
                 // Pages
                 TabView(selection: $currentPage) {
+                    // Page 0: Name
+                    NamePage(name: $name)
+                        .tag(0)
+
                     // Page 1: Age
                     AgePage(age: $age)
-                        .tag(0)
+                        .tag(1)
 
                     // Page 2: Occupation
                     OccupationPage(occupation: $occupation)
-                        .tag(1)
+                        .tag(2)
 
                     // Page 3: Monthly Income
                     OnboardingPage(
@@ -75,19 +80,19 @@ struct OnboardingWizardView: View {
                         text: $monthlyIncome,
                         keyboardType: .decimalPad
                     )
-                    .tag(2)
+                    .tag(3)
 
                     // Page 4: Income Frequency
                     IncomeFrequencyPage(selectedFrequency: $incomeFrequency)
-                        .tag(3)
+                        .tag(4)
 
                     // Page 5: Financial Personality
                     FinancialPersonalityPage(selectedPersonality: $financialPersonality)
-                        .tag(4)
+                        .tag(5)
 
                     // Page 6: Primary Goal
                     PrimaryGoalPage(selectedGoal: $primaryGoal)
-                        .tag(5)
+                        .tag(6)
                 }
                 .tabViewStyle(.page(indexDisplayMode: .never))
 
@@ -157,9 +162,11 @@ struct OnboardingWizardView: View {
     private func finishOnboarding() {
         let income = Double(monthlyIncome) ?? 0.0
         let ageInt = Int(age) ?? 0
+        let trimmedName = name.trimmingCharacters(in: .whitespaces)
 
         Task {
             await authManager.completeOnboarding(
+                name: trimmedName,
                 age: ageInt,
                 occupation: occupation,
                 income: income,
@@ -216,6 +223,42 @@ struct OnboardingPage: View {
             .background(Color.surface)
             .clipShape(RoundedRectangle(cornerRadius: 16))
             .padding(.horizontal, 48)
+
+            Spacer()
+        }
+        .padding(.top, 24)
+    }
+}
+
+// MARK: - Name Page
+
+struct NamePage: View {
+    @Binding var name: String
+
+    var body: some View {
+        VStack(spacing: 24) {
+            Image(systemName: "hand.wave.fill")
+                .font(.system(size: 56))
+                .foregroundStyle(Color.accent)
+
+            Text("What's Your Name?")
+                .font(.roundedHeadline)
+                .foregroundStyle(Color.textPrimary)
+
+            Text("We'll use this to personalize your experience")
+                .font(.roundedBody)
+                .foregroundStyle(Color.textSecondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 32)
+
+            TextField("e.g., Alex", text: $name)
+                .font(.roundedTitle)
+                .foregroundStyle(Color.textPrimary)
+                .multilineTextAlignment(.center)
+                .padding()
+                .background(Color.surface)
+                .clipShape(RoundedRectangle(cornerRadius: 16))
+                .padding(.horizontal, 48)
 
             Spacer()
         }

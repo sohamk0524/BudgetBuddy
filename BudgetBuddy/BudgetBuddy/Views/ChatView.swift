@@ -131,8 +131,8 @@ struct ChatView: View {
 
     /// Computed status for the Pulse Header
     private var pulseStatus: String {
-        if !viewModel.hasStatement {
-            return "No Statement"
+        if !viewModel.hasData {
+            return "No Data"
         } else if viewModel.safeToSpend > 500 {
             return "Looking Good"
         } else if viewModel.safeToSpend > 100 {

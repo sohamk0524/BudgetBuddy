@@ -16,12 +16,23 @@ class WalletViewModel {
     var isLoading = false
     var errorMessage: String?
 
-    // Financial summary from saved statement
-    var hasStatement = false
+    // Financial summary
+    var hasData = false
     var netWorth: Double = 0.0
     var safeToSpend: Double = 0.0
     var statementInfo: StatementInfo?
     var spendingBreakdown: [SpendingCategory] = []
+
+    // Top expenses
+    var topExpenses: [TopExpense] = []
+    var expenseSource: String = "none"
+
+    // Smart nudges
+    var nudges: [SmartNudge] = []
+
+    // Category customization
+    var customCategories: [String] = []
+    var showCategoryEditor: Bool = false
 
     // MARK: - Dependencies
 
@@ -32,7 +43,6 @@ class WalletViewModel {
     /// Fetches the financial summary for the authenticated user
     func fetchFinancialSummary() async {
         guard let userId = AuthManager.shared.authToken else {
-            // Not authenticated - clear data
             clearData()
             return
         }
@@ -52,9 +62,63 @@ class WalletViewModel {
         isLoading = false
     }
 
-    /// Refreshes the financial summary (called after statement upload)
+    /// Fetches top spending categories
+    func fetchTopExpenses() async {
+        guard let userId = AuthManager.shared.authToken else { return }
+
+        do {
+            let response = try await apiService.getTopExpenses(userId: userId)
+            topExpenses = response.topExpenses
+            expenseSource = response.source
+        } catch {
+            print("Failed to fetch top expenses: \(error)")
+        }
+    }
+
+    /// Fetches smart nudges
+    func fetchNudges() async {
+        guard let userId = AuthManager.shared.authToken else { return }
+
+        do {
+            let response = try await apiService.getNudges(userId: userId)
+            nudges = response.nudges
+        } catch {
+            print("Failed to fetch nudges: \(error)")
+        }
+    }
+
+    /// Loads category preferences
+    func loadCategoryPreferences() async {
+        guard let userId = AuthManager.shared.authToken else { return }
+
+        do {
+            let response = try await apiService.getCategoryPreferences(userId: userId)
+            customCategories = response.categories.map { $0.categoryName }
+        } catch {
+            print("Failed to load category preferences: \(error)")
+        }
+    }
+
+    /// Updates category preferences
+    func updateCategoryPreferences(_ categories: [String]) async {
+        guard let userId = AuthManager.shared.authToken else { return }
+
+        do {
+            try await apiService.updateCategoryPreferences(userId: userId, categories: categories)
+            customCategories = categories
+        } catch {
+            print("Failed to update category preferences: \(error)")
+        }
+    }
+
+    /// Refreshes all data concurrently
     func refresh() async {
-        await fetchFinancialSummary()
+        async let summary: () = fetchFinancialSummary()
+        async let expenses: () = fetchTopExpenses()
+        async let nudgesData: () = fetchNudges()
+        async let prefs: () = loadCategoryPreferences()
+
+        _ = await (summary, expenses, nudgesData, prefs)
     }
 
     /// Deletes the user's saved statement
@@ -78,7 +142,7 @@ class WalletViewModel {
     // MARK: - Private Methods
 
     private func updateFromSummary(_ summary: FinancialSummary) {
-        hasStatement = summary.hasStatement
+        hasData = summary.hasData
         netWorth = summary.netWorth ?? 0.0
         safeToSpend = summary.safeToSpend ?? 0.0
         statementInfo = summary.statementInfo
@@ -86,7 +150,7 @@ class WalletViewModel {
     }
 
     private func clearData() {
-        hasStatement = false
+        hasData = false
         netWorth = 0.0
         safeToSpend = 0.0
         statementInfo = nil

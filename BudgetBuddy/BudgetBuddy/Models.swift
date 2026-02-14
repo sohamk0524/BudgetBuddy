@@ -306,10 +306,11 @@ struct ChatMessage: Identifiable, Equatable {
     }
 }
 
-// MARK: - Financial Summary (from saved statement)
+// MARK: - Financial Summary (from Plaid or saved statement)
 
 struct FinancialSummary: Codable {
-    let hasStatement: Bool
+    let hasData: Bool
+    let source: String?
     let netWorth: Double?
     let safeToSpend: Double?
     let statementInfo: StatementInfo?
@@ -412,4 +413,75 @@ struct PlaidSyncResponse: Codable {
     let added: Int
     let modified: Int
     let removed: Int
+}
+
+// MARK: - User Profile Models
+
+struct UserProfile: Codable {
+    let name: String?
+    let email: String
+    let profile: FinancialProfileInfo?
+    let plaidItems: [PlaidItemInfo]
+}
+
+struct FinancialProfileInfo: Codable {
+    let age: Int?
+    let occupation: String?
+    let monthlyIncome: Double?
+    let incomeFrequency: String?
+    let financialPersonality: String?
+    let primaryGoal: String?
+}
+
+struct UserProfileUpdateRequest: Codable {
+    var name: String?
+    var age: Int?
+    var occupation: String?
+    var monthlyIncome: Double?
+    var incomeFrequency: String?
+    var financialPersonality: String?
+    var primaryGoal: String?
+}
+
+// MARK: - Top Expenses Models
+
+struct TopExpensesResponse: Codable {
+    let source: String
+    let topExpenses: [TopExpense]
+    let totalSpending: Double
+    let period: Int
+}
+
+struct TopExpense: Codable, Identifiable {
+    var id: String { category }
+    let category: String
+    let amount: Double
+    let transactionCount: Int
+}
+
+// MARK: - Category Preference Models
+
+struct CategoryPreferencesResponse: Codable {
+    let categories: [CategoryPreference]
+}
+
+struct CategoryPreference: Codable, Identifiable {
+    let id: Int
+    let categoryName: String
+    let displayOrder: Int
+}
+
+// MARK: - Smart Nudge Models
+
+struct NudgesResponse: Codable {
+    let nudges: [SmartNudge]
+}
+
+struct SmartNudge: Codable, Identifiable {
+    var id: String { (type ?? "unknown") + (title ?? "untitled") }
+    let type: String?
+    let title: String?
+    let message: String?
+    let potentialSavings: Double?
+    let category: String?
 }

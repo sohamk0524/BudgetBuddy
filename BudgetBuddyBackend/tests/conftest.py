@@ -11,7 +11,7 @@ from unittest.mock import patch, MagicMock
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from app import app as flask_app
-from db_models import db, User, FinancialProfile, BudgetPlan, PlaidItem, PlaidAccount, Transaction
+from db_models import db, User, FinancialProfile, BudgetPlan, PlaidItem, PlaidAccount, Transaction, UserCategoryPreference
 
 
 @pytest.fixture
@@ -286,3 +286,137 @@ def sample_plaid_item(app, sample_user_for_plaid):
         item_id = plaid_item.id
 
     return item_id
+
+
+# =============================================================================
+# Profile & Nudge Fixtures
+# =============================================================================
+
+@pytest.fixture
+def sample_user_with_name(app):
+    """Create a sample user with a name and financial profile."""
+    from werkzeug.security import generate_password_hash
+    import json
+
+    with app.app_context():
+        user = User(
+            email="named@example.com",
+            password_hash=generate_password_hash("password123"),
+            name="Test User"
+        )
+        db.session.add(user)
+        db.session.flush()
+
+        profile = FinancialProfile(
+            user_id=user.id,
+            age=25,
+            occupation="employed",
+            monthly_income=5000.0,
+            income_frequency="monthly",
+            financial_personality="balanced",
+            primary_goal="emergency_fund"
+        )
+        db.session.add(profile)
+        db.session.commit()
+
+        user_id = user.id
+
+    return user_id
+
+
+@pytest.fixture
+def sample_user_with_plaid_and_plan(app):
+    """Create a user with Plaid data and a budget plan for nudge testing."""
+    from werkzeug.security import generate_password_hash
+    from datetime import date, timedelta
+    import json
+
+    with app.app_context():
+        user = User(
+            email="nudge@example.com",
+            password_hash=generate_password_hash("password123"),
+            name="Nudge Tester"
+        )
+        db.session.add(user)
+        db.session.flush()
+
+        profile = FinancialProfile(
+            user_id=user.id,
+            age=30,
+            occupation="employed",
+            monthly_income=6000.0,
+            income_frequency="monthly",
+            financial_personality="balanced",
+            primary_goal="emergency_fund"
+        )
+        db.session.add(profile)
+        db.session.flush()
+
+        # Add a Plaid item with transactions
+        plaid_item = PlaidItem(
+            user_id=user.id,
+            item_id="nudge-test-item",
+            access_token_encrypted=b'mock_token',
+            institution_name="Test Bank",
+            status="active"
+        )
+        db.session.add(plaid_item)
+        db.session.flush()
+
+        account = PlaidAccount(
+            plaid_item_id=plaid_item.id,
+            account_id="nudge-test-account",
+            name="Checking",
+            account_type="depository",
+            balance_current=5000.0
+        )
+        db.session.add(account)
+        db.session.flush()
+
+        # Add recent transactions (within last 30 days)
+        today = date.today()
+        transactions_data = [
+            ("FOOD_AND_DRINK", 450.0),  # Over the 300 budget
+            ("TRANSPORTATION", 80.0),   # Under the 200 budget
+            ("SHOPPING", 200.0),
+        ]
+        for i, (cat, amount) in enumerate(transactions_data):
+            txn = Transaction(
+                plaid_account_id=account.id,
+                transaction_id=f"nudge-txn-{i}",
+                amount=amount,
+                date=today - timedelta(days=i + 1),
+                name=f"Test {cat}",
+                category_primary=cat,
+                pending=False
+            )
+            db.session.add(txn)
+
+        # Add a budget plan with category allocations
+        plan_data = {
+            "summary": "Test plan for nudges",
+            "safeToSpend": 1500.0,
+            "totalIncome": 6000.0,
+            "totalExpenses": 3500.0,
+            "totalSavings": 1000.0,
+            "daysRemaining": 15,
+            "budgetUsedPercent": 0.5,
+            "categories": [
+                {"name": "FOOD_AND_DRINK", "amount": 300.0, "color": "#FF6B6B"},
+                {"name": "TRANSPORTATION", "amount": 200.0, "color": "#4ECDC4"},
+                {"name": "SHOPPING", "amount": 150.0, "color": "#45B7D1"},
+            ],
+            "recommendations": [],
+            "warnings": []
+        }
+        plan = BudgetPlan(
+            user_id=user.id,
+            plan_json=json.dumps(plan_data),
+            month_year=today.strftime("%Y-%m")
+        )
+        db.session.add(plan)
+        db.session.commit()
+
+        user_id = user.id
+
+    return user_id

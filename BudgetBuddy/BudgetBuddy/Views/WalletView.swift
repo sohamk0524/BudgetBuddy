@@ -3,7 +3,7 @@
 //  BudgetBuddy
 //
 //  Unified Wallet Dashboard
-//  - Statement drives numbers
+//  - Plaid/Statement drives numbers
 //  - Plan drives goals, warnings, upcoming events
 //
 
@@ -16,58 +16,76 @@ struct WalletView: View {
     @State private var walletViewModel = WalletViewModel()
     @Bindable var planViewModel: SpendingPlanViewModel
     @State private var showingStatementUpload = false
+    @State private var showCategoryEditor = false
+
+    private var greeting: String {
+        if let name = AuthManager.shared.userName, !name.isEmpty {
+            return "Hey, \(name)!"
+        }
+        return "Financial Overview"
+    }
+
+    private var dateSubtitle: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "EEEE, MMMM d"
+        return formatter.string(from: Date())
+    }
+
+    /// Top expenses filtered by user's custom category preferences.
+    /// Shows 3 by default; shows however many the user picked when customized.
+    private var filteredTopExpenses: [TopExpense] {
+        let prefs = walletViewModel.customCategories
+        if prefs.isEmpty {
+            return Array(walletViewModel.topExpenses.prefix(3))
+        }
+        return walletViewModel.topExpenses.filter { prefs.contains($0.category) }
+    }
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 24) {
 
-                    // Header
-                    Text("Financial Overview")
-                        .font(.roundedHeadline)
-                        .foregroundStyle(Color.textSecondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                    // MARK: - Header
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(greeting)
+                            .font(.roundedTitle)
+                            .foregroundStyle(Color.textPrimary)
 
-                    // MARK: - Top Row (Statement-driven)
+                        Text(dateSubtitle)
+                            .font(.roundedCaption)
+                            .foregroundStyle(Color.textSecondary)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                    // MARK: - Top Row
                     HStack(spacing: 16) {
                         NetWorthCard(
                             amount: walletViewModel.netWorth,
-                            hasStatement: walletViewModel.hasStatement
+                            hasData: walletViewModel.hasData
                         )
 
                         WalletSafeToSpendCard(
                             amount: walletViewModel.safeToSpend,
-                            hasStatement: walletViewModel.hasStatement
+                            hasData: walletViewModel.hasData
                         )
                     }
 
-                    // MARK: - Statement Section
-                    if walletViewModel.hasStatement {
-                        LinkedStatementCard(
-                            statementInfo: walletViewModel.statementInfo,
-                            spendingBreakdown: walletViewModel.spendingBreakdown,
-                            onUploadNew: { showingStatementUpload = true }
-                        )
-                    } else {
-                        UploadStatementPromptCard {
-                            showingStatementUpload = true
-                        }
-                    }
+                    // MARK: - Top Expenses
+                    TopExpensesCard(
+                        topExpenses: filteredTopExpenses,
+                        source: walletViewModel.expenseSource,
+                        onCustomize: { showCategoryEditor = true }
+                    )
 
-                    // MARK: - Plan-driven Cards
-                    HStack(spacing: 16) {
-                        AnomaliesCard(
-                            warnings: planViewModel.currentPlan?.warnings ?? []
-                        )
+                    // MARK: - Goal Progress (all goals)
+                    GoalProgressSection(
+                        goals: planViewModel.planInput.savingsGoals
+                    )
 
-                        GoalProgressCard(
-                            goals: planViewModel.planInput.savingsGoals
-                        )
-                    }
-
-                    // MARK: - Upcoming Bills
-                    UpcomingBillsCard(
-                        events: planViewModel.planInput.upcomingEvents
+                    // MARK: - Smart Nudges
+                    SmartNudgesCard(
+                        nudges: walletViewModel.nudges
                     )
 
                     // MARK: - Hint
@@ -80,25 +98,41 @@ struct WalletView: View {
                 .padding()
             }
             .background(Color.appBackground)
-            .navigationTitle("Wallet")
-            .navigationBarTitleDisplayMode(.large)
+            .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(Color.appBackground, for: .navigationBar)
             .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Text("Wallet")
+                        .font(.system(size: 22, weight: .bold, design: .rounded))
+                        .foregroundStyle(Color.textPrimary)
+                }
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button {
-                        AuthManager.shared.signOut()
+                    NavigationLink {
+                        ProfileView()
                     } label: {
-                        Image(systemName: "rectangle.portrait.and.arrow.right")
+                        Image(systemName: "person.circle")
                             .foregroundStyle(Color.textSecondary)
                     }
                 }
             }
             .task {
-                await walletViewModel.fetchFinancialSummary()
+                await walletViewModel.refresh()
             }
             .refreshable {
                 await walletViewModel.refresh()
+            }
+            .sheet(isPresented: $showCategoryEditor) {
+                CategoryEditorSheet(
+                    availableCategories: walletViewModel.topExpenses.map { $0.category },
+                    selectedCategories: $walletViewModel.customCategories,
+                    onSave: { categories in
+                        Task {
+                            await walletViewModel.updateCategoryPreferences(categories)
+                            await walletViewModel.fetchTopExpenses()
+                        }
+                    }
+                )
             }
             .fileImporter(
                 isPresented: $showingStatementUpload,
@@ -145,206 +179,30 @@ struct WalletView: View {
 
 struct NetWorthCard: View {
     let amount: Double
-    let hasStatement: Bool
+    let hasData: Bool
 
     var body: some View {
         card(
             title: "Net Worth",
             icon: "chart.line.uptrend.xyaxis",
-            value: hasStatement ? format(amount) : "--",
-            subtitle: hasStatement ? nil : "Upload statement"
+            value: hasData ? format(amount) : "--",
+            subtitle: hasData ? nil : "Link bank account"
         )
     }
 }
 
 struct WalletSafeToSpendCard: View {
     let amount: Double
-    let hasStatement: Bool
+    let hasData: Bool
 
     var body: some View {
         card(
             title: "Safe to Spend",
             icon: "creditcard.fill",
-            value: hasStatement ? format(amount) : "--",
+            value: hasData ? format(amount) : "--",
             valueColor: amount >= 0 ? Color.accent : Color.danger,
-            subtitle: hasStatement ? nil : "Upload statement"
+            subtitle: hasData ? nil : "Link bank account"
         )
-    }
-}
-
-struct UpcomingBillsCard: View {
-    let events: [UpcomingEvent]
-
-    private var nextEvent: UpcomingEvent? {
-        events
-            .filter { $0.date >= Date() }
-            .sorted { $0.date < $1.date }
-            .first
-    }
-
-    private var daysUntil: Int {
-        guard let event = nextEvent else { return 0 }
-        return Calendar.current.dateComponents([.day], from: Date(), to: event.date).day ?? 0
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Label("Upcoming", systemImage: "calendar.badge.clock")
-                .font(.roundedCaption)
-                .foregroundStyle(Color.textSecondary)
-
-            Spacer()
-
-            if let event = nextEvent {
-                Text(event.cost.formatted(.currency(code: "USD")))
-                    .font(.system(size: 24, weight: .bold, design: .rounded))
-
-                Text("\(event.name) in \(daysUntil) days")
-                    .font(.roundedCaption)
-                    .foregroundStyle(Color.textSecondary)
-            } else {
-                Text("--")
-                    .font(.system(size: 24, weight: .bold, design: .rounded))
-                Text("No upcoming bills")
-                    .font(.roundedCaption)
-                    .foregroundStyle(Color.textSecondary)
-            }
-        }
-        .walletCard(minHeight: 140)
-    }
-}
-
-struct AnomaliesCard: View {
-    let warnings: [String]
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Image(systemName: warnings.isEmpty ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
-                    .foregroundStyle(warnings.isEmpty ? Color.accent : Color.danger)
-                Spacer()
-                Text("\(warnings.count)")
-                    .font(.roundedHeadline)
-                    .foregroundStyle(warnings.isEmpty ? Color.accent : Color.danger)
-            }
-
-            Spacer()
-
-            Text(warnings.isEmpty ? "All Good" : "Warnings")
-                .font(.roundedCaption)
-                .foregroundStyle(Color.textSecondary)
-
-            Text(warnings.first ?? "No budget warnings")
-                .font(.system(.caption2, design: .rounded))
-                .foregroundStyle(Color.textSecondary)
-                .lineLimit(2)
-        }
-        .walletCard(minHeight: 120)
-    }
-}
-
-struct GoalProgressCard: View {
-    let goals: [SavingsGoal]
-
-    private var primary: SavingsGoal? {
-        goals.sorted { $0.priority < $1.priority }.first
-    }
-
-    private var progress: Double {
-        guard let goal = primary, goal.target > 0 else { return 0 }
-        return min(1, goal.current / goal.target)
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Image(systemName: "target")
-                    .foregroundStyle(Color.accent)
-                Spacer()
-                Text("\(Int(progress * 100))%")
-                    .font(.roundedHeadline)
-            }
-
-            Spacer()
-
-            if let goal = primary {
-                Text(goal.name)
-                    .font(.roundedCaption)
-                    .foregroundStyle(Color.textSecondary)
-
-                ProgressBar(progress: progress)
-            } else {
-                Text("No goals set")
-                    .font(.roundedCaption)
-                    .foregroundStyle(Color.textSecondary)
-            }
-        }
-        .walletCard(minHeight: 120)
-    }
-}
-
-//
-// MARK: - Statement Cards
-//
-
-struct LinkedStatementCard: View {
-    let statementInfo: StatementInfo?
-    let spendingBreakdown: [SpendingCategory]
-    let onUploadNew: () -> Void
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack {
-                Label("Linked Statement", systemImage: "doc.text.fill")
-                Spacer()
-                Button("Update", action: onUploadNew)
-            }
-            .font(.roundedCaption)
-            .foregroundStyle(Color.textSecondary)
-
-            if let info = statementInfo {
-                Text(info.filename)
-                    .font(.system(.subheadline, design: .rounded, weight: .medium))
-            }
-
-            ForEach(spendingBreakdown.prefix(3)) { category in
-                HStack {
-                    Text(category.category)
-                    Spacer()
-                    Text(category.amount.formatted(.currency(code: "USD")))
-                }
-                .font(.roundedCaption)
-                .foregroundStyle(Color.textSecondary)
-            }
-        }
-        .walletCard()
-    }
-}
-
-struct UploadStatementPromptCard: View {
-    let onUpload: () -> Void
-
-    var body: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "doc.badge.plus")
-                .font(.system(size: 32))
-                .foregroundStyle(Color.accent)
-
-            Text("Link Your Bank Statement")
-                .font(.headline)
-
-            Text("Upload a PDF or CSV to unlock your financial insights")
-                .font(.roundedCaption)
-                .foregroundStyle(Color.textSecondary)
-                .multilineTextAlignment(.center)
-
-            Button("Upload Statement", action: onUpload)
-                .padding(.horizontal, 20)
-                .padding(.vertical, 10)
-                .background(Color.accent)
-                .clipShape(Capsule())
-        }
-        .walletCard()
     }
 }
 
@@ -388,7 +246,14 @@ struct ProgressBar: View {
 }
 
 private func format(_ value: Double) -> String {
-    value.formatted(.currency(code: "USD"))
+    let abs = abs(value)
+    let sign = value < 0 ? "-" : ""
+    if abs >= 1_000_000 {
+        return "\(sign)$\(String(format: "%.1fM", abs / 1_000_000))"
+    } else if abs >= 10_000 {
+        return "\(sign)$\(String(format: "%.1fk", abs / 1_000))"
+    }
+    return value.formatted(.currency(code: "USD"))
 }
 
 private func card(
@@ -403,11 +268,11 @@ private func card(
             .font(.roundedCaption)
             .foregroundStyle(Color.textSecondary)
 
-        Spacer()
-
         Text(value)
             .font(.system(size: 28, weight: .bold, design: .rounded))
             .foregroundStyle(valueColor)
+            .lineLimit(1)
+            .minimumScaleFactor(0.5)
 
         if let subtitle {
             Text(subtitle)
@@ -415,7 +280,7 @@ private func card(
                 .foregroundStyle(Color.textSecondary)
         }
     }
-    .walletCard(minHeight: 140)
+    .walletCard()
 }
 
 extension View {

@@ -28,13 +28,29 @@ The iOS client uses a modern **MVVM (Model-View-ViewModel)** architecture with *
 | `healthCheck()` | `GET` | `/health` | Returns `Bool`. Swallows all errors internally — safe to call on launch. |
 | `generatePlan(userId:planInput:)` | `POST` | `/generate-plan` | Serializes a `SpendingPlanInput` into the nested `deepDiveData` JSON shape the backend expects. Returns `SpendingPlanResponse`. |
 | `getPlan(userId:)` | `GET` | `/get-plan/<userId>` | Fetches the most recent persisted plan. Returns `GetPlanResponse`. |
+| `getFinancialSummary(userId:)` | `GET` | `/user/financial-summary` | Gets net worth, safe-to-spend, and statement info. Returns `FinancialSummary`. |
+| `getUserProfile(userId:)` | `GET` | `/user/profile/<id>` | Fetches name, email, financial profile, and linked Plaid accounts. Returns `UserProfile`. |
+| `updateUserProfile(userId:update:)` | `PUT` | `/user/profile/<id>` | Partial update of profile fields. Accepts `UserProfileUpdateRequest`. |
+| `getTopExpenses(userId:days:)` | `GET` | `/user/top-expenses/<id>` | Aggregates top spending categories. Returns `TopExpensesResponse`. |
+| `getCategoryPreferences(userId:)` | `GET` | `/user/category-preferences/<id>` | Gets pinned category preferences. Returns `CategoryPreferencesResponse`. |
+| `updateCategoryPreferences(userId:categories:)` | `PUT` | `/user/category-preferences/<id>` | Sets pinned categories. |
+| `getNudges(userId:)` | `GET` | `/user/nudges/<id>` | Gets smart nudges comparing actual vs. budget spending. Returns `NudgesResponse`. |
 
 ### 4. MockService (Offline Development)
 * **Responsibility:** Provides simulated responses that mirror the real `APIService` signatures, allowing UI development and testing without a running backend.
 
-<!-- ### 5. BankLinkManager
-* **Responsibility:** Wraps the external banking SDK (e.g., Plaid/Teller).
-* **Key Logic:** Securely handles OAuth tokens and refreshes transaction data in the background. -->
+### 5. AuthManager (Singleton)
+* **Responsibility:** Manages authentication state (login, register, onboarding), persists `authToken` and `userName` to `UserDefaults`.
+* **Key Logic:** `@Observable` class for reactive UI updates. Handles login, register, completeOnboarding (with name support), and signOut.
+
+### 6. PlaidLinkManager / PlaidService
+* **Responsibility:** Wraps the Plaid Link SDK for iOS. Manages the bank account linking flow — creating link tokens, presenting the Plaid Link UI, and exchanging public tokens.
+
+### 7. ProfileViewModel
+* **Responsibility:** `@Observable @MainActor` view model for the user profile page. Loads/saves profile data, manages Plaid item unlinking.
+
+### 8. WalletViewModel
+* **Responsibility:** Manages wallet dashboard state including financial summary, top expenses, smart nudges, and category preferences. Fetches all data concurrently on refresh.
 
 ---
 
@@ -131,6 +147,46 @@ struct SpendingPreferences {
     let spendingStyle: Double   // 0.0 – 1.0 slider value
     let priorities:    [String] // e.g. ["savings", "security"]
     let strictness:    String   // e.g. "moderate", "strict", "flexible"
+}
+```
+
+### Profile & Dashboard Types
+
+```swift
+// User profile with financial info and linked accounts
+struct UserProfile: Codable {
+    let name: String?
+    let email: String
+    let profile: FinancialProfileInfo?
+    let plaidItems: [PlaidItemInfo]
+}
+
+// Partial update request (all fields optional)
+struct UserProfileUpdateRequest: Codable {
+    var name: String?
+    var age: Int?
+    var occupation: String?
+    var monthlyIncome: Double?
+    var incomeFrequency: String?
+    var financialPersonality: String?
+    var primaryGoal: String?
+}
+
+// Top spending categories
+struct TopExpensesResponse: Codable {
+    let source: String       // "plaid", "statement", or "none"
+    let topExpenses: [TopExpense]
+    let totalSpending: Double
+    let period: Int
+}
+
+// Smart nudges (rules-based, no LLM)
+struct SmartNudge: Codable, Identifiable {
+    let type: String?            // "spending_reduction", "positive_reinforcement", "goal_reminder"
+    let title: String?
+    let message: String?
+    let potentialSavings: Double?
+    let category: String?
 }
 ```
 

@@ -9,9 +9,14 @@ The backend acts as the "Brain." It orchestrates the flow between the user and t
 
 * **ORM:** SQLAlchemy (via `flask-sqlalchemy`), backed by a local SQLite database (`budgetbuddy.db`).
 * **Models (defined in `db_models.py`):**
-    * `User` — Stores account credentials (email + hashed password via Werkzeug). Has a one-to-one relationship to `FinancialProfile`.
+    * `User` — Stores account credentials (email + hashed password via Werkzeug) and optional `name`. Has a one-to-one relationship to `FinancialProfile`.
     * `FinancialProfile` — Holds the user's onboarded financial context: income, expenses, housing situation, debt types (stored as a JSON string), financial personality, primary goal, and a named savings goal with a target amount.
     * `BudgetPlan` — Stores a generated spending plan as a JSON blob, with a `created_at` timestamp and an optional `month_year` field. Linked to a user by foreign key.
+    * `SavedStatement` — User's uploaded bank statement with parsed data, LLM analysis, and derived financial metrics.
+    * `PlaidItem` — Represents a user's linked bank connection via Plaid. Stores encrypted access token, institution info, and transaction sync cursor.
+    * `PlaidAccount` — Individual bank account within a PlaidItem (checking, savings, etc.) with balance data.
+    * `Transaction` — Individual transaction from Plaid with category, amount, date, and merchant info.
+    * `UserCategoryPreference` — User's pinned spending category preferences for the homepage display.
 
 ---
 
@@ -36,7 +41,16 @@ The backend acts as the "Brain." It orchestrates the flow between the user and t
 * **Responsibility:** Stores system prompts and persona definitions.
 * **Key Logic:** Dynamically injects context (e.g., user's income, goal, current balance) into the system prompt before sending to the LLM.
 
-### 5. Auth & Security
+### 5. Plaid Service (`services/plaid_service.py`)
+* **Responsibility:** Handles all Plaid API interactions — creating link tokens, exchanging public tokens, fetching accounts/transactions, syncing new transactions, and removing items.
+* **Key Logic:** Access tokens are encrypted at rest using Fernet encryption. Supports sandbox and production environments via `PLAID_ENV`.
+
+### 6. Nudge Generator (`services/nudge_generator.py`)
+* **Responsibility:** Rules-based (no LLM) smart nudge generation. Compares actual spending from Plaid transactions against budget plan allocations.
+* **Nudge Types:** `spending_reduction` (over budget), `positive_reinforcement` (under budget), `goal_reminder` (savings progress).
+* **Interface:** `generate_nudges(user_id: int) -> List[Dict]` — Returns top 5 nudges sorted by impact.
+
+### 7. Auth & Security
 * **Responsibility:** User registration and login.
 * **Key Logic:** Passwords are hashed at rest using Werkzeug's `generate_password_hash` (PBKDF2 by default). Authentication is stateless — the server returns the user's database `id` as a token, which the iOS client sends with subsequent requests.
 
@@ -48,13 +62,27 @@ The backend acts as the "Brain." It orchestrates the flow between the user and t
 |---|---|---|
 | `GET` | `/` | Welcome / API root |
 | `GET` | `/health` | Health check |
-| `POST` | `/register` | Create a new user account |
-| `POST` | `/login` | Authenticate and return user token + profile status |
-| `POST` | `/onboarding` | Save or update a user's financial profile |
+| `POST` | `/register` | Create a new user account (optionally accepts `name`) |
+| `POST` | `/login` | Authenticate and return user token + profile status + name |
+| `POST` | `/onboarding` | Save or update a user's financial profile (accepts `name`) |
 | `POST` | `/generate-plan` | Run the plan generator with deep-dive data |
 | `GET` | `/get-plan/<user_id>` | Retrieve the user's most recent saved plan |
 | `POST` | `/chat` | Main chat interaction with the AI assistant |
 | `POST` | `/upload-statement` | Upload and analyze a PDF or CSV bank statement |
+| `GET` | `/user/financial-summary` | Get financial summary from saved statement |
+| `DELETE` | `/user/statement` | Delete user's saved statement |
+| `GET` | `/user/profile/<user_id>` | Fetch user profile, financial info, and linked accounts |
+| `PUT` | `/user/profile/<user_id>` | Update user profile fields (partial update) |
+| `GET` | `/user/top-expenses/<user_id>` | Aggregate top spending categories (Plaid or statement) |
+| `GET` | `/user/category-preferences/<user_id>` | Get user's pinned category preferences |
+| `PUT` | `/user/category-preferences/<user_id>` | Set pinned categories |
+| `GET` | `/user/nudges/<user_id>` | Get rules-based smart nudges |
+| `POST` | `/plaid/link-token` | Create a Plaid Link token |
+| `POST` | `/plaid/exchange-token` | Exchange public token for access token + fetch data |
+| `GET` | `/plaid/accounts/<user_id>` | Get all linked accounts |
+| `GET` | `/plaid/transactions/<user_id>` | Get transactions with date filtering + pagination |
+| `POST` | `/plaid/sync/<user_id>` | Sync new transactions for linked accounts |
+| `DELETE` | `/plaid/unlink/<user_id>/<item_id>` | Unlink a bank connection |
 
 ---
 
@@ -72,7 +100,8 @@ The backend acts as the "Brain." It orchestrates the flow between the user and t
 ```json
 {
   "token": 1,
-  "hasProfile": true
+  "hasProfile": true,
+  "name": "Alex"
 }
 ```
 
@@ -160,6 +189,56 @@ The backend acts as the "Brain." It orchestrates the flow between the user and t
 ### Upload-Statement
 * **Request:** `multipart/form-data` with a `file` field (PDF or CSV).
 * **Response:** Same shape as the chat response (`textMessage` + optional `visualPayload`).
+
+### User Profile Response (`GET /user/profile/<id>`)
+```json
+{
+  "name": "Alex",
+  "email": "user@example.com",
+  "profile": {
+    "age": 25,
+    "occupation": "employed",
+    "monthlyIncome": 5000.0,
+    "incomeFrequency": "monthly",
+    "financialPersonality": "balanced",
+    "primaryGoal": "emergency_fund"
+  },
+  "plaidItems": [
+    {
+      "itemId": "item_abc123",
+      "institutionName": "Chase",
+      "status": "active",
+      "accounts": [{ "accountId": "acc_1", "name": "Checking", "type": "depository", "balanceCurrent": 5000 }]
+    }
+  ]
+}
+```
+
+### Top Expenses Response (`GET /user/top-expenses/<id>`)
+```json
+{
+  "source": "plaid",
+  "topExpenses": [
+    { "category": "FOOD_AND_DRINK", "amount": 450.50, "transactionCount": 28 }
+  ],
+  "totalSpending": 2500.00,
+  "period": 30
+}
+```
+
+### Nudges Response (`GET /user/nudges/<id>`)
+```json
+{
+  "nudges": [
+    {
+      "type": "spending_reduction",
+      "title": "Food Over Budget",
+      "message": "You've spent $450 of your $300 Food budget.",
+      "category": "Food",
+      "potentialSavings": 150.00
+    }
+  ]
+}
 
 ---
 

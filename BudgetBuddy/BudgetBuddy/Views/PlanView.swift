@@ -25,11 +25,15 @@ struct PlanView: View {
                 .padding()
             }
             .background(Color.appBackground)
-            .navigationTitle("My Plan")
-            .navigationBarTitleDisplayMode(.large)
+            .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(Color.appBackground, for: .navigationBar)
             .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Text("My Plan")
+                        .font(.system(size: 22, weight: .bold, design: .rounded))
+                        .foregroundStyle(Color.textPrimary)
+                }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     if viewModel.hasPlan {
                         Button {
