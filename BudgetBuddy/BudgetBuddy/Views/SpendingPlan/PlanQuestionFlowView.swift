@@ -349,11 +349,23 @@ struct SliderInputView: View {
 struct SubscriptionsInputView: View {
     @Bindable var viewModel: SpendingPlanViewModel
 
+    private func binding(for id: UUID) -> Binding<Subscription> {
+        Binding(
+            get: { viewModel.planInput.fixedExpenses.subscriptions.first { $0.id == id } ?? Subscription() },
+            set: { newValue in
+                if let i = viewModel.planInput.fixedExpenses.subscriptions.firstIndex(where: { $0.id == id }) {
+                    viewModel.planInput.fixedExpenses.subscriptions[i] = newValue
+                }
+            }
+        )
+    }
+
     var body: some View {
         VStack(spacing: 12) {
-            ForEach(Array(viewModel.planInput.fixedExpenses.subscriptions.enumerated()), id: \.element.id) { index, _ in
+            ForEach(viewModel.planInput.fixedExpenses.subscriptions) { sub in
+                let b = binding(for: sub.id)
                 HStack {
-                    TextField("Name", text: $viewModel.planInput.fixedExpenses.subscriptions[index].name)
+                    TextField("Name", text: b.name)
                         .font(.roundedBody)
                         .foregroundStyle(Color.textPrimary)
 
@@ -363,7 +375,7 @@ struct SubscriptionsInputView: View {
                         Text("$")
                             .foregroundStyle(Color.textSecondary)
 
-                        TextField("0", value: $viewModel.planInput.fixedExpenses.subscriptions[index].amount, format: .number)
+                        TextField("0", value: b.amount, format: .number)
                             .font(.roundedBody)
                             .foregroundStyle(Color.textPrimary)
                             .keyboardType(.decimalPad)
@@ -371,7 +383,7 @@ struct SubscriptionsInputView: View {
                     }
 
                     Button {
-                        viewModel.removeSubscription(at: index)
+                        viewModel.planInput.fixedExpenses.subscriptions.removeAll { $0.id == sub.id }
                     } label: {
                         Image(systemName: "minus.circle.fill")
                             .foregroundStyle(Color.danger)
@@ -522,17 +534,29 @@ struct ExpenseRow: View {
 struct UpcomingEventsInputView: View {
     @Bindable var viewModel: SpendingPlanViewModel
 
+    private func binding(for id: UUID) -> Binding<UpcomingEvent> {
+        Binding(
+            get: { viewModel.planInput.upcomingEvents.first { $0.id == id } ?? UpcomingEvent() },
+            set: { newValue in
+                if let i = viewModel.planInput.upcomingEvents.firstIndex(where: { $0.id == id }) {
+                    viewModel.planInput.upcomingEvents[i] = newValue
+                }
+            }
+        )
+    }
+
     var body: some View {
         VStack(spacing: 12) {
-            ForEach(Array(viewModel.planInput.upcomingEvents.enumerated()), id: \.element.id) { index, _ in
+            ForEach(viewModel.planInput.upcomingEvents) { event in
+                let b = binding(for: event.id)
                 VStack(spacing: 8) {
                     HStack {
-                        TextField("Event name", text: $viewModel.planInput.upcomingEvents[index].name)
+                        TextField("Event name", text: b.name)
                             .font(.roundedBody)
                             .foregroundStyle(Color.textPrimary)
 
                         Button {
-                            viewModel.removeUpcomingEvent(at: index)
+                            viewModel.planInput.upcomingEvents.removeAll { $0.id == event.id }
                         } label: {
                             Image(systemName: "minus.circle.fill")
                                 .foregroundStyle(Color.danger)
@@ -540,7 +564,7 @@ struct UpcomingEventsInputView: View {
                     }
 
                     HStack {
-                        DatePicker("", selection: $viewModel.planInput.upcomingEvents[index].date, displayedComponents: .date)
+                        DatePicker("", selection: b.date, displayedComponents: .date)
                             .labelsHidden()
 
                         Spacer()
@@ -549,7 +573,7 @@ struct UpcomingEventsInputView: View {
                             Text("$")
                                 .foregroundStyle(Color.textSecondary)
 
-                            TextField("Cost", value: $viewModel.planInput.upcomingEvents[index].cost, format: .number)
+                            TextField("Cost", value: b.cost, format: .number)
                                 .font(.roundedBody)
                                 .foregroundStyle(Color.textPrimary)
                                 .keyboardType(.decimalPad)
@@ -557,7 +581,7 @@ struct UpcomingEventsInputView: View {
                         }
                     }
 
-                    Toggle("Save gradually", isOn: $viewModel.planInput.upcomingEvents[index].saveGradually)
+                    Toggle("Save gradually", isOn: b.saveGradually)
                         .font(.roundedCaption)
                         .tint(Color.accent)
                 }
@@ -595,17 +619,29 @@ struct UpcomingEventsInputView: View {
 struct SavingsGoalsInputView: View {
     @Bindable var viewModel: SpendingPlanViewModel
 
+    private func binding(for id: UUID) -> Binding<SavingsGoal> {
+        Binding(
+            get: { viewModel.planInput.savingsGoals.first { $0.id == id } ?? SavingsGoal() },
+            set: { newValue in
+                if let i = viewModel.planInput.savingsGoals.firstIndex(where: { $0.id == id }) {
+                    viewModel.planInput.savingsGoals[i] = newValue
+                }
+            }
+        )
+    }
+
     var body: some View {
         VStack(spacing: 12) {
-            ForEach(Array(viewModel.planInput.savingsGoals.enumerated()), id: \.element.id) { index, _ in
+            ForEach(viewModel.planInput.savingsGoals) { goal in
+                let b = binding(for: goal.id)
                 VStack(spacing: 8) {
                     HStack {
-                        TextField("Goal name", text: $viewModel.planInput.savingsGoals[index].name)
+                        TextField("Goal name", text: b.name)
                             .font(.roundedBody)
                             .foregroundStyle(Color.textPrimary)
 
                         Button {
-                            viewModel.removeSavingsGoal(at: index)
+                            viewModel.planInput.savingsGoals.removeAll { $0.id == goal.id }
                         } label: {
                             Image(systemName: "minus.circle.fill")
                                 .foregroundStyle(Color.danger)
@@ -622,7 +658,7 @@ struct SavingsGoalsInputView: View {
                                 Text("$")
                                     .foregroundStyle(Color.textSecondary)
 
-                                TextField("0", value: $viewModel.planInput.savingsGoals[index].target, format: .number)
+                                TextField("0", value: b.target, format: .number)
                                     .font(.roundedBody)
                                     .foregroundStyle(Color.textPrimary)
                                     .keyboardType(.decimalPad)
@@ -640,7 +676,7 @@ struct SavingsGoalsInputView: View {
                                 Text("$")
                                     .foregroundStyle(Color.textSecondary)
 
-                                TextField("0", value: $viewModel.planInput.savingsGoals[index].current, format: .number)
+                                TextField("0", value: b.current, format: .number)
                                     .font(.roundedBody)
                                     .foregroundStyle(Color.textPrimary)
                                     .keyboardType(.decimalPad)

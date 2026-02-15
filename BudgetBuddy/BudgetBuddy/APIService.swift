@@ -299,6 +299,105 @@ actor APIService {
         let decoder = JSONDecoder()
         return try decoder.decode(GetPlanResponse.self, from: data)
     }
+
+    // MARK: - User Profile API
+
+    /// Gets the user's profile including name, email, financial info, and linked accounts
+    func getUserProfile(userId: Int) async throws -> UserProfile {
+        let url = baseURL.appendingPathComponent("user/profile/\(userId)")
+
+        let (data, response) = try await URLSession.shared.data(from: url)
+
+        guard let httpResponse = response as? HTTPURLResponse,
+              httpResponse.statusCode == 200 else {
+            throw APIError.invalidResponse
+        }
+
+        return try JSONDecoder().decode(UserProfile.self, from: data)
+    }
+
+    /// Updates the user's profile (partial update)
+    func updateUserProfile(userId: Int, update: UserProfileUpdateRequest) async throws {
+        let url = baseURL.appendingPathComponent("user/profile/\(userId)")
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "PUT"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONEncoder().encode(update)
+
+        let (_, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse,
+              httpResponse.statusCode == 200 else {
+            throw APIError.invalidResponse
+        }
+    }
+
+    /// Gets top spending categories
+    func getTopExpenses(userId: Int, days: Int = 30) async throws -> TopExpensesResponse {
+        var urlComponents = URLComponents(url: baseURL.appendingPathComponent("user/top-expenses/\(userId)"), resolvingAgainstBaseURL: false)!
+        urlComponents.queryItems = [URLQueryItem(name: "days", value: String(days))]
+
+        guard let url = urlComponents.url else {
+            throw APIError.invalidResponse
+        }
+
+        let (data, response) = try await URLSession.shared.data(from: url)
+
+        guard let httpResponse = response as? HTTPURLResponse,
+              httpResponse.statusCode == 200 else {
+            throw APIError.invalidResponse
+        }
+
+        return try JSONDecoder().decode(TopExpensesResponse.self, from: data)
+    }
+
+    /// Gets category preferences
+    func getCategoryPreferences(userId: Int) async throws -> CategoryPreferencesResponse {
+        let url = baseURL.appendingPathComponent("user/category-preferences/\(userId)")
+
+        let (data, response) = try await URLSession.shared.data(from: url)
+
+        guard let httpResponse = response as? HTTPURLResponse,
+              httpResponse.statusCode == 200 else {
+            throw APIError.invalidResponse
+        }
+
+        return try JSONDecoder().decode(CategoryPreferencesResponse.self, from: data)
+    }
+
+    /// Updates category preferences
+    func updateCategoryPreferences(userId: Int, categories: [String]) async throws {
+        let url = baseURL.appendingPathComponent("user/category-preferences/\(userId)")
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "PUT"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        let body: [String: Any] = ["categories": categories]
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        let (_, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse,
+              httpResponse.statusCode == 200 else {
+            throw APIError.invalidResponse
+        }
+    }
+
+    /// Gets smart nudges
+    func getNudges(userId: Int) async throws -> NudgesResponse {
+        let url = baseURL.appendingPathComponent("user/nudges/\(userId)")
+
+        let (data, response) = try await URLSession.shared.data(from: url)
+
+        guard let httpResponse = response as? HTTPURLResponse,
+              httpResponse.statusCode == 200 else {
+            throw APIError.invalidResponse
+        }
+
+        return try JSONDecoder().decode(NudgesResponse.self, from: data)
+    }
 }
 
 // MARK: - Errors

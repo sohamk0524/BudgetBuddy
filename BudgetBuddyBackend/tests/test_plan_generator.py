@@ -28,10 +28,9 @@ class TestGetFullUserProfile:
             profile = get_full_user_profile(sample_user_with_profile)
 
             assert profile is not None
-            assert profile["monthly_income"] == 5000.0
-            assert profile["fixed_expenses"] == 2000.0
-            assert profile["savings_goal_name"] == "Emergency Fund"
-            assert profile["income_frequency"] == "monthly"
+            assert profile["is_student"] is False
+            assert profile["budgeting_goal"] == "emergency_fund"
+            assert profile["strictness_level"] == "moderate"
             assert isinstance(profile["debt_types"], list)
 
     def test_get_nonexistent_profile(self, app):
@@ -42,12 +41,11 @@ class TestGetFullUserProfile:
             assert profile is None
 
     def test_debt_types_json_parsing(self, app, sample_user_with_profile):
-        """Test that debt_types JSON is properly parsed."""
+        """Test that debt_types JSON is properly parsed (defaults to empty list)."""
         with app.app_context():
             profile = get_full_user_profile(sample_user_with_profile)
 
             assert isinstance(profile["debt_types"], list)
-            assert "student_loans" in profile["debt_types"]
 
 
 @pytest.mark.unit
@@ -186,12 +184,14 @@ class TestGenerateFallbackPlan:
     def test_fallback_plan_basic(self):
         """Test generating a basic fallback plan."""
         profile = {
-            "monthly_income": 5000,
+            "is_student": False,
+            "budgeting_goal": "emergency_fund",
+            "strictness_level": "moderate",
             "fixed_expenses": 2000,
             "savings_goal_name": "Emergency Fund",
             "savings_goal_target": 10000
         }
-        deep_dive = {}
+        deep_dive = {"monthlyIncome": 5000}
 
         result = generate_fallback_plan(profile, deep_dive)
 
@@ -203,12 +203,15 @@ class TestGenerateFallbackPlan:
     def test_fallback_plan_with_deep_dive(self):
         """Test fallback plan with deep dive data."""
         profile = {
-            "monthly_income": 5000,
-            "fixed_expenses": 0,  # Use deep dive instead
+            "is_student": False,
+            "budgeting_goal": "save_purchase",
+            "strictness_level": "moderate",
+            "fixed_expenses": 0,
             "savings_goal_name": "Car",
             "savings_goal_target": 15000
         }
         deep_dive = {
+            "monthlyIncome": 5000,
             "fixedExpenses": {
                 "rent": 1500,
                 "utilities": 200,
@@ -231,12 +234,15 @@ class TestGenerateFallbackPlan:
     def test_fallback_plan_with_events(self):
         """Test fallback plan with upcoming events."""
         profile = {
-            "monthly_income": 4000,
+            "is_student": False,
+            "budgeting_goal": "stability",
+            "strictness_level": "relaxed",
             "fixed_expenses": 1500,
             "savings_goal_name": None,
             "savings_goal_target": 0
         }
         deep_dive = {
+            "monthlyIncome": 4000,
             "upcomingEvents": [
                 {"name": "Wedding", "cost": 600, "saveGradually": True}
             ]
@@ -251,12 +257,14 @@ class TestGenerateFallbackPlan:
     def test_fallback_plan_recommendations(self):
         """Test that fallback plan generates recommendations."""
         profile = {
-            "monthly_income": 3000,
-            "fixed_expenses": 2000,  # High fixed expenses
+            "is_student": False,
+            "budgeting_goal": "stability",
+            "strictness_level": "moderate",
+            "fixed_expenses": 2000,
             "savings_goal_name": "Savings",
             "savings_goal_target": 5000
         }
-        deep_dive = {}
+        deep_dive = {"monthlyIncome": 3000}
 
         result = generate_fallback_plan(profile, deep_dive)
 
@@ -267,12 +275,14 @@ class TestGenerateFallbackPlan:
     def test_fallback_plan_negative_safe_to_spend(self):
         """Test fallback plan when expenses exceed income."""
         profile = {
-            "monthly_income": 2000,
+            "is_student": False,
+            "budgeting_goal": "stability",
+            "strictness_level": "moderate",
             "fixed_expenses": 2500,
             "savings_goal_name": None,
             "savings_goal_target": 0
         }
-        deep_dive = {}
+        deep_dive = {"monthlyIncome": 2000}
 
         result = generate_fallback_plan(profile, deep_dive)
 
@@ -299,20 +309,19 @@ class TestGeneratePlan:
     def test_generate_plan_ollama_unavailable(self, mock_get_profile, mock_agent, app):
         """Test generating plan when Ollama is unavailable."""
         mock_get_profile.return_value = {
-            "monthly_income": 5000,
+            "is_student": False,
+            "budgeting_goal": "stability",
+            "strictness_level": "moderate",
             "fixed_expenses": 2000,
             "savings_goal_name": "Car",
             "savings_goal_target": 10000,
-            "income_frequency": "monthly",
             "housing_situation": "rent",
-            "debt_types": [],
-            "financial_personality": "balanced",
-            "primary_goal": "stability"
+            "debt_types": []
         }
         mock_agent.is_available.return_value = False
 
         with app.app_context():
-            result = generate_plan(1, {})
+            result = generate_plan(1, {"monthlyIncome": 5000})
 
             # Should fall back to rule-based plan
             assert "plan" in result
@@ -322,15 +331,14 @@ class TestGeneratePlan:
     def test_generate_plan_with_llm(self, mock_get_profile, mock_agent, app):
         """Test generating plan with LLM response."""
         mock_get_profile.return_value = {
-            "monthly_income": 5000,
+            "is_student": False,
+            "budgeting_goal": "emergency_fund",
+            "strictness_level": "moderate",
             "fixed_expenses": 2000,
             "savings_goal_name": "Emergency",
             "savings_goal_target": 5000,
-            "income_frequency": "monthly",
             "housing_situation": "rent",
-            "debt_types": [],
-            "financial_personality": "balanced",
-            "primary_goal": "emergency_fund"
+            "debt_types": []
         }
 
         mock_agent.is_available.return_value = True

@@ -11,6 +11,8 @@ struct ContentView: View {
     @State private var authManager = AuthManager.shared
     @State private var selectedTab = 0
     @State private var planViewModel = SpendingPlanViewModel()
+    @State private var showPlaidLink = false
+    @State private var hasCompletedPlaidFlow = false
 
     var body: some View {
         Group {
@@ -20,10 +22,32 @@ struct ContentView: View {
             } else if authManager.needsOnboarding {
                 // Show onboarding wizard
                 OnboardingWizardView()
+            } else if showPlaidLink && !hasCompletedPlaidFlow {
+                // Show Plaid Link after onboarding
+                PlaidLinkView(
+                    showPlaidLink: $showPlaidLink,
+                    userId: authManager.authToken ?? 0,
+                    onComplete: {
+                        hasCompletedPlaidFlow = true
+                        showPlaidLink = false
+                    },
+                    onSkip: {
+                        hasCompletedPlaidFlow = true
+                        showPlaidLink = false
+                    }
+                )
             } else {
                 // Show main app
                 mainTabView
             }
+        }
+        .task {
+            // Validate persisted session with the backend on launch
+            await authManager.restoreSession()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .onboardingCompleted)) { _ in
+            // Show Plaid Link after onboarding completes
+            showPlaidLink = true
         }
     }
 

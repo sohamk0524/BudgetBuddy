@@ -18,6 +18,23 @@ TOOL_DEFINITIONS: List[Dict[str, Any]] = [
     {
         "type": "function",
         "function": {
+            "name": "get_plaid_transactions",
+            "description": "Get the user's recent transactions from their linked bank accounts via Plaid. Use this when the user asks about their recent spending, transactions, purchases, or where their money is going. This provides real transaction data from connected bank accounts.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "days": {
+                        "type": "integer",
+                        "description": "Number of days of transactions to fetch (default 30)"
+                    }
+                },
+                "required": []
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "get_budget_plan",
             "description": "Get the user's personalized budget plan including category allocations, recommendations, and spending limits. Use this when the user asks about their budget, spending plan, how to reduce spending, what they should spend on different categories, or wants advice on their finances.",
             "parameters": {
@@ -93,6 +110,111 @@ TOOL_DEFINITIONS: List[Dict[str, Any]] = [
 # ============================================
 # USER DATA FETCHERS (Real data from database)
 # ============================================
+
+def _get_plaid_transactions(user_id: Optional[int], days: int = 30) -> Dict[str, Any]:
+    """
+    Fetch recent transactions from Plaid-linked bank accounts.
+    Returns categorized transactions for AI context.
+    """
+    if not user_id:
+        return {"error": "No user ID provided", "has_plaid": False}
+
+    try:
+        from db_models import PlaidItem, PlaidAccount, Transaction
+        from datetime import datetime, timedelta
+
+        # Check if user has linked accounts
+        plaid_items = PlaidItem.query.filter_by(user_id=user_id, status="active").all()
+
+        if not plaid_items:
+            return {
+                "has_plaid": False,
+                "message": "No bank accounts linked. The user should connect their bank via Plaid for transaction data."
+            }
+
+        # Get all account IDs
+        account_ids = []
+        accounts_info = []
+        for item in plaid_items:
+            for account in item.accounts:
+                account_ids.append(account.id)
+                accounts_info.append({
+                    "name": account.name,
+                    "type": account.account_type,
+                    "balance": account.balance_current
+                })
+
+        if not account_ids:
+            return {
+                "has_plaid": True,
+                "has_transactions": False,
+                "message": "Bank accounts linked but no account data available."
+            }
+
+        # Get transactions from the last N days
+        start_date = (datetime.now() - timedelta(days=days)).date()
+        transactions = Transaction.query.filter(
+            Transaction.plaid_account_id.in_(account_ids),
+            Transaction.date >= start_date
+        ).order_by(Transaction.date.desc()).limit(100).all()
+
+        if not transactions:
+            return {
+                "has_plaid": True,
+                "has_transactions": False,
+                "accounts": accounts_info,
+                "message": f"No transactions found in the last {days} days."
+            }
+
+        # Aggregate by category
+        category_totals = {}
+        transaction_list = []
+
+        for txn in transactions:
+            category = txn.category_primary or "Uncategorized"
+
+            # Sum up spending by category (positive amounts are spending)
+            if txn.amount > 0:
+                category_totals[category] = category_totals.get(category, 0) + txn.amount
+
+            transaction_list.append({
+                "date": txn.date.isoformat() if txn.date else None,
+                "name": txn.name,
+                "merchant": txn.merchant_name,
+                "amount": txn.amount,
+                "category": category,
+                "pending": txn.pending
+            })
+
+        # Sort categories by total
+        sorted_categories = sorted(
+            category_totals.items(),
+            key=lambda x: x[1],
+            reverse=True
+        )
+
+        total_spending = sum(category_totals.values())
+        total_income = sum(-txn.amount for txn in transactions if txn.amount < 0)
+
+        return {
+            "has_plaid": True,
+            "has_transactions": True,
+            "period_days": days,
+            "accounts": accounts_info,
+            "total_spending": round(total_spending, 2),
+            "total_income": round(total_income, 2),
+            "spending_by_category": [
+                {"category": cat, "amount": round(amt, 2)}
+                for cat, amt in sorted_categories[:10]
+            ],
+            "recent_transactions": transaction_list[:20],
+            "transaction_count": len(transactions),
+            "summary": f"Found {len(transactions)} transactions in the last {days} days. Total spending: ${total_spending:.2f}, Total income: ${total_income:.2f}"
+        }
+
+    except Exception as e:
+        return {"error": f"Failed to fetch Plaid transactions: {str(e)}", "has_plaid": False}
+
 
 def _get_user_budget_plan(user_id: Optional[int]) -> Dict[str, Any]:
     """
@@ -213,7 +335,6 @@ def _get_user_financial_summary(user_id: Optional[int]) -> Dict[str, Any]:
         result = {
             "has_profile": False,
             "has_statement": False,
-            "monthly_income": 0,
             "net_worth": 0,
             "safe_to_spend": 0
         }
@@ -221,10 +342,9 @@ def _get_user_financial_summary(user_id: Optional[int]) -> Dict[str, Any]:
         # Get profile data
         if user.profile:
             result["has_profile"] = True
-            result["monthly_income"] = user.profile.monthly_income
-            result["fixed_expenses"] = user.profile.fixed_expenses
-            result["financial_personality"] = user.profile.financial_personality
-            result["primary_goal"] = user.profile.primary_goal
+            result["is_student"] = user.profile.is_student
+            result["budgeting_goal"] = user.profile.budgeting_goal
+            result["strictness_level"] = user.profile.strictness_level
 
         # Get statement data
         statement = SavedStatement.query.filter_by(user_id=user_id).first()
@@ -348,7 +468,7 @@ def _get_user_savings_progress(user_id: Optional[int]) -> Dict[str, Any]:
                             "current": current_savings,
                             "progress_percent": round((current_savings / target) * 100, 1) if target > 0 else 0
                         }],
-                        "primary_goal": profile.primary_goal,
+                        "budgeting_goal": profile.budgeting_goal,
                         "summary": f"Saving for {profile.savings_goal_name}: ${current_savings:.2f} of ${target:.2f} target"
                     }
         except Exception:
@@ -379,6 +499,7 @@ def get_tool_context() -> Optional[int]:
 
 # Tool executor registry - now uses user context
 TOOL_EXECUTORS: Dict[str, Callable] = {
+    "get_plaid_transactions": lambda args: _get_plaid_transactions(get_tool_context(), args.get("days", 30) if args else 30),
     "get_budget_plan": lambda _: _get_user_budget_plan(get_tool_context()),
     "get_spending_analysis": lambda _: _get_user_spending_analysis(get_tool_context()),
     "get_financial_summary": lambda _: _get_user_financial_summary(get_tool_context()),
@@ -417,6 +538,7 @@ def get_tool_definitions() -> List[Dict[str, Any]]:
 
 # Mapping from tool names to visual payload types
 TOOL_TO_VISUAL_TYPE: Dict[str, Optional[str]] = {
+    "get_plaid_transactions": "burndownChart",
     "get_budget_plan": "spendingPlan",
     "get_spending_analysis": "burndownChart",
     "get_financial_summary": "burndownChart",

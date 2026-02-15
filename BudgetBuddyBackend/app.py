@@ -1,14 +1,20 @@
 import json
+import os
 import random
 import string
 from datetime import datetime, date, timedelta
 from flask import Flask, jsonify, request
 from flask_cors import CORS
+from dotenv import load_dotenv
 
-from db_models import db, User, FinancialProfile, BudgetPlan, SavedStatement, OTPCode
+# Load environment variables from .env file
+load_dotenv()
+
+from db_models import db, User, FinancialProfile, BudgetPlan, SavedStatement, OTPCode, PlaidItem, PlaidAccount, Transaction, UserCategoryPreference
 from services.orchestrator import process_message
 from services.statement_analyzer import analyze_statement
 from services.plan_generator import generate_plan, save_plan_to_db
+from services import plaid_service
 
 app = Flask(__name__)
 
@@ -23,9 +29,25 @@ db.init_app(app)
 with app.app_context():
     db.create_all()
 
+    # Migrate: add 'name' column to User table if it doesn't exist (SQLite)
+    try:
+        import sqlite3 as _sqlite3
+        db_path = os.path.join(app.instance_path, 'budgetbuddy.db')
+        if os.path.exists(db_path):
+            conn = _sqlite3.connect(db_path)
+            cursor = conn.execute("PRAGMA table_info(user)")
+            columns = [row[1] for row in cursor.fetchall()]
+            if columns and 'name' not in columns:
+                conn.execute("ALTER TABLE user ADD COLUMN name VARCHAR(100)")
+                conn.commit()
+                print("Migration: added 'name' column to user table")
+            conn.close()
+    except Exception as e:
+        print(f"Migration warning (non-fatal): {e}")
+
 # Enable CORS for iOS simulator to communicate with localhost
 # Allow all origins and methods for development
-CORS(app, resources={r"/*": {"origins": "*", "methods": ["GET", "POST", "DELETE", "OPTIONS"]}})
+CORS(app, resources={r"/*": {"origins": "*", "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"]}})
 
 
 @app.route("/")
@@ -162,7 +184,8 @@ def verify_code():
 
     return jsonify({
         "token": user.id,
-        "hasProfile": user.profile is not None
+        "hasProfile": user.profile is not None,
+        "name": user.name
     })
 
 
@@ -202,17 +225,15 @@ def delete_user():
 @app.route("/onboarding", methods=["POST"])
 def onboarding():
     """
-    Save user's general profile from onboarding.
+    Save user's profile from onboarding (4-Question Protocol).
 
     Expected request body:
     {
         "userId": 1,
-        "age": 25,
-        "occupation": "employed",
-        "income": 5000.0,
-        "incomeFrequency": "monthly",
-        "financialPersonality": "balanced",
-        "primaryGoal": "emergency_fund"
+        "name": "Alex",
+        "isStudent": true,
+        "budgetingGoal": "emergency_fund",
+        "strictnessLevel": "moderate"
     }
 
     Returns:
@@ -226,12 +247,10 @@ def onboarding():
         return jsonify({"error": "Request body must be JSON"}), 400
 
     user_id = data.get("userId")
-    age = data.get("age", 0)
-    occupation = data.get("occupation", "")
-    income = data.get("income", 0.0)
-    income_frequency = data.get("incomeFrequency", "monthly")
-    financial_personality = data.get("financialPersonality", "balanced")
-    primary_goal = data.get("primaryGoal", "stability")
+    name = data.get("name", "").strip() or None
+    is_student = data.get("isStudent", False)
+    budgeting_goal = data.get("budgetingGoal", "stability")
+    strictness_level = data.get("strictnessLevel", "moderate")
 
     if not user_id:
         return jsonify({"error": "userId is required"}), 400
@@ -241,25 +260,23 @@ def onboarding():
     if not user:
         return jsonify({"error": "User not found"}), 404
 
+    # Update name if provided
+    if name:
+        user.name = name
+
     # Check if profile already exists
     if user.profile:
         # Update existing profile
-        user.profile.age = age
-        user.profile.occupation = occupation
-        user.profile.monthly_income = income
-        user.profile.income_frequency = income_frequency
-        user.profile.financial_personality = financial_personality
-        user.profile.primary_goal = primary_goal
+        user.profile.is_student = is_student
+        user.profile.budgeting_goal = budgeting_goal
+        user.profile.strictness_level = strictness_level
     else:
         # Create new profile
         profile = FinancialProfile(
             user_id=user_id,
-            age=age,
-            occupation=occupation,
-            monthly_income=income,
-            income_frequency=income_frequency,
-            financial_personality=financial_personality,
-            primary_goal=primary_goal
+            is_student=is_student,
+            budgeting_goal=budgeting_goal,
+            strictness_level=strictness_level
         )
         db.session.add(profile)
 
@@ -558,14 +575,15 @@ def _save_statement(user_id: int, filename: str, file_type: str,
 @app.route("/user/financial-summary", methods=["GET"])
 def get_financial_summary():
     """
-    Get financial summary derived from user's saved statement.
+    Get financial summary from Plaid accounts (preferred) or saved statement (fallback).
 
     Query params:
         userId: int - the authenticated user's ID
 
     Returns:
     {
-        "hasStatement": true/false,
+        "hasData": true/false,
+        "source": "plaid" | "statement" | "none",
         "netWorth": float or null,
         "safeToSpend": float or null,
         "statementInfo": { filename, statementPeriod, uploadedAt } or null,
@@ -582,67 +600,113 @@ def get_financial_summary():
     except ValueError:
         return jsonify({"error": "Invalid userId"}), 400
 
-    # Get user and their profile
     user = User.query.get(user_id)
     if not user:
         return jsonify({"error": "User not found"}), 404
 
-    # Get user's saved statement
-    statement = SavedStatement.query.filter_by(user_id=user_id).first()
+    # --- Try Plaid first ---
+    plaid_accounts = (
+        PlaidAccount.query
+        .join(PlaidItem)
+        .filter(PlaidItem.user_id == user_id, PlaidItem.status == "active")
+        .all()
+    )
 
-    # Get user's financial profile (from onboarding)
-    profile = user.profile
-    essential_expenses = profile.fixed_expenses if profile else 0.0
-    savings_target = profile.savings_goal_target if profile else 0.0
+    if plaid_accounts:
+        # Net Worth = assets - liabilities
+        asset_types = {"depository", "investment"}
+        liability_types = {"credit", "loan"}
 
-    if not statement:
+        asset_total = sum(
+            (a.balance_current or 0) for a in plaid_accounts
+            if a.account_type in asset_types
+        )
+        liability_total = sum(
+            (a.balance_current or 0) for a in plaid_accounts
+            if a.account_type in liability_types
+        )
+        net_worth = round(asset_total - liability_total, 2)
+
+        # Safe to Spend: prefer BudgetPlan.safeToSpend, else sum of available balances
+        safe_to_spend = None
+        latest_plan = (
+            BudgetPlan.query
+            .filter_by(user_id=user_id)
+            .order_by(BudgetPlan.created_at.desc())
+            .first()
+        )
+        if latest_plan:
+            try:
+                plan_data = json.loads(latest_plan.plan_json)
+                safe_to_spend = plan_data.get("safeToSpend")
+            except (json.JSONDecodeError, TypeError):
+                pass
+
+        if safe_to_spend is None:
+            safe_to_spend = sum(
+                (a.balance_available or a.balance_current or 0)
+                for a in plaid_accounts
+                if a.account_type == "depository"
+            )
+
+        safe_to_spend = round(max(0, safe_to_spend), 2)
+
         return jsonify({
-            "hasStatement": False,
-            "netWorth": None,
-            "safeToSpend": None,
+            "hasData": True,
+            "source": "plaid",
+            "netWorth": net_worth,
+            "safeToSpend": safe_to_spend,
             "statementInfo": None,
             "spendingBreakdown": None
         })
 
-    # Calculate derived metrics
-    net_worth = statement.ending_balance
-    net_income = statement.total_income
+    # --- Fall back to statement ---
+    statement = SavedStatement.query.filter_by(user_id=user_id).first()
 
-    # Safe to Spend = Net Worth + Net Income - Essential Expenses - Savings Target
-    safe_to_spend = .08 * net_worth 
-    safe_to_spend = max(0, safe_to_spend)  # Don't go negative
+    if statement:
+        net_worth = statement.ending_balance
+        safe_to_spend = max(0, .08 * net_worth) if net_worth else 0.0
 
-    # Build statement info
-    statement_period = None
-    if statement.statement_start_date and statement.statement_end_date:
-        statement_period = f"{statement.statement_start_date.isoformat()} to {statement.statement_end_date.isoformat()}"
+        statement_period = None
+        if statement.statement_start_date and statement.statement_end_date:
+            statement_period = f"{statement.statement_start_date.isoformat()} to {statement.statement_end_date.isoformat()}"
 
-    statement_info = {
-        "filename": statement.filename,
-        "statementPeriod": statement_period,
-        "uploadedAt": statement.created_at.isoformat() if statement.created_at else None
-    }
+        statement_info = {
+            "filename": statement.filename,
+            "statementPeriod": statement_period,
+            "uploadedAt": statement.created_at.isoformat() if statement.created_at else None
+        }
 
-    # Get spending breakdown from LLM analysis
-    spending_breakdown = None
-    if statement.llm_analysis:
-        try:
-            analysis = json.loads(statement.llm_analysis)
-            top_categories = analysis.get("top_categories", [])
-            if top_categories:
-                spending_breakdown = [
-                    {"category": cat.get("category", "Other"), "amount": float(cat.get("amount", 0))}
-                    for cat in top_categories
-                ]
-        except (json.JSONDecodeError, TypeError):
-            pass
+        spending_breakdown = None
+        if statement.llm_analysis:
+            try:
+                analysis = json.loads(statement.llm_analysis)
+                top_categories = analysis.get("top_categories", [])
+                if top_categories:
+                    spending_breakdown = [
+                        {"category": cat.get("category", "Other"), "amount": float(cat.get("amount", 0))}
+                        for cat in top_categories
+                    ]
+            except (json.JSONDecodeError, TypeError):
+                pass
 
+        return jsonify({
+            "hasData": True,
+            "source": "statement",
+            "netWorth": round(net_worth, 2) if net_worth else 0.0,
+            "safeToSpend": round(safe_to_spend, 2),
+            "statementInfo": statement_info,
+            "spendingBreakdown": spending_breakdown
+        })
+
+    # --- Neither ---
     return jsonify({
-        "hasStatement": True,
-        "netWorth": round(net_worth, 2) if net_worth else 0.0,
-        "safeToSpend": round(safe_to_spend, 2) if safe_to_spend else 0.0,
-        "statementInfo": statement_info,
-        "spendingBreakdown": spending_breakdown
+        "hasData": False,
+        "source": "none",
+        "netWorth": None,
+        "safeToSpend": None,
+        "statementInfo": None,
+        "spendingBreakdown": None
     })
 
 
@@ -673,6 +737,756 @@ def delete_statement():
         db.session.commit()
 
     return "", 204
+
+
+# =============================================================================
+# Plaid Integration Endpoints
+# =============================================================================
+
+@app.route("/plaid/link-token", methods=["POST"])
+def create_plaid_link_token():
+    """
+    Create a Plaid Link token to initialize the Link flow.
+
+    Expected request body:
+    {
+        "userId": 1
+    }
+
+    Returns:
+    {
+        "linkToken": "link-sandbox-...",
+        "expiration": "2026-02-10T00:00:00Z"
+    }
+    """
+    data = request.get_json()
+
+    if not data:
+        return jsonify({"error": "Request body must be JSON"}), 400
+
+    user_id = data.get("userId")
+    if not user_id:
+        return jsonify({"error": "userId is required"}), 400
+
+    # Verify user exists
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
+    try:
+        result = plaid_service.create_link_token(user_id)
+        return jsonify({
+            "linkToken": result["link_token"],
+            "expiration": result["expiration"],
+        })
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 500
+    except Exception as e:
+        print(f"Plaid link token error: {e}")
+        return jsonify({"error": "Failed to create link token"}), 500
+
+
+@app.route("/plaid/exchange-token", methods=["POST"])
+def exchange_plaid_token():
+    """
+    Exchange a public token for an access token and fetch initial data.
+
+    Expected request body:
+    {
+        "userId": 1,
+        "publicToken": "public-sandbox-...",
+        "institutionId": "ins_109508",
+        "institutionName": "First Platypus Bank"
+    }
+
+    Returns:
+    {
+        "success": true,
+        "itemId": "...",
+        "accounts": [...],
+        "transactionCount": 150
+    }
+    """
+    data = request.get_json()
+
+    if not data:
+        return jsonify({"error": "Request body must be JSON"}), 400
+
+    user_id = data.get("userId")
+    public_token = data.get("publicToken")
+    institution_id = data.get("institutionId")
+    institution_name = data.get("institutionName")
+
+    if not user_id or not public_token:
+        return jsonify({"error": "userId and publicToken are required"}), 400
+
+    # Verify user exists
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
+    try:
+        # Exchange public token for access token
+        encrypted_token, item_id = plaid_service.exchange_public_token(public_token)
+
+        # Create PlaidItem record
+        plaid_item = PlaidItem(
+            user_id=user_id,
+            item_id=item_id,
+            access_token_encrypted=encrypted_token,
+            institution_id=institution_id,
+            institution_name=institution_name or plaid_service.get_institution_name(institution_id),
+            status="active"
+        )
+        db.session.add(plaid_item)
+        db.session.flush()
+
+        # Fetch accounts
+        accounts_response = plaid_service.get_accounts(encrypted_token)
+        account_records = []
+
+        for account_data in accounts_response["accounts"]:
+            account = PlaidAccount(
+                plaid_item_id=plaid_item.id,
+                account_id=account_data["account_id"],
+                name=account_data["name"],
+                official_name=account_data["official_name"],
+                account_type=account_data["type"],
+                account_subtype=account_data["subtype"],
+                balance_available=account_data["balances"]["available"],
+                balance_current=account_data["balances"]["current"],
+                balance_limit=account_data["balances"]["limit"],
+                mask=account_data["mask"]
+            )
+            db.session.add(account)
+            account_records.append(account)
+
+        db.session.flush()
+
+        # Fetch historical transactions (6 months)
+        transactions = plaid_service.fetch_historical_transactions(encrypted_token, months=6)
+
+        # Create a mapping of account_id to PlaidAccount record
+        account_map = {acc.account_id: acc for acc in account_records}
+
+        transaction_count = 0
+        for txn_data in transactions:
+            account = account_map.get(txn_data["account_id"])
+            if account:
+                transaction = Transaction(
+                    plaid_account_id=account.id,
+                    transaction_id=txn_data["transaction_id"],
+                    amount=txn_data["amount"],
+                    date=datetime.strptime(txn_data["date"], "%Y-%m-%d").date() if txn_data["date"] else None,
+                    authorized_date=datetime.strptime(txn_data["authorized_date"], "%Y-%m-%d").date() if txn_data["authorized_date"] else None,
+                    name=txn_data["name"],
+                    merchant_name=txn_data["merchant_name"],
+                    category_primary=txn_data["category"],
+                    category_detailed=txn_data["category_detailed"],
+                    category_confidence=txn_data["category_confidence"],
+                    pending=txn_data["pending"],
+                    payment_channel=txn_data["payment_channel"]
+                )
+                db.session.add(transaction)
+                transaction_count += 1
+
+        db.session.commit()
+
+        return jsonify({
+            "success": True,
+            "itemId": item_id,
+            "accounts": [
+                {
+                    "accountId": acc.account_id,
+                    "name": acc.name,
+                    "type": acc.account_type,
+                    "subtype": acc.account_subtype,
+                    "mask": acc.mask,
+                    "balanceCurrent": acc.balance_current,
+                    "balanceAvailable": acc.balance_available
+                }
+                for acc in account_records
+            ],
+            "transactionCount": transaction_count
+        })
+
+    except ValueError as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
+    except Exception as e:
+        db.session.rollback()
+        print(f"Plaid exchange token error: {e}")
+        return jsonify({"error": "Failed to exchange token and fetch data"}), 500
+
+
+@app.route("/plaid/accounts/<int:user_id>", methods=["GET"])
+def get_plaid_accounts(user_id):
+    """
+    Get all linked accounts for a user.
+
+    Returns:
+    {
+        "items": [
+            {
+                "itemId": "...",
+                "institutionName": "First Platypus Bank",
+                "status": "active",
+                "accounts": [...]
+            }
+        ]
+    }
+    """
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
+    plaid_items = PlaidItem.query.filter_by(user_id=user_id).all()
+
+    items = []
+    for item in plaid_items:
+        accounts = []
+        for account in item.accounts:
+            accounts.append({
+                "accountId": account.account_id,
+                "name": account.name,
+                "officialName": account.official_name,
+                "type": account.account_type,
+                "subtype": account.account_subtype,
+                "mask": account.mask,
+                "balanceAvailable": account.balance_available,
+                "balanceCurrent": account.balance_current,
+                "balanceLimit": account.balance_limit
+            })
+
+        items.append({
+            "itemId": item.item_id,
+            "institutionId": item.institution_id,
+            "institutionName": item.institution_name,
+            "status": item.status,
+            "createdAt": item.created_at.isoformat() if item.created_at else None,
+            "accounts": accounts
+        })
+
+    return jsonify({"items": items})
+
+
+@app.route("/plaid/transactions/<int:user_id>", methods=["GET"])
+def get_plaid_transactions(user_id):
+    """
+    Get transactions for a user with optional date filtering.
+
+    Query params:
+        startDate: YYYY-MM-DD (optional)
+        endDate: YYYY-MM-DD (optional)
+        limit: int (optional, default 100)
+        offset: int (optional, default 0)
+
+    Returns:
+    {
+        "transactions": [...],
+        "total": 500,
+        "hasMore": true
+    }
+    """
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
+    start_date = request.args.get("startDate")
+    end_date = request.args.get("endDate")
+    limit = request.args.get("limit", 100, type=int)
+    offset = request.args.get("offset", 0, type=int)
+
+    # Get all account IDs for this user
+    plaid_items = PlaidItem.query.filter_by(user_id=user_id).all()
+    account_ids = []
+    for item in plaid_items:
+        for account in item.accounts:
+            account_ids.append(account.id)
+
+    if not account_ids:
+        return jsonify({"transactions": [], "total": 0, "hasMore": False})
+
+    # Build query
+    query = Transaction.query.filter(Transaction.plaid_account_id.in_(account_ids))
+
+    if start_date:
+        try:
+            start = datetime.strptime(start_date, "%Y-%m-%d").date()
+            query = query.filter(Transaction.date >= start)
+        except ValueError:
+            pass
+
+    if end_date:
+        try:
+            end = datetime.strptime(end_date, "%Y-%m-%d").date()
+            query = query.filter(Transaction.date <= end)
+        except ValueError:
+            pass
+
+    # Get total count
+    total = query.count()
+
+    # Apply pagination and ordering
+    transactions = query.order_by(Transaction.date.desc()).offset(offset).limit(limit).all()
+
+    result = []
+    for txn in transactions:
+        result.append({
+            "transactionId": txn.transaction_id,
+            "accountId": txn.plaid_account.account_id,
+            "amount": txn.amount,
+            "date": txn.date.isoformat() if txn.date else None,
+            "authorizedDate": txn.authorized_date.isoformat() if txn.authorized_date else None,
+            "name": txn.name,
+            "merchantName": txn.merchant_name,
+            "categoryPrimary": txn.category_primary,
+            "categoryDetailed": txn.category_detailed,
+            "pending": txn.pending,
+            "paymentChannel": txn.payment_channel
+        })
+
+    return jsonify({
+        "transactions": result,
+        "total": total,
+        "hasMore": offset + limit < total
+    })
+
+
+@app.route("/plaid/sync/<int:user_id>", methods=["POST"])
+def sync_plaid_transactions(user_id):
+    """
+    Sync new transactions for all of a user's linked accounts.
+
+    Returns:
+    {
+        "added": 5,
+        "modified": 2,
+        "removed": 0
+    }
+    """
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
+    plaid_items = PlaidItem.query.filter_by(user_id=user_id, status="active").all()
+
+    if not plaid_items:
+        return jsonify({"error": "No linked accounts found"}), 404
+
+    total_added = 0
+    total_modified = 0
+    total_removed = 0
+
+    for item in plaid_items:
+        try:
+            # Build account map for this item
+            account_map = {acc.account_id: acc for acc in item.accounts}
+
+            has_more = True
+            cursor = item.transactions_cursor
+
+            while has_more:
+                result = plaid_service.sync_transactions(
+                    item.access_token_encrypted,
+                    cursor
+                )
+
+                # Process added transactions
+                for txn_data in result["added"]:
+                    account = account_map.get(txn_data["account_id"])
+                    if account:
+                        # Check if transaction already exists
+                        existing = Transaction.query.filter_by(
+                            transaction_id=txn_data["transaction_id"]
+                        ).first()
+
+                        if not existing:
+                            transaction = Transaction(
+                                plaid_account_id=account.id,
+                                transaction_id=txn_data["transaction_id"],
+                                amount=txn_data["amount"],
+                                date=datetime.strptime(txn_data["date"], "%Y-%m-%d").date() if txn_data["date"] else None,
+                                authorized_date=datetime.strptime(txn_data["authorized_date"], "%Y-%m-%d").date() if txn_data["authorized_date"] else None,
+                                name=txn_data["name"],
+                                merchant_name=txn_data["merchant_name"],
+                                category_primary=txn_data["category"],
+                                category_detailed=txn_data["category_detailed"],
+                                category_confidence=txn_data["category_confidence"],
+                                pending=txn_data["pending"],
+                                payment_channel=txn_data["payment_channel"]
+                            )
+                            db.session.add(transaction)
+                            total_added += 1
+
+                # Process modified transactions
+                for txn_data in result["modified"]:
+                    existing = Transaction.query.filter_by(
+                        transaction_id=txn_data["transaction_id"]
+                    ).first()
+
+                    if existing:
+                        existing.amount = txn_data["amount"]
+                        existing.date = datetime.strptime(txn_data["date"], "%Y-%m-%d").date() if txn_data["date"] else None
+                        existing.name = txn_data["name"]
+                        existing.merchant_name = txn_data["merchant_name"]
+                        existing.category_primary = txn_data["category"]
+                        existing.category_detailed = txn_data["category_detailed"]
+                        existing.pending = txn_data["pending"]
+                        total_modified += 1
+
+                # Process removed transactions
+                for removed in result["removed"]:
+                    existing = Transaction.query.filter_by(
+                        transaction_id=removed["transaction_id"]
+                    ).first()
+                    if existing:
+                        db.session.delete(existing)
+                        total_removed += 1
+
+                cursor = result["next_cursor"]
+                has_more = result["has_more"]
+
+            # Update the cursor for next sync
+            item.transactions_cursor = cursor
+
+        except Exception as e:
+            print(f"Error syncing item {item.item_id}: {e}")
+            continue
+
+    db.session.commit()
+
+    return jsonify({
+        "added": total_added,
+        "modified": total_modified,
+        "removed": total_removed
+    })
+
+
+@app.route("/plaid/unlink/<int:user_id>/<item_id>", methods=["DELETE"])
+def unlink_plaid_item(user_id, item_id):
+    """
+    Unlink a bank account (remove PlaidItem and associated data).
+
+    Returns:
+    {
+        "success": true
+    }
+    """
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
+    plaid_item = PlaidItem.query.filter_by(
+        user_id=user_id,
+        item_id=item_id
+    ).first()
+
+    if not plaid_item:
+        return jsonify({"error": "Plaid item not found"}), 404
+
+    try:
+        # Remove from Plaid
+        plaid_service.remove_item(plaid_item.access_token_encrypted)
+    except Exception as e:
+        print(f"Warning: Failed to remove item from Plaid: {e}")
+        # Continue with local cleanup even if Plaid removal fails
+
+    # Delete from database (cascade will remove accounts and transactions)
+    db.session.delete(plaid_item)
+    db.session.commit()
+
+    return jsonify({"success": True})
+
+
+# =============================================================================
+# User Profile Endpoints
+# =============================================================================
+
+@app.route("/user/profile/<int:user_id>", methods=["GET"])
+def get_user_profile(user_id):
+    """
+    Fetch user profile including name, email, financial profile, and linked Plaid accounts.
+    """
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
+    profile_data = None
+    if user.profile:
+        profile_data = {
+            "isStudent": user.profile.is_student,
+            "budgetingGoal": user.profile.budgeting_goal,
+            "strictnessLevel": user.profile.strictness_level
+        }
+
+    plaid_items_data = []
+    for item in user.plaid_items:
+        accounts = [{
+            "accountId": acc.account_id,
+            "name": acc.name,
+            "type": acc.account_type,
+            "subtype": acc.account_subtype,
+            "mask": acc.mask,
+            "balanceCurrent": acc.balance_current
+        } for acc in item.accounts]
+
+        plaid_items_data.append({
+            "itemId": item.item_id,
+            "institutionName": item.institution_name,
+            "status": item.status,
+            "accounts": accounts
+        })
+
+    return jsonify({
+        "name": user.name,
+        "phoneNumber": user.phone_number,
+        "profile": profile_data,
+        "plaidItems": plaid_items_data
+    })
+
+
+@app.route("/user/profile/<int:user_id>", methods=["PUT"])
+def update_user_profile(user_id):
+    """
+    Update user profile fields (partial update).
+    Accepts any subset of: name, isStudent, budgetingGoal, strictnessLevel.
+    """
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "Request body must be JSON"}), 400
+
+    # Update user-level fields
+    if "name" in data:
+        user.name = data["name"]
+
+    # Update profile fields
+    if user.profile:
+        if "isStudent" in data:
+            user.profile.is_student = data["isStudent"]
+        if "budgetingGoal" in data:
+            user.profile.budgeting_goal = data["budgetingGoal"]
+        if "strictnessLevel" in data:
+            user.profile.strictness_level = data["strictnessLevel"]
+
+    db.session.commit()
+
+    return jsonify({"status": "success"})
+
+
+# Plaid category code → human-readable display name
+CATEGORY_DISPLAY_NAMES = {
+    "INCOME": "Income",
+    "TRANSFER_IN": "Transfers In",
+    "TRANSFER_OUT": "Transfers Out",
+    "LOAN_PAYMENTS": "Loan Payments",
+    "BANK_FEES": "Bank Fees",
+    "ENTERTAINMENT": "Entertainment",
+    "FOOD_AND_DRINK": "Food & Drink",
+    "GENERAL_MERCHANDISE": "Shopping",
+    "HOME_IMPROVEMENT": "Home Improvement",
+    "MEDICAL": "Medical",
+    "PERSONAL_CARE": "Personal Care",
+    "GENERAL_SERVICES": "Services",
+    "GOVERNMENT_AND_NON_PROFIT": "Government & Taxes",
+    "TRANSPORTATION": "Transportation",
+    "TRAVEL": "Travel",
+    "RENT_AND_UTILITIES": "Rent & Utilities",
+    "COFFEE": "Coffee",
+    "GROCERIES": "Groceries",
+    "RESTAURANTS": "Restaurants",
+    "SHOPPING": "Shopping",
+    "CLOTHING": "Clothing",
+    "ELECTRONICS": "Electronics",
+    "GAS": "Gas",
+    "PARKING": "Parking",
+    "PUBLIC_TRANSIT": "Public Transit",
+    "RIDESHARE": "Rideshare",
+    "AIRLINES": "Airlines",
+    "LODGING": "Lodging",
+    "SUBSCRIPTION": "Subscriptions",
+    "GYM_AND_FITNESS": "Gym & Fitness",
+    "UTILITIES": "Utilities",
+    "INTERNET_AND_CABLE": "Internet & Cable",
+    "PHONE": "Phone",
+    "INSURANCE": "Insurance",
+    "MORTGAGE": "Mortgage",
+    "RENT": "Rent",
+    "EDUCATION": "Education",
+    "CHILDCARE": "Childcare",
+    "PETS": "Pets",
+    "CHARITY": "Charity",
+    "INVESTMENTS": "Investments",
+    "SAVINGS": "Savings",
+    "TAXES": "Taxes",
+    "GAMBLING": "Gambling",
+    "ALCOHOL_AND_BARS": "Alcohol & Bars",
+}
+
+
+def format_category_name(raw_name):
+    """Convert a Plaid category code to a human-readable display name."""
+    if raw_name in CATEGORY_DISPLAY_NAMES:
+        return CATEGORY_DISPLAY_NAMES[raw_name]
+    # Fallback: "FOOD_AND_DRINK" → "Food & Drink"
+    return raw_name.replace("_", " ").title().replace(" And ", " & ")
+
+
+@app.route("/user/top-expenses/<int:user_id>", methods=["GET"])
+def get_top_expenses(user_id):
+    """
+    Aggregate top spending categories from Plaid transactions (fallback: statement).
+
+    Query params:
+        days: int (optional, default 30)
+
+    Returns:
+    {
+        "source": "plaid" | "statement",
+        "topExpenses": [{ "category": str, "amount": float, "transactionCount": int }],
+        "totalSpending": float,
+        "period": int
+    }
+    """
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
+    days = request.args.get("days", 30, type=int)
+
+    # Try Plaid transactions first
+    plaid_items = PlaidItem.query.filter_by(user_id=user_id, status="active").all()
+    account_ids = []
+    for item in plaid_items:
+        for account in item.accounts:
+            account_ids.append(account.id)
+
+    if account_ids:
+        start_date = (datetime.now() - timedelta(days=days)).date()
+        transactions = Transaction.query.filter(
+            Transaction.plaid_account_id.in_(account_ids),
+            Transaction.date >= start_date
+        ).all()
+
+        category_data = {}
+        for txn in transactions:
+            if txn.amount > 0:
+                cat = txn.category_primary or "Uncategorized"
+                if cat not in category_data:
+                    category_data[cat] = {"amount": 0, "count": 0}
+                category_data[cat]["amount"] += txn.amount
+                category_data[cat]["count"] += 1
+
+        sorted_cats = sorted(category_data.items(), key=lambda x: x[1]["amount"], reverse=True)
+        total = sum(v["amount"] for v in category_data.values())
+
+        return jsonify({
+            "source": "plaid",
+            "topExpenses": [
+                {"category": format_category_name(cat), "amount": round(data["amount"], 2), "transactionCount": data["count"]}
+                for cat, data in sorted_cats[:5]
+            ],
+            "totalSpending": round(total, 2),
+            "period": days
+        })
+
+    # Fallback to statement
+    statement = SavedStatement.query.filter_by(user_id=user_id).first()
+    if statement and statement.llm_analysis:
+        try:
+            analysis = json.loads(statement.llm_analysis)
+            top_categories = analysis.get("top_categories", [])
+            expenses = [
+                {"category": cat.get("category", "Other"), "amount": float(cat.get("amount", 0)), "transactionCount": 0}
+                for cat in top_categories[:5]
+            ]
+            total = sum(e["amount"] for e in expenses)
+            return jsonify({
+                "source": "statement",
+                "topExpenses": expenses,
+                "totalSpending": round(total, 2),
+                "period": days
+            })
+        except (json.JSONDecodeError, TypeError):
+            pass
+
+    return jsonify({
+        "source": "none",
+        "topExpenses": [],
+        "totalSpending": 0,
+        "period": days
+    })
+
+
+@app.route("/user/category-preferences/<int:user_id>", methods=["GET"])
+def get_category_preferences(user_id):
+    """Get user's pinned category preferences."""
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
+    prefs = UserCategoryPreference.query.filter_by(user_id=user_id).order_by(
+        UserCategoryPreference.display_order
+    ).all()
+
+    return jsonify({
+        "categories": [
+            {"id": p.id, "categoryName": p.category_name, "displayOrder": p.display_order}
+            for p in prefs
+        ]
+    })
+
+
+@app.route("/user/category-preferences/<int:user_id>", methods=["PUT"])
+def update_category_preferences(user_id):
+    """
+    Set pinned categories.
+
+    Expected body:
+    { "categories": ["FOOD_AND_DRINK", "TRANSPORTATION", "SHOPPING"] }
+    """
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
+    data = request.get_json()
+    if not data or "categories" not in data:
+        return jsonify({"error": "categories field is required"}), 400
+
+    # Delete existing preferences
+    UserCategoryPreference.query.filter_by(user_id=user_id).delete()
+
+    # Insert new ones
+    for i, cat_name in enumerate(data["categories"]):
+        pref = UserCategoryPreference(
+            user_id=user_id,
+            category_name=cat_name,
+            display_order=i
+        )
+        db.session.add(pref)
+
+    db.session.commit()
+
+    return jsonify({"status": "success"})
+
+
+@app.route("/user/nudges/<int:user_id>", methods=["GET"])
+def get_nudges(user_id):
+    """
+    Get rules-based smart nudges (actual vs. budget comparison).
+    """
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
+    from services.nudge_generator import generate_nudges
+    nudges = generate_nudges(user_id)
+
+    return jsonify({"nudges": nudges})
 
 
 if __name__ == "__main__":
