@@ -14,7 +14,7 @@ struct EnterPhoneView: View {
 
     var authManager = AuthManager.shared
 
-    private let phoneNumberKit = PhoneNumberKit()
+//    private let phoneNumberKit = PhoneNumberKit()
 
     private var digitsOnly: String {
         phoneNumber.filter { $0.isNumber }
