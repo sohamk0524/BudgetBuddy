@@ -15,7 +15,7 @@ class ProfileViewModel {
     // MARK: - State
 
     var name: String = ""
-    var email: String = ""
+    var phoneNumber: String = ""
     var isStudent: Bool = false
     var budgetingGoal: String = ""
     var strictnessLevel: String = ""
@@ -42,7 +42,7 @@ class ProfileViewModel {
         do {
             let profile = try await apiService.getUserProfile(userId: userId)
             name = profile.name ?? ""
-            email = profile.email
+            phoneNumber = profile.phoneNumber ?? ""
             isStudent = profile.profile?.isStudent ?? false
             budgetingGoal = profile.profile?.budgetingGoal ?? ""
             strictnessLevel = profile.profile?.strictnessLevel ?? ""

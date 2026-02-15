@@ -124,7 +124,7 @@ struct ProfileView: View {
                     .foregroundStyle(Color.textPrimary)
             }
 
-            Text(viewModel.email)
+            Text(viewModel.phoneNumber)
                 .font(.roundedCaption)
                 .foregroundStyle(Color.textSecondary)
         }

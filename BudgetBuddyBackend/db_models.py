@@ -3,20 +3,31 @@ Database models for BudgetBuddy authentication and user profiles.
 Uses SQLAlchemy for ORM with SQLite database.
 """
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from flask_sqlalchemy import SQLAlchemy
 
 db = SQLAlchemy()
 
 
 class User(db.Model):
-    """User account for authentication."""
+    """User account for SMS-based authentication."""
     id = db.Column(db.Integer, primary_key=True)
-    email = db.Column(db.String(120), unique=True, nullable=False)
-    password_hash = db.Column(db.String(256))
+    phone_number = db.Column(db.String(20), unique=True, nullable=False)  # E.164 format
     name = db.Column(db.String(100), nullable=True)
-    profile = db.relationship('FinancialProfile', backref='user', uselist=False)
-    statement = db.relationship('SavedStatement', backref='user', uselist=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    profile = db.relationship('FinancialProfile', backref='user', uselist=False, cascade='all, delete-orphan')
+    statement = db.relationship('SavedStatement', backref='user', uselist=False, cascade='all, delete-orphan')
+    budget_plans = db.relationship('BudgetPlan', backref='user_ref', cascade='all, delete-orphan')
+
+
+class OTPCode(db.Model):
+    """One-time password codes for SMS verification."""
+    id = db.Column(db.Integer, primary_key=True)
+    phone_number = db.Column(db.String(20), nullable=False, index=True)
+    code = db.Column(db.String(6), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    expires_at = db.Column(db.DateTime, nullable=False)
+    verified = db.Column(db.Boolean, default=False)
 
 
 class UserCategoryPreference(db.Model):
@@ -55,8 +66,6 @@ class BudgetPlan(db.Model):
     plan_json = db.Column(db.Text, nullable=False)  # Full plan as JSON
     created_at = db.Column(db.DateTime, default=db.func.now())
     month_year = db.Column(db.String(7))  # "2026-02" format
-
-    user = db.relationship('User', backref='budget_plans')
 
 
 class SavedStatement(db.Model):

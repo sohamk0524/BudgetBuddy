@@ -11,7 +11,7 @@ from unittest.mock import patch, MagicMock
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from app import app as flask_app
-from db_models import db, User, FinancialProfile, BudgetPlan, PlaidItem, PlaidAccount, Transaction, UserCategoryPreference
+from db_models import db, User, FinancialProfile, BudgetPlan, OTPCode, PlaidItem, PlaidAccount, Transaction, UserCategoryPreference
 
 
 @pytest.fixture
@@ -45,12 +45,9 @@ def runner(app):
 @pytest.fixture
 def sample_user(app):
     """Create a sample user in the test database."""
-    from werkzeug.security import generate_password_hash
-
     with app.app_context():
         user = User(
-            email="test@example.com",
-            password_hash=generate_password_hash("password123")
+            phone_number="+15555550100"
         )
         db.session.add(user)
         db.session.commit()
@@ -64,12 +61,9 @@ def sample_user(app):
 @pytest.fixture
 def sample_user_with_profile(app):
     """Create a sample user with a complete financial profile."""
-    from werkzeug.security import generate_password_hash
-
     with app.app_context():
         user = User(
-            email="profile@example.com",
-            password_hash=generate_password_hash("password123")
+            phone_number="+15555550101"
         )
         db.session.add(user)
         db.session.flush()
@@ -156,12 +150,9 @@ def sample_csv_content():
 @pytest.fixture
 def sample_user_for_plaid(app):
     """Create a sample user for Plaid integration tests."""
-    from werkzeug.security import generate_password_hash
-
     with app.app_context():
         user = User(
-            email="plaid_test@example.com",
-            password_hash=generate_password_hash("password123")
+            phone_number="+15555550102"
         )
         db.session.add(user)
         db.session.commit()
@@ -288,12 +279,9 @@ def sample_plaid_item(app, sample_user_for_plaid):
 @pytest.fixture
 def sample_user_with_name(app):
     """Create a sample user with a name and financial profile."""
-    from werkzeug.security import generate_password_hash
-
     with app.app_context():
         user = User(
-            email="named@example.com",
-            password_hash=generate_password_hash("password123"),
+            phone_number="+15555550103",
             name="Test User"
         )
         db.session.add(user)
@@ -316,14 +304,12 @@ def sample_user_with_name(app):
 @pytest.fixture
 def sample_user_with_plaid_and_plan(app):
     """Create a user with Plaid data and a budget plan for nudge testing."""
-    from werkzeug.security import generate_password_hash
     from datetime import date, timedelta
     import json
 
     with app.app_context():
         user = User(
-            email="nudge@example.com",
-            password_hash=generate_password_hash("password123"),
+            phone_number="+15555550104",
             name="Nudge Tester"
         )
         db.session.add(user)

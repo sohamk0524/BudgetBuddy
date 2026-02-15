@@ -13,7 +13,7 @@ import UniformTypeIdentifiers
 // MARK: - Wallet View
 
 struct WalletView: View {
-    @State private var walletViewModel = WalletViewModel()
+    @State private var walletViewModel = MainActor.assumeIsolated { WalletViewModel() }
     @Bindable var planViewModel: SpendingPlanViewModel
     @State private var showingStatementUpload = false
     @State private var showCategoryEditor = false

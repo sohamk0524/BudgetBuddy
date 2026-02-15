@@ -419,7 +419,7 @@ struct PlaidSyncResponse: Codable {
 
 struct UserProfile: Codable {
     let name: String?
-    let email: String
+    let phoneNumber: String?
     let profile: FinancialProfileInfo?
     let plaidItems: [PlaidItemInfo]
 }

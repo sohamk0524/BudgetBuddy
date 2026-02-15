@@ -10,41 +10,30 @@ from db_models import db, User, UserCategoryPreference, SavedStatement, PlaidIte
 
 
 # =============================================================================
-# Auth Name Support
+# Auth Name Support (SMS-based)
 # =============================================================================
 
 @pytest.mark.integration
 class TestAuthNameSupport:
-    """Tests for name field in register, login, and onboarding."""
+    """Tests for name field in SMS auth and onboarding."""
 
-    def test_register_with_name(self, client):
-        """Test registering a user with a name."""
+    def test_verify_returns_name(self, client, sample_user_with_name):
+        """Test that verify_code response includes the user's name."""
+        from db_models import OTPCode
+        with client.application.app_context():
+            user = User.query.get(sample_user_with_name)
+            phone = user.phone_number
+
+        # Send code
+        client.post("/v1/send_sms_code", json={"phone_number": phone})
+
+        with client.application.app_context():
+            otp = OTPCode.query.filter_by(phone_number=phone).first()
+            code = otp.code
+
         response = client.post(
-            "/register",
-            json={"email": "named@test.com", "password": "pass123", "name": "Alex"}
-        )
-
-        assert response.status_code == 200
-        data = json.loads(response.data)
-        assert data["status"] == "success"
-        assert "token" in data
-
-    def test_register_without_name(self, client):
-        """Test registering a user without a name still works."""
-        response = client.post(
-            "/register",
-            json={"email": "noname@test.com", "password": "pass123"}
-        )
-
-        assert response.status_code == 200
-        data = json.loads(response.data)
-        assert data["status"] == "success"
-
-    def test_login_returns_name(self, client, sample_user_with_name):
-        """Test that login response includes the user's name."""
-        response = client.post(
-            "/login",
-            json={"email": "named@example.com", "password": "password123"}
+            "/v1/verify_code",
+            json={"phone_number": phone, "code": code}
         )
 
         assert response.status_code == 200
@@ -52,11 +41,22 @@ class TestAuthNameSupport:
         assert "name" in data
         assert data["name"] == "Test User"
 
-    def test_login_returns_null_name_when_unset(self, client, sample_user):
-        """Test that login returns null name when user has no name."""
+    def test_verify_returns_null_name_when_unset(self, client, sample_user):
+        """Test that verify returns null name when user has no name."""
+        from db_models import OTPCode
+        with client.application.app_context():
+            user = User.query.get(sample_user)
+            phone = user.phone_number
+
+        client.post("/v1/send_sms_code", json={"phone_number": phone})
+
+        with client.application.app_context():
+            otp = OTPCode.query.filter_by(phone_number=phone).first()
+            code = otp.code
+
         response = client.post(
-            "/login",
-            json={"email": "test@example.com", "password": "password123"}
+            "/v1/verify_code",
+            json={"phone_number": phone, "code": code}
         )
 
         assert response.status_code == 200
@@ -113,7 +113,7 @@ class TestUserProfileEndpoints:
         assert response.status_code == 200
         data = json.loads(response.data)
         assert data["name"] == "Test User"
-        assert data["email"] == "named@example.com"
+        assert data["phoneNumber"] == "+15555550103"
         assert data["profile"] is not None
         assert data["profile"]["isStudent"] is False
         assert data["profile"]["budgetingGoal"] == "emergency_fund"
@@ -126,7 +126,7 @@ class TestUserProfileEndpoints:
 
         assert response.status_code == 200
         data = json.loads(response.data)
-        assert data["email"] == "test@example.com"
+        assert data["phoneNumber"] == "+15555550100"
         assert data["profile"] is None
 
     def test_get_profile_nonexistent_user(self, client):
@@ -559,13 +559,8 @@ class TestUserCategoryPreferenceModel:
 
     def test_create_preference(self, app):
         """Test creating a category preference."""
-        from werkzeug.security import generate_password_hash
-
         with app.app_context():
-            user = User(
-                email="pref@test.com",
-                password_hash=generate_password_hash("pass")
-            )
+            user = User(phone_number="+15555550600")
             db.session.add(user)
             db.session.flush()
 
@@ -584,44 +579,31 @@ class TestUserCategoryPreferenceModel:
 
     def test_user_name_column(self, app):
         """Test that User model has name column."""
-        from werkzeug.security import generate_password_hash
-
         with app.app_context():
             user = User(
-                email="nametest@test.com",
-                password_hash=generate_password_hash("pass"),
+                phone_number="+15555550601",
                 name="Test Name"
             )
             db.session.add(user)
             db.session.commit()
 
-            saved = User.query.filter_by(email="nametest@test.com").first()
+            saved = User.query.filter_by(phone_number="+15555550601").first()
             assert saved.name == "Test Name"
 
     def test_user_name_nullable(self, app):
         """Test that name can be null."""
-        from werkzeug.security import generate_password_hash
-
         with app.app_context():
-            user = User(
-                email="nonull@test.com",
-                password_hash=generate_password_hash("pass")
-            )
+            user = User(phone_number="+15555550602")
             db.session.add(user)
             db.session.commit()
 
-            saved = User.query.filter_by(email="nonull@test.com").first()
+            saved = User.query.filter_by(phone_number="+15555550602").first()
             assert saved.name is None
 
     def test_user_category_preferences_relationship(self, app):
         """Test the user -> category_preferences relationship."""
-        from werkzeug.security import generate_password_hash
-
         with app.app_context():
-            user = User(
-                email="rel@test.com",
-                password_hash=generate_password_hash("pass")
-            )
+            user = User(phone_number="+15555550603")
             db.session.add(user)
             db.session.flush()
 
@@ -649,10 +631,8 @@ class TestFinancialSummaryEndpoint:
 
     def test_plaid_user_net_worth(self, client, app):
         """Plaid-linked user: net worth = assets - liabilities."""
-        from werkzeug.security import generate_password_hash
-
         with app.app_context():
-            user = User(email="fs_plaid@test.com", password_hash=generate_password_hash("pass"))
+            user = User(phone_number="+15555550700")
             db.session.add(user)
             db.session.flush()
 
@@ -707,10 +687,8 @@ class TestFinancialSummaryEndpoint:
 
     def test_plaid_user_safe_to_spend_no_plan(self, client, app):
         """Plaid user without plan: safe to spend = sum of depository balance_available."""
-        from werkzeug.security import generate_password_hash
-
         with app.app_context():
-            user = User(email="fs_noplan@test.com", password_hash=generate_password_hash("pass"))
+            user = User(phone_number="+15555550701")
             db.session.add(user)
             db.session.flush()
 
@@ -743,10 +721,8 @@ class TestFinancialSummaryEndpoint:
 
     def test_statement_fallback(self, client, app):
         """Statement-only user: fallback to statement logic, source='statement'."""
-        from werkzeug.security import generate_password_hash
-
         with app.app_context():
-            user = User(email="fs_stmt@test.com", password_hash=generate_password_hash("pass"))
+            user = User(phone_number="+15555550702")
             db.session.add(user)
             db.session.flush()
 
