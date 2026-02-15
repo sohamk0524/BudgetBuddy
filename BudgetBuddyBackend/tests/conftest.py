@@ -65,7 +65,6 @@ def sample_user(app):
 def sample_user_with_profile(app):
     """Create a sample user with a complete financial profile."""
     from werkzeug.security import generate_password_hash
-    import json
 
     with app.app_context():
         user = User(
@@ -77,15 +76,9 @@ def sample_user_with_profile(app):
 
         profile = FinancialProfile(
             user_id=user.id,
-            monthly_income=5000.0,
-            fixed_expenses=2000.0,
-            savings_goal_name="Emergency Fund",
-            savings_goal_target=10000.0,
-            income_frequency="monthly",
-            housing_situation="rent",
-            debt_types=json.dumps(["student_loans", "credit_cards"]),
-            financial_personality="balanced",
-            primary_goal="emergency_fund"
+            is_student=False,
+            budgeting_goal="emergency_fund",
+            strictness_level="moderate"
         )
         db.session.add(profile)
         db.session.commit()
@@ -296,7 +289,6 @@ def sample_plaid_item(app, sample_user_for_plaid):
 def sample_user_with_name(app):
     """Create a sample user with a name and financial profile."""
     from werkzeug.security import generate_password_hash
-    import json
 
     with app.app_context():
         user = User(
@@ -309,12 +301,9 @@ def sample_user_with_name(app):
 
         profile = FinancialProfile(
             user_id=user.id,
-            age=25,
-            occupation="employed",
-            monthly_income=5000.0,
-            income_frequency="monthly",
-            financial_personality="balanced",
-            primary_goal="emergency_fund"
+            is_student=False,
+            budgeting_goal="emergency_fund",
+            strictness_level="moderate"
         )
         db.session.add(profile)
         db.session.commit()
@@ -342,12 +331,9 @@ def sample_user_with_plaid_and_plan(app):
 
         profile = FinancialProfile(
             user_id=user.id,
-            age=30,
-            occupation="employed",
-            monthly_income=6000.0,
-            income_frequency="monthly",
-            financial_personality="balanced",
-            primary_goal="emergency_fund"
+            is_student=False,
+            budgeting_goal="emergency_fund",
+            strictness_level="moderate"
         )
         db.session.add(profile)
         db.session.flush()

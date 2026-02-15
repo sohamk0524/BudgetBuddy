@@ -134,15 +134,10 @@ class TestOnboardingEndpoint:
             "/onboarding",
             json={
                 "userId": sample_user,
-                "income": 5000.0,
-                "expenses": 2000.0,
-                "goalName": "Vacation",
-                "goalTarget": 3000.0,
-                "incomeFrequency": "monthly",
-                "housingSituation": "rent",
-                "debtTypes": ["student_loans"],
-                "financialPersonality": "balanced",
-                "primaryGoal": "save_purchase"
+                "name": "Test User",
+                "isStudent": True,
+                "budgetingGoal": "save_purchase",
+                "strictnessLevel": "moderate"
             }
         )
 
@@ -156,15 +151,9 @@ class TestOnboardingEndpoint:
             "/onboarding",
             json={
                 "userId": sample_user_with_profile,
-                "income": 6000.0,
-                "expenses": 2500.0,
-                "goalName": "House",
-                "goalTarget": 50000.0,
-                "incomeFrequency": "biweekly",
-                "housingSituation": "own",
-                "debtTypes": [],
-                "financialPersonality": "aggressive_saver",
-                "primaryGoal": "save_purchase"
+                "isStudent": False,
+                "budgetingGoal": "pay_debt",
+                "strictnessLevel": "strict"
             }
         )
 

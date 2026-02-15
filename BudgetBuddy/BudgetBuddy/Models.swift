@@ -425,22 +425,16 @@ struct UserProfile: Codable {
 }
 
 struct FinancialProfileInfo: Codable {
-    let age: Int?
-    let occupation: String?
-    let monthlyIncome: Double?
-    let incomeFrequency: String?
-    let financialPersonality: String?
-    let primaryGoal: String?
+    let isStudent: Bool?
+    let budgetingGoal: String?
+    let strictnessLevel: String?
 }
 
 struct UserProfileUpdateRequest: Codable {
     var name: String?
-    var age: Int?
-    var occupation: String?
-    var monthlyIncome: Double?
-    var incomeFrequency: String?
-    var financialPersonality: String?
-    var primaryGoal: String?
+    var isStudent: Bool?
+    var budgetingGoal: String?
+    var strictnessLevel: String?
 }
 
 // MARK: - Top Expenses Models

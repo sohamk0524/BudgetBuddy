@@ -71,12 +71,9 @@ class TestAuthNameSupport:
             json={
                 "userId": sample_user,
                 "name": "Onboarded User",
-                "age": 25,
-                "occupation": "student",
-                "income": 2000.0,
-                "incomeFrequency": "monthly",
-                "financialPersonality": "balanced",
-                "primaryGoal": "stability"
+                "isStudent": True,
+                "budgetingGoal": "stability",
+                "strictnessLevel": "moderate"
             }
         )
 
@@ -93,9 +90,8 @@ class TestAuthNameSupport:
             "/onboarding",
             json={
                 "userId": sample_user,
-                "age": 22,
-                "occupation": "student",
-                "income": 1500.0
+                "isStudent": False,
+                "budgetingGoal": "stability"
             }
         )
 
@@ -119,12 +115,9 @@ class TestUserProfileEndpoints:
         assert data["name"] == "Test User"
         assert data["email"] == "named@example.com"
         assert data["profile"] is not None
-        assert data["profile"]["age"] == 25
-        assert data["profile"]["occupation"] == "employed"
-        assert data["profile"]["monthlyIncome"] == 5000.0
-        assert data["profile"]["incomeFrequency"] == "monthly"
-        assert data["profile"]["financialPersonality"] == "balanced"
-        assert data["profile"]["primaryGoal"] == "emergency_fund"
+        assert data["profile"]["isStudent"] is False
+        assert data["profile"]["budgetingGoal"] == "emergency_fund"
+        assert data["profile"]["strictnessLevel"] == "moderate"
         assert isinstance(data["plaidItems"], list)
 
     def test_get_profile_no_profile(self, client, sample_user):
@@ -163,10 +156,9 @@ class TestUserProfileEndpoints:
         response = client.put(
             f"/user/profile/{sample_user_with_name}",
             json={
-                "age": 30,
-                "occupation": "self_employed",
-                "monthlyIncome": 8000.0,
-                "primaryGoal": "pay_debt"
+                "isStudent": True,
+                "budgetingGoal": "pay_debt",
+                "strictnessLevel": "strict"
             }
         )
 
@@ -175,26 +167,23 @@ class TestUserProfileEndpoints:
         # Verify
         response = client.get(f"/user/profile/{sample_user_with_name}")
         data = json.loads(response.data)
-        assert data["profile"]["age"] == 30
-        assert data["profile"]["occupation"] == "self_employed"
-        assert data["profile"]["monthlyIncome"] == 8000.0
-        assert data["profile"]["primaryGoal"] == "pay_debt"
-        # Unchanged fields preserved
-        assert data["profile"]["incomeFrequency"] == "monthly"
+        assert data["profile"]["isStudent"] is True
+        assert data["profile"]["budgetingGoal"] == "pay_debt"
+        assert data["profile"]["strictnessLevel"] == "strict"
 
     def test_update_profile_partial(self, client, sample_user_with_name):
         """Test partial update only changes specified fields."""
         response = client.put(
             f"/user/profile/{sample_user_with_name}",
-            json={"financialPersonality": "aggressive_saver"}
+            json={"strictnessLevel": "relaxed"}
         )
 
         assert response.status_code == 200
 
         response = client.get(f"/user/profile/{sample_user_with_name}")
         data = json.loads(response.data)
-        assert data["profile"]["financialPersonality"] == "aggressive_saver"
-        assert data["profile"]["monthlyIncome"] == 5000.0  # Unchanged
+        assert data["profile"]["strictnessLevel"] == "relaxed"
+        assert data["profile"]["budgetingGoal"] == "emergency_fund"  # Unchanged
         assert data["name"] == "Test User"  # Unchanged
 
     def test_update_profile_nonexistent_user(self, client):

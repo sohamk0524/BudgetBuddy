@@ -150,17 +150,15 @@ def login():
 @app.route("/onboarding", methods=["POST"])
 def onboarding():
     """
-    Save user's general profile from onboarding.
+    Save user's profile from onboarding (4-Question Protocol).
 
     Expected request body:
     {
         "userId": 1,
-        "age": 25,
-        "occupation": "employed",
-        "income": 5000.0,
-        "incomeFrequency": "monthly",
-        "financialPersonality": "balanced",
-        "primaryGoal": "emergency_fund"
+        "name": "Alex",
+        "isStudent": true,
+        "budgetingGoal": "emergency_fund",
+        "strictnessLevel": "moderate"
     }
 
     Returns:
@@ -175,12 +173,9 @@ def onboarding():
 
     user_id = data.get("userId")
     name = data.get("name", "").strip() or None
-    age = data.get("age", 0)
-    occupation = data.get("occupation", "")
-    income = data.get("income", 0.0)
-    income_frequency = data.get("incomeFrequency", "monthly")
-    financial_personality = data.get("financialPersonality", "balanced")
-    primary_goal = data.get("primaryGoal", "stability")
+    is_student = data.get("isStudent", False)
+    budgeting_goal = data.get("budgetingGoal", "stability")
+    strictness_level = data.get("strictnessLevel", "moderate")
 
     if not user_id:
         return jsonify({"error": "userId is required"}), 400
@@ -197,22 +192,16 @@ def onboarding():
     # Check if profile already exists
     if user.profile:
         # Update existing profile
-        user.profile.age = age
-        user.profile.occupation = occupation
-        user.profile.monthly_income = income
-        user.profile.income_frequency = income_frequency
-        user.profile.financial_personality = financial_personality
-        user.profile.primary_goal = primary_goal
+        user.profile.is_student = is_student
+        user.profile.budgeting_goal = budgeting_goal
+        user.profile.strictness_level = strictness_level
     else:
         # Create new profile
         profile = FinancialProfile(
             user_id=user_id,
-            age=age,
-            occupation=occupation,
-            monthly_income=income,
-            income_frequency=income_frequency,
-            financial_personality=financial_personality,
-            primary_goal=primary_goal
+            is_student=is_student,
+            budgeting_goal=budgeting_goal,
+            strictness_level=strictness_level
         )
         db.session.add(profile)
 
@@ -1151,12 +1140,9 @@ def get_user_profile(user_id):
     profile_data = None
     if user.profile:
         profile_data = {
-            "age": user.profile.age,
-            "occupation": user.profile.occupation,
-            "monthlyIncome": user.profile.monthly_income,
-            "incomeFrequency": user.profile.income_frequency,
-            "financialPersonality": user.profile.financial_personality,
-            "primaryGoal": user.profile.primary_goal
+            "isStudent": user.profile.is_student,
+            "budgetingGoal": user.profile.budgeting_goal,
+            "strictnessLevel": user.profile.strictness_level
         }
 
     plaid_items_data = []
@@ -1189,8 +1175,7 @@ def get_user_profile(user_id):
 def update_user_profile(user_id):
     """
     Update user profile fields (partial update).
-    Accepts any subset of: name, age, occupation, monthlyIncome,
-    incomeFrequency, financialPersonality, primaryGoal.
+    Accepts any subset of: name, isStudent, budgetingGoal, strictnessLevel.
     """
     user = User.query.get(user_id)
     if not user:
@@ -1206,18 +1191,12 @@ def update_user_profile(user_id):
 
     # Update profile fields
     if user.profile:
-        if "age" in data:
-            user.profile.age = data["age"]
-        if "occupation" in data:
-            user.profile.occupation = data["occupation"]
-        if "monthlyIncome" in data:
-            user.profile.monthly_income = data["monthlyIncome"]
-        if "incomeFrequency" in data:
-            user.profile.income_frequency = data["incomeFrequency"]
-        if "financialPersonality" in data:
-            user.profile.financial_personality = data["financialPersonality"]
-        if "primaryGoal" in data:
-            user.profile.primary_goal = data["primaryGoal"]
+        if "isStudent" in data:
+            user.profile.is_student = data["isStudent"]
+        if "budgetingGoal" in data:
+            user.profile.budgeting_goal = data["budgetingGoal"]
+        if "strictnessLevel" in data:
+            user.profile.strictness_level = data["strictnessLevel"]
 
     db.session.commit()
 

@@ -335,7 +335,6 @@ def _get_user_financial_summary(user_id: Optional[int]) -> Dict[str, Any]:
         result = {
             "has_profile": False,
             "has_statement": False,
-            "monthly_income": 0,
             "net_worth": 0,
             "safe_to_spend": 0
         }
@@ -343,10 +342,9 @@ def _get_user_financial_summary(user_id: Optional[int]) -> Dict[str, Any]:
         # Get profile data
         if user.profile:
             result["has_profile"] = True
-            result["monthly_income"] = user.profile.monthly_income
-            result["fixed_expenses"] = user.profile.fixed_expenses
-            result["financial_personality"] = user.profile.financial_personality
-            result["primary_goal"] = user.profile.primary_goal
+            result["is_student"] = user.profile.is_student
+            result["budgeting_goal"] = user.profile.budgeting_goal
+            result["strictness_level"] = user.profile.strictness_level
 
         # Get statement data
         statement = SavedStatement.query.filter_by(user_id=user_id).first()
@@ -470,7 +468,7 @@ def _get_user_savings_progress(user_id: Optional[int]) -> Dict[str, Any]:
                             "current": current_savings,
                             "progress_percent": round((current_savings / target) * 100, 1) if target > 0 else 0
                         }],
-                        "primary_goal": profile.primary_goal,
+                        "budgeting_goal": profile.budgeting_goal,
                         "summary": f"Saving for {profile.savings_goal_name}: ${current_savings:.2f} of ${target:.2f} target"
                     }
         except Exception:

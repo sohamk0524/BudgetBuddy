@@ -148,57 +148,28 @@ struct ProfileView: View {
                 .foregroundStyle(Color.textPrimary)
 
             VStack(spacing: 12) {
-                profileRow(label: "Age", value: viewModel.age.map { "\($0)" } ?? "--") {
-                    TextField("Age", value: $viewModel.age, format: .number)
-                        .keyboardType(.numberPad)
-                        .multilineTextAlignment(.trailing)
+                profileRow(label: "Student", value: viewModel.isStudent ? "Yes" : "No") {
+                    Toggle("Student", isOn: $viewModel.isStudent)
                         .tint(Color.accent)
+                        .labelsHidden()
                 }
 
-                profileRow(label: "Occupation", value: formatOccupation(viewModel.occupation)) {
-                    Picker("Occupation", selection: $viewModel.occupation) {
-                        Text("Student").tag("student")
-                        Text("Employed").tag("employed")
-                        Text("Self-Employed").tag("self_employed")
-                        Text("Retired").tag("retired")
-                    }
-                    .pickerStyle(.menu)
-                    .tint(Color.accent)
-                }
-
-                profileRow(label: "Monthly Income", value: viewModel.monthlyIncome.map { "$\(Int($0))" } ?? "--") {
-                    TextField("Income", value: $viewModel.monthlyIncome, format: .number)
-                        .keyboardType(.decimalPad)
-                        .multilineTextAlignment(.trailing)
-                        .tint(Color.accent)
-                }
-
-                profileRow(label: "Pay Frequency", value: formatFrequency(viewModel.incomeFrequency)) {
-                    Picker("Frequency", selection: $viewModel.incomeFrequency) {
-                        Text("Biweekly").tag("biweekly")
-                        Text("Monthly").tag("monthly")
-                        Text("Irregular").tag("irregular")
-                    }
-                    .pickerStyle(.menu)
-                    .tint(Color.accent)
-                }
-
-                profileRow(label: "Personality", value: formatPersonality(viewModel.financialPersonality)) {
-                    Picker("Personality", selection: $viewModel.financialPersonality) {
-                        Text("Aggressive Saver").tag("aggressive_saver")
-                        Text("Balanced").tag("balanced")
-                        Text("Relaxed").tag("relaxed")
-                    }
-                    .pickerStyle(.menu)
-                    .tint(Color.accent)
-                }
-
-                profileRow(label: "Primary Goal", value: formatGoal(viewModel.primaryGoal)) {
-                    Picker("Goal", selection: $viewModel.primaryGoal) {
+                profileRow(label: "Budgeting Goal", value: formatGoal(viewModel.budgetingGoal)) {
+                    Picker("Goal", selection: $viewModel.budgetingGoal) {
                         Text("Emergency Fund").tag("emergency_fund")
                         Text("Pay Off Debt").tag("pay_debt")
                         Text("Save for Purchase").tag("save_purchase")
                         Text("General Stability").tag("stability")
+                    }
+                    .pickerStyle(.menu)
+                    .tint(Color.accent)
+                }
+
+                profileRow(label: "Strictness", value: formatStrictness(viewModel.strictnessLevel)) {
+                    Picker("Strictness", selection: $viewModel.strictnessLevel) {
+                        Text("Relaxed").tag("relaxed")
+                        Text("Moderate").tag("moderate")
+                        Text("Strict").tag("strict")
                     }
                     .pickerStyle(.menu)
                     .tint(Color.accent)
@@ -315,40 +286,21 @@ struct ProfileView: View {
 
     // MARK: - Formatters
 
-    private func formatOccupation(_ value: String) -> String {
-        switch value {
-        case "student": return "Student"
-        case "employed": return "Employed"
-        case "self_employed": return "Self-Employed"
-        case "retired": return "Retired"
-        default: return "--"
-        }
-    }
-
-    private func formatFrequency(_ value: String) -> String {
-        switch value {
-        case "biweekly": return "Biweekly"
-        case "monthly": return "Monthly"
-        case "irregular": return "Irregular"
-        default: return "--"
-        }
-    }
-
-    private func formatPersonality(_ value: String) -> String {
-        switch value {
-        case "aggressive_saver": return "Aggressive Saver"
-        case "balanced": return "Balanced"
-        case "relaxed": return "Relaxed"
-        default: return "--"
-        }
-    }
-
     private func formatGoal(_ value: String) -> String {
         switch value {
         case "emergency_fund": return "Emergency Fund"
         case "pay_debt": return "Pay Off Debt"
         case "save_purchase": return "Save for Purchase"
         case "stability": return "General Stability"
+        default: return "--"
+        }
+    }
+
+    private func formatStrictness(_ value: String) -> String {
+        switch value {
+        case "relaxed": return "Relaxed"
+        case "moderate": return "Moderate"
+        case "strict": return "Strict"
         default: return "--"
         }
     }

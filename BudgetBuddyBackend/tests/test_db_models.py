@@ -74,15 +74,16 @@ class TestUserModel:
 
             profile = FinancialProfile(
                 user_id=user.id,
-                monthly_income=5000.0,
-                fixed_expenses=2000.0
+                is_student=True,
+                budgeting_goal="stability",
+                strictness_level="moderate"
             )
             db.session.add(profile)
             db.session.commit()
 
             # Test relationship
             assert user.profile is not None
-            assert user.profile.monthly_income == 5000.0
+            assert user.profile.is_student is True
             assert profile.user.email == "profile_test@example.com"
 
 
@@ -95,22 +96,21 @@ class TestFinancialProfileModel:
         with app.app_context():
             profile = FinancialProfile(
                 user_id=sample_user,
-                monthly_income=6000.0,
-                fixed_expenses=2500.0,
+                is_student=True,
+                budgeting_goal="save_purchase",
+                strictness_level="strict",
                 savings_goal_name="Vacation",
                 savings_goal_target=5000.0,
-                income_frequency="biweekly",
                 housing_situation="own",
-                debt_types=json.dumps(["car_loan"]),
-                financial_personality="aggressive_saver",
-                primary_goal="save_purchase"
+                debt_types=json.dumps(["car_loan"])
             )
             db.session.add(profile)
             db.session.commit()
 
             assert profile.id is not None
-            assert profile.monthly_income == 6000.0
-            assert profile.savings_goal_name == "Vacation"
+            assert profile.is_student is True
+            assert profile.budgeting_goal == "save_purchase"
+            assert profile.strictness_level == "strict"
 
     def test_profile_defaults(self, app, sample_user):
         """Test default values for profile fields."""
@@ -119,7 +119,7 @@ class TestFinancialProfileModel:
             db.session.add(profile)
             db.session.commit()
 
-            assert profile.monthly_income == 0.0
+            assert profile.is_student is False
             assert profile.fixed_expenses == 0.0
             assert profile.savings_goal_target == 0.0
 
@@ -148,13 +148,13 @@ class TestFinancialProfileModel:
             profile = user.profile
 
             # Update values
-            profile.monthly_income = 6500.0
+            profile.strictness_level = "strict"
             profile.savings_goal_name = "New Car"
             db.session.commit()
 
             # Verify updates
             updated_profile = user.profile
-            assert updated_profile.monthly_income == 6500.0
+            assert updated_profile.strictness_level == "strict"
             assert updated_profile.savings_goal_name == "New Car"
 
 

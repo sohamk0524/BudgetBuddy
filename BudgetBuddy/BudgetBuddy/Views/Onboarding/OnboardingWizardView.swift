@@ -2,7 +2,8 @@
 //  OnboardingWizardView.swift
 //  BudgetBuddy
 //
-//  Onboarding wizard for collecting user financial profile
+//  Onboarding wizard – 4-Question Protocol:
+//  1. Name  2. Student Status  3. Primary Motivation  4. Strictness Level
 //
 
 import SwiftUI
@@ -10,21 +11,18 @@ import SwiftUI
 struct OnboardingWizardView: View {
     @State private var currentPage = 0
 
-    // General profile fields
+    // 4-Question Protocol fields
     @State private var name: String = ""
-    @State private var age: String = ""
-    @State private var occupation: String = ""
-    @State private var monthlyIncome: String = ""
-    @State private var incomeFrequency: String = "monthly"
-    @State private var financialPersonality: String = "balanced"
-    @State private var primaryGoal: String = "stability"
+    @State private var isStudent: Bool = false
+    @State private var userBudgetingGoal: String = "stability"
+    @State private var strictnessLevel: String = "moderate"
 
     var authManager = AuthManager.shared
 
-    private let totalPages = 7
+    private let totalPages = 4
 
     private var canFinish: Bool {
-        !monthlyIncome.isEmpty
+        !name.trimmingCharacters(in: .whitespaces).isEmpty
     }
 
     var body: some View {
@@ -63,36 +61,17 @@ struct OnboardingWizardView: View {
                     NamePage(name: $name)
                         .tag(0)
 
-                    // Page 1: Age
-                    AgePage(age: $age)
+                    // Page 1: Student Status
+                    StudentStatusPage(isStudent: $isStudent)
                         .tag(1)
 
-                    // Page 2: Occupation
-                    OccupationPage(occupation: $occupation)
+                    // Page 2: Primary Motivation ("Why")
+                    PrimaryMotivationPage(selectedGoal: $userBudgetingGoal)
                         .tag(2)
 
-                    // Page 3: Monthly Income
-                    OnboardingPage(
-                        icon: "dollarsign.circle.fill",
-                        title: "Monthly Income",
-                        subtitle: "How much do you earn each month after taxes?",
-                        placeholder: "e.g., 5000",
-                        text: $monthlyIncome,
-                        keyboardType: .decimalPad
-                    )
-                    .tag(3)
-
-                    // Page 4: Income Frequency
-                    IncomeFrequencyPage(selectedFrequency: $incomeFrequency)
-                        .tag(4)
-
-                    // Page 5: Financial Personality
-                    FinancialPersonalityPage(selectedPersonality: $financialPersonality)
-                        .tag(5)
-
-                    // Page 6: Primary Goal
-                    PrimaryGoalPage(selectedGoal: $primaryGoal)
-                        .tag(6)
+                    // Page 3: Strictness Level
+                    StrictnessLevelPage(selectedStrictness: $strictnessLevel)
+                        .tag(3)
                 }
                 .tabViewStyle(.page(indexDisplayMode: .never))
 
@@ -160,73 +139,16 @@ struct OnboardingWizardView: View {
     }
 
     private func finishOnboarding() {
-        let income = Double(monthlyIncome) ?? 0.0
-        let ageInt = Int(age) ?? 0
         let trimmedName = name.trimmingCharacters(in: .whitespaces)
 
         Task {
             await authManager.completeOnboarding(
                 name: trimmedName,
-                age: ageInt,
-                occupation: occupation,
-                income: income,
-                incomeFrequency: incomeFrequency,
-                financialPersonality: financialPersonality,
-                primaryGoal: primaryGoal
+                isStudent: isStudent,
+                userBudgetingGoal: userBudgetingGoal,
+                strictnessLevel: strictnessLevel
             )
         }
-    }
-}
-
-// MARK: - Onboarding Page Component
-
-struct OnboardingPage: View {
-    let icon: String
-    let title: String
-    let subtitle: String
-    let placeholder: String
-    @Binding var text: String
-    var keyboardType: UIKeyboardType = .default
-
-    var body: some View {
-        VStack(spacing: 24) {
-            // Icon
-            Image(systemName: icon)
-                .font(.system(size: 56))
-                .foregroundStyle(Color.accent)
-
-            // Title
-            Text(title)
-                .font(.roundedHeadline)
-                .foregroundStyle(Color.textPrimary)
-
-            // Subtitle
-            Text(subtitle)
-                .font(.roundedBody)
-                .foregroundStyle(Color.textSecondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 32)
-
-            // Input Field
-            HStack {
-                Text("$")
-                    .font(.roundedTitle)
-                    .foregroundStyle(Color.textSecondary)
-
-                TextField(placeholder, text: $text)
-                    .font(.roundedTitle)
-                    .foregroundStyle(Color.textPrimary)
-                    .keyboardType(keyboardType)
-                    .multilineTextAlignment(.center)
-            }
-            .padding()
-            .background(Color.surface)
-            .clipShape(RoundedRectangle(cornerRadius: 16))
-            .padding(.horizontal, 48)
-
-            Spacer()
-        }
-        .padding(.top, 24)
     }
 }
 
@@ -266,78 +188,42 @@ struct NamePage: View {
     }
 }
 
-// MARK: - Age Page
+// MARK: - Student Status Page
 
-struct AgePage: View {
-    @Binding var age: String
+struct StudentStatusPage: View {
+    @Binding var isStudent: Bool
 
     var body: some View {
         VStack(spacing: 24) {
-            Image(systemName: "person.fill")
+            Image(systemName: "graduationcap.fill")
                 .font(.system(size: 56))
                 .foregroundStyle(Color.accent)
 
-            Text("Your Age")
+            Text("Are You a Student?")
                 .font(.roundedHeadline)
                 .foregroundStyle(Color.textPrimary)
 
-            Text("This helps us tailor advice for your life stage")
+            Text("This helps us tailor advice for your situation")
                 .font(.roundedBody)
                 .foregroundStyle(Color.textSecondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 32)
 
-            TextField("e.g., 25", text: $age)
-                .font(.roundedTitle)
-                .foregroundStyle(Color.textPrimary)
-                .keyboardType(.numberPad)
-                .multilineTextAlignment(.center)
-                .padding()
-                .background(Color.surface)
-                .clipShape(RoundedRectangle(cornerRadius: 16))
-                .padding(.horizontal, 48)
-
-            Spacer()
-        }
-        .padding(.top, 24)
-    }
-}
-
-// MARK: - Occupation Page
-
-struct OccupationPage: View {
-    @Binding var occupation: String
-
-    private let options = [
-        ("student", "Student", "Currently in school or university"),
-        ("employed", "Employed", "Working full-time or part-time"),
-        ("self_employed", "Self-Employed", "Freelancer or business owner"),
-        ("retired", "Retired", "No longer working")
-    ]
-
-    var body: some View {
-        VStack(spacing: 24) {
-            Image(systemName: "briefcase.fill")
-                .font(.system(size: 56))
-                .foregroundStyle(Color.accent)
-
-            Text("Your Occupation")
-                .font(.roundedHeadline)
-                .foregroundStyle(Color.textPrimary)
-
-            Text("What best describes your work situation?")
-                .font(.roundedBody)
-                .foregroundStyle(Color.textSecondary)
-
             VStack(spacing: 12) {
-                ForEach(options, id: \.0) { value, title, subtitle in
-                    SelectableOptionCard(
-                        title: title,
-                        subtitle: subtitle,
-                        isSelected: occupation == value
-                    ) {
-                        occupation = value
-                    }
+                SelectableOptionCard(
+                    title: "Yes",
+                    subtitle: "I'm currently enrolled in school",
+                    isSelected: isStudent
+                ) {
+                    isStudent = true
+                }
+
+                SelectableOptionCard(
+                    title: "No",
+                    subtitle: "I'm not currently a student",
+                    isSelected: !isStudent
+                ) {
+                    isStudent = false
                 }
             }
             .padding(.horizontal, 24)
@@ -348,203 +234,9 @@ struct OccupationPage: View {
     }
 }
 
-// MARK: - Income Frequency Page
+// MARK: - Primary Motivation Page
 
-struct IncomeFrequencyPage: View {
-    @Binding var selectedFrequency: String
-
-    private let options = [
-        ("biweekly", "Biweekly", "Every two weeks"),
-        ("monthly", "Monthly", "Once a month"),
-        ("irregular", "Irregular", "Varies each month")
-    ]
-
-    var body: some View {
-        VStack(spacing: 24) {
-            Image(systemName: "calendar.badge.clock")
-                .font(.system(size: 56))
-                .foregroundStyle(Color.accent)
-
-            Text("Income Frequency")
-                .font(.roundedHeadline)
-                .foregroundStyle(Color.textPrimary)
-
-            Text("How often do you get paid?")
-                .font(.roundedBody)
-                .foregroundStyle(Color.textSecondary)
-
-            VStack(spacing: 12) {
-                ForEach(options, id: \.0) { value, title, subtitle in
-                    SelectableOptionCard(
-                        title: title,
-                        subtitle: subtitle,
-                        isSelected: selectedFrequency == value
-                    ) {
-                        selectedFrequency = value
-                    }
-                }
-            }
-            .padding(.horizontal, 24)
-
-            Spacer()
-        }
-        .padding(.top, 24)
-    }
-}
-
-// MARK: - Housing Situation Page
-
-struct HousingSituationPage: View {
-    @Binding var selectedSituation: String
-
-    private let options = [
-        ("rent", "Renting", "I pay rent monthly"),
-        ("own", "Own Home", "I have a mortgage or own outright"),
-        ("family", "Living with Family", "No housing payment")
-    ]
-
-    var body: some View {
-        VStack(spacing: 24) {
-            Image(systemName: "house.fill")
-                .font(.system(size: 56))
-                .foregroundStyle(Color.accent)
-
-            Text("Housing Situation")
-                .font(.roundedHeadline)
-                .foregroundStyle(Color.textPrimary)
-
-            Text("What's your current living arrangement?")
-                .font(.roundedBody)
-                .foregroundStyle(Color.textSecondary)
-
-            VStack(spacing: 12) {
-                ForEach(options, id: \.0) { value, title, subtitle in
-                    SelectableOptionCard(
-                        title: title,
-                        subtitle: subtitle,
-                        isSelected: selectedSituation == value
-                    ) {
-                        selectedSituation = value
-                    }
-                }
-            }
-            .padding(.horizontal, 24)
-
-            Spacer()
-        }
-        .padding(.top, 24)
-    }
-}
-
-// MARK: - Debt Types Page
-
-struct DebtTypesPage: View {
-    @Binding var selectedDebtTypes: Set<String>
-
-    private let options = [
-        ("student_loans", "Student Loans", "Education debt"),
-        ("credit_cards", "Credit Cards", "Revolving credit"),
-        ("car", "Car Payment", "Auto loan"),
-        ("none", "No Debt", "Debt-free")
-    ]
-
-    var body: some View {
-        VStack(spacing: 24) {
-            Image(systemName: "creditcard.fill")
-                .font(.system(size: 56))
-                .foregroundStyle(Color.accent)
-
-            Text("Debt Obligations")
-                .font(.roundedHeadline)
-                .foregroundStyle(Color.textPrimary)
-
-            Text("Select all that apply")
-                .font(.roundedBody)
-                .foregroundStyle(Color.textSecondary)
-
-            VStack(spacing: 12) {
-                ForEach(options, id: \.0) { value, title, subtitle in
-                    MultiSelectOptionCard(
-                        title: title,
-                        subtitle: subtitle,
-                        isSelected: selectedDebtTypes.contains(value)
-                    ) {
-                        if value == "none" {
-                            // If "No Debt" is selected, clear all others
-                            if selectedDebtTypes.contains(value) {
-                                selectedDebtTypes.remove(value)
-                            } else {
-                                selectedDebtTypes = [value]
-                            }
-                        } else {
-                            // Remove "none" if selecting a debt type
-                            selectedDebtTypes.remove("none")
-                            if selectedDebtTypes.contains(value) {
-                                selectedDebtTypes.remove(value)
-                            } else {
-                                selectedDebtTypes.insert(value)
-                            }
-                        }
-                    }
-                }
-            }
-            .padding(.horizontal, 24)
-
-            Spacer()
-        }
-        .padding(.top, 24)
-    }
-}
-
-// MARK: - Financial Personality Page
-
-struct FinancialPersonalityPage: View {
-    @Binding var selectedPersonality: String
-
-    private let options = [
-        ("aggressive_saver", "Aggressive Saver", "I prioritize saving over spending"),
-        ("balanced", "Balanced", "I maintain a healthy balance"),
-        ("relaxed", "Relaxed", "Most of my income goes to expenses")
-    ]
-
-    var body: some View {
-        VStack(spacing: 24) {
-            Image(systemName: "person.fill.questionmark")
-                .font(.system(size: 56))
-                .foregroundStyle(Color.accent)
-
-            Text("Financial Personality")
-                .font(.roundedHeadline)
-                .foregroundStyle(Color.textPrimary)
-
-            Text("How would you describe your spending style?")
-                .font(.roundedBody)
-                .foregroundStyle(Color.textSecondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 24)
-
-            VStack(spacing: 12) {
-                ForEach(options, id: \.0) { value, title, subtitle in
-                    SelectableOptionCard(
-                        title: title,
-                        subtitle: subtitle,
-                        isSelected: selectedPersonality == value
-                    ) {
-                        selectedPersonality = value
-                    }
-                }
-            }
-            .padding(.horizontal, 24)
-
-            Spacer()
-        }
-        .padding(.top, 24)
-    }
-}
-
-// MARK: - Primary Goal Page
-
-struct PrimaryGoalPage: View {
+struct PrimaryMotivationPage: View {
     @Binding var selectedGoal: String
 
     private let options = [
@@ -560,11 +252,11 @@ struct PrimaryGoalPage: View {
                 .font(.system(size: 56))
                 .foregroundStyle(Color.accent)
 
-            Text("Primary Goal")
+            Text("Why Are You Here?")
                 .font(.roundedHeadline)
                 .foregroundStyle(Color.textPrimary)
 
-            Text("What's your main financial priority right now?")
+            Text("What's your main reason for using BudgetBuddy?")
                 .font(.roundedBody)
                 .foregroundStyle(Color.textSecondary)
                 .multilineTextAlignment(.center)
@@ -578,6 +270,52 @@ struct PrimaryGoalPage: View {
                         isSelected: selectedGoal == value
                     ) {
                         selectedGoal = value
+                    }
+                }
+            }
+            .padding(.horizontal, 24)
+
+            Spacer()
+        }
+        .padding(.top, 24)
+    }
+}
+
+// MARK: - Strictness Level Page
+
+struct StrictnessLevelPage: View {
+    @Binding var selectedStrictness: String
+
+    private let options = [
+        ("relaxed", "Relaxed", "Guide me gently"),
+        ("moderate", "Moderate", "Keep me on track"),
+        ("strict", "Strict", "Don't let me overspend")
+    ]
+
+    var body: some View {
+        VStack(spacing: 24) {
+            Image(systemName: "slider.horizontal.3")
+                .font(.system(size: 56))
+                .foregroundStyle(Color.accent)
+
+            Text("How Strict Should We Be?")
+                .font(.roundedHeadline)
+                .foregroundStyle(Color.textPrimary)
+
+            Text("Choose how aggressively we should enforce your budget")
+                .font(.roundedBody)
+                .foregroundStyle(Color.textSecondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 24)
+
+            VStack(spacing: 12) {
+                ForEach(options, id: \.0) { value, title, subtitle in
+                    SelectableOptionCard(
+                        title: title,
+                        subtitle: subtitle,
+                        isSelected: selectedStrictness == value
+                    ) {
+                        selectedStrictness = value
                     }
                 }
             }
@@ -613,44 +351,6 @@ struct SelectableOptionCard: View {
                 Spacer()
 
                 Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                    .font(.title2)
-                    .foregroundStyle(isSelected ? Color.accent : Color.textSecondary)
-            }
-            .padding()
-            .background(isSelected ? Color.accent.opacity(0.15) : Color.surface)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(isSelected ? Color.accent : Color.clear, lineWidth: 2)
-            )
-        }
-    }
-}
-
-// MARK: - Multi-Select Option Card
-
-struct MultiSelectOptionCard: View {
-    let title: String
-    let subtitle: String
-    let isSelected: Bool
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(title)
-                        .font(.roundedHeadline)
-                        .foregroundStyle(Color.textPrimary)
-
-                    Text(subtitle)
-                        .font(.roundedCaption)
-                        .foregroundStyle(Color.textSecondary)
-                }
-
-                Spacer()
-
-                Image(systemName: isSelected ? "checkmark.square.fill" : "square")
                     .font(.title2)
                     .foregroundStyle(isSelected ? Color.accent : Color.textSecondary)
             }

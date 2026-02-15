@@ -13,12 +13,10 @@ from services.llm_service import BudgetBuddyAgent
 PLAN_GENERATION_PROMPT = """You are BudgetBuddy's financial planning assistant. Generate a personalized monthly spending plan based on the user's financial data.
 
 USER PROFILE:
-- Age: {age}
-- Occupation: {occupation}
+- Student: {is_student}
+- Budgeting Goal: {budgeting_goal}
+- Strictness Level: {strictness_level}
 - Monthly Income: ${monthly_income:,.2f}
-- Income Frequency: {income_frequency}
-- Financial Personality: {financial_personality}
-- Primary Goal: {primary_goal}
 
 FINANCIAL SITUATION:
 - Housing Situation: {housing_situation}
@@ -88,17 +86,14 @@ def get_full_user_profile(user_id: int) -> Optional[Dict[str, Any]]:
                     debt_types = []
 
             return {
-                "age": profile.age or 0,
-                "occupation": profile.occupation or "Not specified",
-                "monthly_income": profile.monthly_income or 0,
+                "is_student": profile.is_student or False,
+                "budgeting_goal": profile.budgeting_goal or "stability",
+                "strictness_level": profile.strictness_level or "moderate",
                 "fixed_expenses": profile.fixed_expenses or 0,
                 "savings_goal_name": profile.savings_goal_name or "",
                 "savings_goal_target": profile.savings_goal_target or 0,
-                "income_frequency": profile.income_frequency or "monthly",
                 "housing_situation": profile.housing_situation or "rent",
-                "debt_types": debt_types,
-                "financial_personality": profile.financial_personality or "balanced",
-                "primary_goal": profile.primary_goal or "stability"
+                "debt_types": debt_types
             }
     except Exception as e:
         print(f"Error fetching user profile: {e}")
@@ -228,17 +223,18 @@ def generate_plan(user_id: int, deep_dive_data: Dict[str, Any]) -> Dict[str, Any
     subscriptions = sum(s.get("amount", 0) for s in fixed_expenses_data.get("subscriptions", []))
     calculated_fixed = rent + utilities + subscriptions
 
+    # Income comes from deep_dive_data (collected during plan creation, not onboarding)
+    monthly_income = deep_dive_data.get("monthlyIncome", 0)
+
     # Format the prompt with user data
     prompt_data = {
-        "age": profile.get("age", 0) or "Not specified",
-        "occupation": (profile.get("occupation", "") or "Not specified").replace("_", " ").title(),
-        "monthly_income": profile["monthly_income"],
-        "income_frequency": profile["income_frequency"],
+        "is_student": "Yes" if profile.get("is_student") else "No",
+        "budgeting_goal": (profile.get("budgeting_goal", "stability") or "stability").replace("_", " ").title(),
+        "strictness_level": (profile.get("strictness_level", "moderate") or "moderate").replace("_", " ").title(),
+        "monthly_income": monthly_income,
         "housing_situation": housing_situation.replace("_", " ").title(),
         "fixed_expenses": calculated_fixed if calculated_fixed > 0 else profile.get("fixed_expenses", 0),
         "debt_types": ", ".join(d.replace("_", " ").title() for d in debt_types) if debt_types else "None",
-        "financial_personality": profile["financial_personality"].replace("_", " ").title(),
-        "primary_goal": profile["primary_goal"].replace("_", " ").title(),
         "detailed_expenses": format_deep_dive_data(deep_dive_data),
         "upcoming_events": format_upcoming_events(deep_dive_data.get("upcomingEvents", [])),
         "savings_goals": format_savings_goals(deep_dive_data.get("savingsGoals", [])),
@@ -312,8 +308,8 @@ def generate_fallback_plan(profile: Dict[str, Any], deep_dive_data: Dict[str, An
     Generate a basic plan without AI when Ollama is unavailable.
     Uses simple rules-based allocation.
     """
-    income = profile["monthly_income"]
-    fixed_from_profile = profile["fixed_expenses"]
+    income = deep_dive_data.get("monthlyIncome", 0)
+    fixed_from_profile = profile.get("fixed_expenses", 0)
 
     # Calculate from deep dive data
     fixed_expenses = deep_dive_data.get("fixedExpenses", {})
@@ -398,7 +394,7 @@ def generate_fallback_plan(profile: Dict[str, Any], deep_dive_data: Dict[str, An
     # Generate recommendations
     recommendations = []
 
-    if total_fixed / income > 0.5:
+    if income > 0 and total_fixed / income > 0.5:
         recommendations.append({
             "category": "housing",
             "title": "High fixed costs",

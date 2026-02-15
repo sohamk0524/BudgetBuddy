@@ -16,12 +16,9 @@ class ProfileViewModel {
 
     var name: String = ""
     var email: String = ""
-    var age: Int?
-    var occupation: String = ""
-    var monthlyIncome: Double?
-    var incomeFrequency: String = ""
-    var financialPersonality: String = ""
-    var primaryGoal: String = ""
+    var isStudent: Bool = false
+    var budgetingGoal: String = ""
+    var strictnessLevel: String = ""
 
     var plaidItems: [PlaidItemInfo] = []
 
@@ -46,12 +43,9 @@ class ProfileViewModel {
             let profile = try await apiService.getUserProfile(userId: userId)
             name = profile.name ?? ""
             email = profile.email
-            age = profile.profile?.age
-            occupation = profile.profile?.occupation ?? ""
-            monthlyIncome = profile.profile?.monthlyIncome
-            incomeFrequency = profile.profile?.incomeFrequency ?? ""
-            financialPersonality = profile.profile?.financialPersonality ?? ""
-            primaryGoal = profile.profile?.primaryGoal ?? ""
+            isStudent = profile.profile?.isStudent ?? false
+            budgetingGoal = profile.profile?.budgetingGoal ?? ""
+            strictnessLevel = profile.profile?.strictnessLevel ?? ""
             plaidItems = profile.plaidItems
         } catch {
             print("Failed to load profile: \(error)")
@@ -70,12 +64,9 @@ class ProfileViewModel {
         do {
             let update = UserProfileUpdateRequest(
                 name: name.isEmpty ? nil : name,
-                age: age,
-                occupation: occupation.isEmpty ? nil : occupation,
-                monthlyIncome: monthlyIncome,
-                incomeFrequency: incomeFrequency.isEmpty ? nil : incomeFrequency,
-                financialPersonality: financialPersonality.isEmpty ? nil : financialPersonality,
-                primaryGoal: primaryGoal.isEmpty ? nil : primaryGoal
+                isStudent: isStudent,
+                budgetingGoal: budgetingGoal.isEmpty ? nil : budgetingGoal,
+                strictnessLevel: strictnessLevel.isEmpty ? nil : strictnessLevel
             )
             try await apiService.updateUserProfile(userId: userId, update: update)
 

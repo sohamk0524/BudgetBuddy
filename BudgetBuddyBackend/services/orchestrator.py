@@ -21,9 +21,9 @@ def get_user_profile(user_id):
         user = User.query.get(user_id)
         if user and user.profile:
             return {
-                "monthly_income": user.profile.monthly_income,
-                "fixed_expenses": user.profile.fixed_expenses,
-                "discretionary": user.profile.monthly_income - user.profile.fixed_expenses,
+                "is_student": user.profile.is_student,
+                "budgeting_goal": user.profile.budgeting_goal,
+                "strictness_level": user.profile.strictness_level,
                 "savings_goal_name": user.profile.savings_goal_name,
                 "savings_goal_target": user.profile.savings_goal_target
             }
@@ -128,57 +128,11 @@ def _extract_amount(text: str) -> float:
 def _handle_personalized_query(text: str, user_id) -> Optional[AssistantResponse]:
     """
     Handle queries that require user's financial profile.
-    Returns None if no personalized response is needed.
+    Returns None if no personalized response is needed or if no profile exists.
     """
-    text_lower = text.lower()
-    profile = get_user_profile(user_id)
-
-    if not profile:
-        return None
-
-    discretionary = profile["discretionary"]
-
-    # Handle "afford" or "can I buy" queries
-    if "afford" in text_lower or "can i buy" in text_lower:
-        amount = _extract_amount(text)
-
-        if amount <= discretionary:
-            response_text = f"Based on your budget, you have ${discretionary:,.2f} discretionary income. You can afford this ${amount:,.2f} purchase!"
-        else:
-            response_text = f"Your discretionary budget is ${discretionary:,.2f}. A ${amount:,.2f} purchase would exceed your available funds."
-
-        return AssistantResponse(
-            text_message=response_text,
-            visual_payload=VisualPayload.burndown_chart(
-                spent=amount,
-                budget=discretionary,
-                ideal_pace=discretionary * 0.5
-            )
-        )
-
-    # Handle "plan" queries
-    if "plan" in text_lower:
-        income = profile["monthly_income"]
-        expenses = profile["fixed_expenses"]
-
-        nodes = [
-            SankeyNode(id="income", name="Income", value=income),
-            SankeyNode(id="expenses", name="Fixed Expenses", value=expenses),
-            SankeyNode(id="discretionary", name="Discretionary", value=discretionary),
-        ]
-
-        if profile["savings_goal_name"]:
-            nodes.append(SankeyNode(
-                id="savings",
-                name=profile["savings_goal_name"],
-                value=profile["savings_goal_target"]
-            ))
-
-        return AssistantResponse(
-            text_message=f"Here's your financial plan. You earn ${income:,.2f}/month with ${expenses:,.2f} in fixed expenses, leaving ${discretionary:,.2f} for spending and savings.",
-            visual_payload=VisualPayload.sankey_flow(nodes)
-        )
-
+    # With the new 4-question protocol the profile no longer stores income
+    # or expenses, so affordability queries are handled by the LLM via tools
+    # (get_budget_plan, get_financial_summary) which pull from Plaid/statements.
     return None
 
 
@@ -201,7 +155,8 @@ def _build_user_context(user_id_int: Optional[int]) -> Optional[str]:
 
         # Check for profile
         if user.profile:
-            context_parts.append(f"- User has a financial profile (income: ${user.profile.monthly_income:.2f}/month)")
+            goal = (user.profile.budgeting_goal or "").replace("_", " ").title()
+            context_parts.append(f"- User has a financial profile (goal: {goal}, strictness: {user.profile.strictness_level})")
 
         # Check for budget plan
         plan = BudgetPlan.query.filter_by(user_id=user_id_int).first()

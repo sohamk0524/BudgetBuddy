@@ -204,12 +204,9 @@ class AuthManager {
 
     func completeOnboarding(
         name: String = "",
-        age: Int,
-        occupation: String,
-        income: Double,
-        incomeFrequency: String = "monthly",
-        financialPersonality: String = "balanced",
-        primaryGoal: String = "stability"
+        isStudent: Bool = false,
+        userBudgetingGoal: String = "stability",
+        strictnessLevel: String = "moderate"
     ) async {
         guard let userId = authToken else { return }
 
@@ -226,12 +223,9 @@ class AuthManager {
 
             var body: [String: Any] = [
                 "userId": userId,
-                "age": age,
-                "occupation": occupation,
-                "income": income,
-                "incomeFrequency": incomeFrequency,
-                "financialPersonality": financialPersonality,
-                "primaryGoal": primaryGoal
+                "isStudent": isStudent,
+                "budgetingGoal": userBudgetingGoal,
+                "strictnessLevel": strictnessLevel
             ]
             if !name.isEmpty {
                 body["name"] = name
