@@ -6,7 +6,7 @@ import json
 from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional
 from models import AssistantResponse
-from services.llm_service import BudgetBuddyAgent
+from services.llm_service import Agent
 
 
 # System prompt for plan generation
@@ -67,8 +67,8 @@ OUTPUT FORMAT (respond ONLY with valid JSON, no other text):
 Be encouraging but honest. Adapt recommendations to their financial personality."""
 
 
-# Initialize agent
-agent = BudgetBuddyAgent(model="llama3.2:3b")
+# Agent is created per-request in generate_plan() since the system prompt
+# is personalized with user data each time.
 
 
 def get_full_user_profile(user_id: int) -> Optional[Dict[str, Any]]:
@@ -244,18 +244,22 @@ def generate_plan(user_id: int, deep_dive_data: Dict[str, Any]) -> Dict[str, Any
     system_prompt = PLAN_GENERATION_PROMPT.format(**prompt_data)
 
     try:
-        # Check if Ollama is available
-        if not agent.is_available():
+        # Create a plan-generation agent with the personalized prompt
+        plan_agent = Agent(
+            name="BudgetPlanGenerator",
+            instructions=system_prompt,
+            model="claude-opus-4-6",
+        )
+
+        # Check if the LLM provider is available
+        if not plan_agent.is_available():
             return generate_fallback_plan(profile, deep_dive_data)
 
-        # Call the LLM
-        messages = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": "Generate my personalized spending plan based on the data provided. Respond only with valid JSON."}
-        ]
-
-        response = agent.chat(messages, tools=None)
-        response_text = response.choices[0].message.content or ""
+        # Run the agent
+        result = plan_agent.run(
+            "Generate my personalized spending plan based on the data provided. Respond only with valid JSON."
+        )
+        response_text = result.get("content", "")
 
         # Parse the JSON response
         try:
@@ -305,7 +309,7 @@ def days_remaining_in_month() -> int:
 
 def generate_fallback_plan(profile: Dict[str, Any], deep_dive_data: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Generate a basic plan without AI when Ollama is unavailable.
+    Generate a basic plan without AI when the LLM is unavailable.
     Uses simple rules-based allocation.
     """
     income = deep_dive_data.get("monthlyIncome", 0)

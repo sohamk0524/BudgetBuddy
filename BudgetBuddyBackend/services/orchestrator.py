@@ -1,13 +1,12 @@
 """
 Orchestrator service - The "Brain" of BudgetBuddy.
-Uses OpenAI SDK with Ollama for intelligent conversation and tool calling.
+Uses a declarative Agent with LiteLLM for intelligent conversation and tool calling.
 """
 
-import re
 from typing import Optional, Dict, Any
 from models import AssistantResponse, VisualPayload, SankeyNode
-from services.llm_service import BudgetBuddyAgent, OllamaConnectionError, OllamaError
-from services.tools import get_tool_definitions, execute_tool, set_tool_context
+from services.llm_service import Agent
+from services.tools import get_tools, execute_tool, set_tool_context
 from services.data_mock import get_budget_overview_data, get_spending_status_data
 
 
@@ -66,11 +65,20 @@ AVAILABLE TOOLS AND WHEN TO USE THEM:
 5. get_spending_status - Use for budget tracking status
 6. get_savings_progress - Use for savings goal progress
 
+7. render_visual - Render a chart or diagram for the user
+   - ONLY call this when you have REAL data that would benefit from visualization
+   - Do NOT render visuals for greetings, errors, or when the user has no data
+   - Types: "spending_plan" (budget categories), "burndown_chart" (spending pace), "sankey_flow" (money flow)
+   - For spending_plan, pass: {"safe_to_spend": <number>, "categories": <array from get_budget_plan>}
+   - For burndown_chart, pass: {"spent": <number>, "budget": <number>, "ideal_pace": <number>}
+   - For sankey_flow, pass: {"nodes": [{"id": "...", "name": "...", "value": <number>}]}
+
 IMPORTANT GUIDANCE:
 - When user asks for help reducing spending or financial advice, FIRST fetch their plan with get_budget_plan
 - If they ask about actual spending, use get_spending_analysis
 - You can call multiple tools if needed to give comprehensive advice
 - If a tool returns "has_plan: false" or "has_statement: false", let the user know they need to set that up first
+- Only call render_visual when you have real data to show — never for missing data or error states
 
 DO NOT USE TOOLS FOR:
 - Greetings (hi, hello, hey, good morning, etc.)
@@ -86,66 +94,27 @@ RESPONSE STYLE:
 
 
 # Initialize the agent
-agent = BudgetBuddyAgent(model="llama3.2:3b")
-
-
-def _should_use_tools(text: str) -> bool:
-    """
-    Determine if the message is likely asking about financial data.
-    Only provide tools for finance-related queries to prevent over-eager tool calling.
-    """
-    text_lower = text.lower()
-
-    # Keywords that suggest user wants financial data or advice
-    finance_keywords = [
-        # Budget and spending
-        "budget", "spend", "spending", "expense", "expenses", "money",
-        "afford", "cost", "balance", "account", "savings", "save",
-        "income", "salary", "pay", "payment", "bill", "bills",
-        "overview", "breakdown", "status", "track", "tracking",
-        # Questions and help
-        "how much", "how am i", "can i buy", "should i buy",
-        "financial", "finances", "cash", "funds", "dollars", "$",
-        # Advice and planning
-        "reduce", "cut", "lower", "plan", "advice", "recommend",
-        "help me", "tips", "suggest", "improve", "optimize",
-        # Analysis
-        "analyze", "analysis", "review", "where", "why",
-        "category", "categories", "breakdown"
-    ]
-
-    return any(keyword in text_lower for keyword in finance_keywords)
-
-
-def _extract_amount(text: str) -> float:
-    """Extract a dollar amount from text, default to 100 if not found."""
-    match = re.search(r'\$?([\d,]+(?:\.\d{2})?)', text)
-    if match:
-        return float(match.group(1).replace(',', ''))
-    return 100.0
-
-
-def _handle_personalized_query(text: str, user_id) -> Optional[AssistantResponse]:
-    """
-    Handle queries that require user's financial profile.
-    Returns None if no personalized response is needed or if no profile exists.
-    """
-    # With the new 4-question protocol the profile no longer stores income
-    # or expenses, so affordability queries are handled by the LLM via tools
-    # (get_budget_plan, get_financial_summary) which pull from Plaid/statements.
-    return None
+agent = Agent(
+    name="BudgetBuddy",
+    instructions=SYSTEM_PROMPT,
+    tools=get_tools(),
+    model="claude-opus-4-6",
+    tool_executor=execute_tool,
+)
 
 
 def _build_user_context(user_id_int: Optional[int]) -> Optional[str]:
     """
-    Build a brief context string about the user for the LLM.
-    This helps the LLM understand what data is available.
+    Build a detailed context string about the user for the LLM.
+    Pre-fetches key financial data so the agent starts every conversation
+    with a complete picture of the user's state.
     """
     if not user_id_int:
         return None
 
     try:
-        from db_models import User, BudgetPlan, SavedStatement
+        from db_models import User, BudgetPlan, SavedStatement, PlaidItem
+        import json
 
         user = User.query.get(user_id_int)
         if not user:
@@ -153,24 +122,53 @@ def _build_user_context(user_id_int: Optional[int]) -> Optional[str]:
 
         context_parts = []
 
-        # Check for profile
+        # Profile info
         if user.profile:
             goal = (user.profile.budgeting_goal or "").replace("_", " ").title()
-            context_parts.append(f"- User has a financial profile (goal: {goal}, strictness: {user.profile.strictness_level})")
-
-        # Check for budget plan
-        plan = BudgetPlan.query.filter_by(user_id=user_id_int).first()
-        if plan:
-            context_parts.append("- User has a budget plan (use get_budget_plan to access)")
+            context_parts.append(f"- Financial profile: goal={goal}, strictness={user.profile.strictness_level}, student={user.profile.is_student}")
         else:
-            context_parts.append("- User does NOT have a budget plan yet")
+            context_parts.append("- No financial profile (user has NOT completed onboarding)")
 
-        # Check for statement
+        # Budget plan summary
+        plan = BudgetPlan.query.filter_by(user_id=user_id_int).order_by(
+            BudgetPlan.created_at.desc()
+        ).first()
+        if plan:
+            try:
+                plan_data = json.loads(plan.plan_json)
+                safe_to_spend = plan_data.get("safeToSpend", 0)
+                categories = plan_data.get("categoryAllocations", plan_data.get("categories", []))
+                total_budget = sum(c.get("amount", 0) for c in categories)
+                cat_names = [c.get("name", "") for c in categories]
+                context_parts.append(
+                    f"- Has budget plan: safe_to_spend=${safe_to_spend:.2f}, "
+                    f"total_budget=${total_budget:.2f}, categories=[{', '.join(cat_names)}]"
+                )
+            except (json.JSONDecodeError, TypeError):
+                context_parts.append("- Has a budget plan (use get_budget_plan for details)")
+        else:
+            context_parts.append("- No budget plan created yet")
+
+        # Bank statement summary
         statement = SavedStatement.query.filter_by(user_id=user_id_int).first()
         if statement:
-            context_parts.append("- User has uploaded a bank statement (use get_spending_analysis to access)")
+            context_parts.append(
+                f"- Has bank statement: income=${statement.total_income:.2f}, "
+                f"expenses=${statement.total_expenses:.2f}, balance=${statement.ending_balance:.2f}"
+            )
         else:
-            context_parts.append("- User has NOT uploaded a bank statement")
+            context_parts.append("- No bank statement uploaded")
+
+        # Plaid connection status
+        plaid_items = PlaidItem.query.filter_by(user_id=user_id_int, status="active").all()
+        if plaid_items:
+            account_count = sum(len(item.accounts) for item in plaid_items)
+            institution_names = [item.institution_name or "Unknown" for item in plaid_items]
+            context_parts.append(
+                f"- Plaid linked: {account_count} account(s) at {', '.join(institution_names)}"
+            )
+        else:
+            context_parts.append("- No bank accounts linked via Plaid")
 
         if context_parts:
             return "\n".join(context_parts)
@@ -183,7 +181,7 @@ def _build_user_context(user_id_int: Optional[int]) -> Optional[str]:
 
 def process_message(text: str, user_id: str = "default") -> AssistantResponse:
     """
-    Process user message using the AI agent with optional tool calling.
+    Process user message using the AI agent with tool calling.
 
     Args:
         text: The user's input message
@@ -202,150 +200,80 @@ def process_message(text: str, user_id: str = "default") -> AssistantResponse:
     # Set tool context so tools can access user data
     set_tool_context(user_id_int)
 
-    # Try personalized response first if user has a profile
-    personalized = _handle_personalized_query(text, user_id)
-    if personalized:
-        return personalized
-
     try:
-        # Check if Ollama is available
+        # Check if the LLM provider is available
         if not agent.is_available():
             return _fallback_response(
                 text,
-                "I'm having trouble connecting to my AI backend. Please make sure Ollama is running with 'ollama serve'."
+                "I'm having trouble connecting to my AI backend. Please try again in a moment."
             )
 
-        # Build the conversation with user context
+        # Build user context and append to the message
         context_info = _build_user_context(user_id_int)
-        system_prompt_with_context = SYSTEM_PROMPT
+        user_message = text
         if context_info:
-            system_prompt_with_context += f"\n\nUSER CONTEXT:\n{context_info}"
+            user_message = f"{text}\n\n[USER CONTEXT:\n{context_info}]"
 
-        messages = [
-            {"role": "system", "content": system_prompt_with_context},
-            {"role": "user", "content": text}
-        ]
+        # Run the agent — it decides whether to use tools
+        result = agent.run(user_message)
 
-        # Only provide tools if message seems finance-related
-        # This prevents the model from over-eagerly calling tools for simple greetings
-        use_tools = _should_use_tools(text)
-        tools = get_tool_definitions() if use_tools else None
-
-        # Call the agent
-        if use_tools:
-            result = agent.chat_with_tools(
-                messages=messages,
-                tools=tools,
-                tool_executor=execute_tool,
-                max_iterations=3
-            )
-        else:
-            # Simple chat without tools for greetings/general questions
-            response = agent.chat(messages, tools=None)
-            result = {
-                "content": response.choices[0].message.content or "",
-                "tool_results": []
-            }
-
-        # Extract the response content
+        # Extract the response
         response_text = result.get("content", "I'm not sure how to help with that. Try asking about your budget or spending!")
         tool_results = result.get("tool_results", [])
 
-        # Determine visual payload based on tools called
-        visual_payload = _determine_visual_payload(tool_results)
+        # Extract visual payload if the agent called render_visual
+        visual_payload = _extract_visual_payload(tool_results)
 
         return AssistantResponse(
             text_message=response_text,
             visual_payload=visual_payload
         )
 
-    except OllamaConnectionError:
-        return _fallback_response(
-            text,
-            "I can't connect to my AI backend right now. Please make sure Ollama is running."
-        )
-    except OllamaError as e:
-        return _fallback_response(
-            text,
-            "I encountered an error processing your request. Please try again."
-        )
     except Exception as e:
         print(f"Orchestrator error: {e}")
         return _fallback_response(text)
 
 
-def _determine_visual_payload(tool_results: list) -> Optional[Dict[str, Any]]:
+def _extract_visual_payload(tool_results: list) -> Optional[Dict[str, Any]]:
     """
-    Determine the appropriate visual payload based on which tools were called.
-    Returns None if no tools were called (for regular conversation).
+    Extract visual payload from the agent's render_visual tool call.
+    Returns None if the agent didn't render a visual.
     """
     if not tool_results:
         return None
 
-    # Find the most relevant tool result for visualization
     for tool_result in tool_results:
-        tool_name = tool_result.get("tool", "")
+        if tool_result.get("tool") != "render_visual":
+            continue
+
         result_data = tool_result.get("result", {})
+        if not result_data.get("rendered"):
+            continue
 
-        # Handle budget plan - show spending plan widget if categories exist
-        if tool_name == "get_budget_plan":
-            if result_data.get("has_plan") and result_data.get("categories"):
-                categories = result_data.get("categories", [])
-                safe_to_spend = result_data.get("safe_to_spend", 0)
-                return VisualPayload.spending_plan(safe_to_spend, categories)
+        visual_type = result_data.get("visual_type")
+        data = result_data.get("data", {})
 
-        # Handle spending analysis - show burndown of actual vs expected
-        elif tool_name == "get_spending_analysis":
-            if result_data.get("has_statement"):
-                total_expenses = result_data.get("total_expenses", 0)
-                total_income = result_data.get("total_income", 0)
-                # Show a burndown comparing expenses to income
-                return VisualPayload.burndown_chart(
-                    spent=total_expenses,
-                    budget=total_income,
-                    ideal_pace=total_income * 0.7  # Assume 70% spending is ideal
-                )
-
-        # Handle financial summary - show burndown of safe to spend
-        elif tool_name == "get_financial_summary":
-            safe_to_spend = result_data.get("safe_to_spend", 0)
-            net_worth = result_data.get("net_worth", 0)
-            if safe_to_spend > 0 or net_worth > 0:
-                return VisualPayload.burndown_chart(
-                    spent=0,  # Current period spent
-                    budget=safe_to_spend,
-                    ideal_pace=safe_to_spend * 0.5
-                )
-
-        # Handle budget overview
-        elif tool_name == "get_budget_overview":
-            # Check if it's from user plan or mock data
-            if result_data.get("source") == "user_plan":
-                categories = result_data.get("categories", [])
-                safe_to_spend = result_data.get("safe_to_spend", 0)
-                if categories:
-                    return VisualPayload.spending_plan(safe_to_spend, categories)
-            else:
-                # Mock data - Return Sankey flow visualization
-                nodes = result_data.get("nodes", [])
-                if nodes:
-                    return VisualPayload.sankey_flow([
-                        SankeyNode(
-                            id=node["id"],
-                            name=node["name"],
-                            value=node["value"]
-                        )
-                        for node in nodes
-                    ])
-
-        # Handle spending status
-        elif tool_name == "get_spending_status":
-            # Return burndown chart visualization
-            return VisualPayload.burndown_chart(
-                spent=result_data.get("spent", 0),
-                budget=result_data.get("budget", 0),
-                ideal_pace=result_data.get("idealPace", result_data.get("ideal_pace", 0))
+        if visual_type == "spending_plan":
+            return VisualPayload.spending_plan(
+                safe_to_spend=data.get("safe_to_spend", 0),
+                categories=data.get("categories", [])
             )
+        elif visual_type == "burndown_chart":
+            return VisualPayload.burndown_chart(
+                spent=data.get("spent", 0),
+                budget=data.get("budget", 0),
+                ideal_pace=data.get("ideal_pace", 0)
+            )
+        elif visual_type == "sankey_flow":
+            nodes = data.get("nodes", [])
+            return VisualPayload.sankey_flow([
+                SankeyNode(
+                    id=node.get("id", ""),
+                    name=node.get("name", ""),
+                    value=node.get("value", 0)
+                )
+                for node in nodes
+            ])
 
     return None
 

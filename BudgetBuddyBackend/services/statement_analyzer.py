@@ -14,14 +14,16 @@ from datetime import datetime
 from typing import Optional, Dict, Any, List, Tuple
 
 from models import AssistantResponse, VisualPayload, SankeyNode
-from services.llm_service import BudgetBuddyAgent
+from services.llm_service import Agent
 
-# Use a larger model for complex analysis if available
-agent = BudgetBuddyAgent(model="llama3.2:3b")
+# Statement analysis agent
+analysis_agent = Agent(
+    name="StatementAnalyzer",
+    instructions="""You are BudgetBuddy, a friendly financial assistant helping college students understand their spending.
 
-SYSTEM_PROMPT = """You are BudgetBuddy, a friendly financial assistant helping college students understand their spending.
-
-Analyze bank statements and provide helpful, conversational insights. Be encouraging and non-judgmental."""
+Analyze bank statements and provide helpful, conversational insights. Be encouraging and non-judgmental.""",
+    model="claude-opus-4-6",
+)
 
 USER_PROMPT_TEMPLATE = """Here is a bank statement to analyze:
 
@@ -659,8 +661,8 @@ def _parse_date(value: str) -> Optional[str]:
 def _get_llm_analysis(parsed_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     """Get LLM analysis for categorization and summary."""
     try:
-        if not agent.is_available():
-            print("LLM not available - Ollama may not be running on localhost:11434")
+        if not analysis_agent.is_available():
+            print("LLM not available - check ANTHROPIC_API_KEY")
             return None
 
         raw_text = parsed_data.get('raw_text', '')
@@ -679,13 +681,8 @@ def _get_llm_analysis(parsed_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
             transaction_count=len(parsed_data.get('transactions', []))
         )
 
-        messages = [
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": prompt}
-        ]
-
-        llm_response = agent.chat(messages)
-        content = llm_response.choices[0].message.content or ""
+        result = analysis_agent.run(prompt)
+        content = result.get("content", "")
 
         return _parse_llm_json(content)
 
