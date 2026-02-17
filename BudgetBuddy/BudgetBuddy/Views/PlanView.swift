@@ -129,15 +129,15 @@ struct PlanView: View {
             )
 
             // Summary text
-            if !plan.summary.isEmpty {
-                Text(plan.summary)
-                    .font(.roundedBody)
-                    .foregroundStyle(Color.textSecondary)
-                    .padding()
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color.surface)
-                    .clipShape(RoundedRectangle(cornerRadius: 16))
-            }
+//            if !plan.summary.isEmpty {
+//                Text(plan.summary)
+//                    .font(.roundedBody)
+//                    .foregroundStyle(Color.textSecondary)
+//                    .padding()
+//                    .frame(maxWidth: .infinity, alignment: .leading)
+//                    .background(Color.surface)
+//                    .clipShape(RoundedRectangle(cornerRadius: 16))
+//            }
 
             // Budget Breakdown
             BudgetBreakdownCard(
@@ -153,28 +153,28 @@ struct PlanView: View {
                 RecommendationsCard(recommendations: plan.recommendations)
             }
 
-            // Warnings
-            if !plan.warnings.isEmpty {
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .foregroundStyle(Color.danger)
-                        Text("Warnings")
-                            .font(.roundedCaption)
-                            .foregroundStyle(Color.danger)
-                    }
-
-                    ForEach(plan.warnings, id: \.self) { warning in
-                        Text(warning)
-                            .font(.roundedCaption)
-                            .foregroundStyle(Color.textSecondary)
-                    }
-                }
-                .padding()
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.danger.opacity(0.1))
-                .clipShape(RoundedRectangle(cornerRadius: 16))
-            }
+//            // Warnings
+//            if !plan.warnings.isEmpty {
+//                VStack(alignment: .leading, spacing: 8) {
+//                    HStack {
+//                        Image(systemName: "exclamationmark.triangle.fill")
+//                            .foregroundStyle(Color.danger)
+//                        Text("Warnings")
+//                            .font(.roundedCaption)
+//                            .foregroundStyle(Color.danger)
+//                    }
+//
+//                    ForEach(plan.warnings, id: \.self) { warning in
+//                        Text(warning)
+//                            .font(.roundedCaption)
+//                            .foregroundStyle(Color.textSecondary)
+//                    }
+//                }
+//                .padding()
+//                .frame(maxWidth: .infinity, alignment: .leading)
+//                .background(Color.danger.opacity(0.1))
+//                .clipShape(RoundedRectangle(cornerRadius: 16))
+//            }
 
             // Edit button
             Button {
