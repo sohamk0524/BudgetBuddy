@@ -24,6 +24,13 @@ final class SpendingPlanViewModel {
     var errorMessage: String?
     var showQuestionFlow: Bool = false
 
+    // MARK: - User Savings Goals (persisted locally)
+    var userSavingsGoals: [SavingsGoal] = [] {
+        didSet { persistSavingsGoals() }
+    }
+    var showAddGoalSheet: Bool = false
+    var selectedGoal: SavingsGoal?
+
     // MARK: - Questions Configuration
 
     struct Question {
@@ -270,5 +277,57 @@ final class SpendingPlanViewModel {
     func removeSavingsGoal(at index: Int) {
         guard index < planInput.savingsGoals.count else { return }
         planInput.savingsGoals.remove(at: index)
+    }
+
+    // MARK: - Chart Mock Data
+
+    var weeklySpendingData: [(day: String, amount: Double)] {
+        // TODO: Replace with real transaction data grouped by day-of-week
+        [("Mon", 23), ("Tue", 18), ("Wed", 35), ("Thu", 22), ("Fri", 56), ("Sat", 78), ("Sun", 41)]
+    }
+
+    var lastMonthSpending: [(category: String, amount: Double)] {
+        // TODO: Replace with real historical data
+        [("Groceries", 420), ("Dining", 180), ("Transport", 165), ("Entertainment", 95), ("Shopping", 130)]
+    }
+
+    var semesterMonthlyTotals: [(month: String, amount: Double)] {
+        // TODO: Replace with real multi-month data
+        [("Sep", 3200), ("Oct", 2800), ("Nov", 2950), ("Dec", 3400), ("Jan", 2700)]
+    }
+
+    var semesterCostBreakdown: [(category: String, amount: Double)] {
+        // TODO: Replace with real semester data
+        [("Tuition & Fees", 5200), ("Housing", 4800), ("Food & Dining", 2400), ("Transportation", 900), ("Textbooks", 600), ("Personal", 1200)]
+    }
+
+    // MARK: - User Savings Goals (Persistent)
+
+    private static let savingsGoalsKey = "userSavingsGoals"
+
+    func loadSavingsGoals() {
+        guard let data = UserDefaults.standard.data(forKey: Self.savingsGoalsKey),
+              let decoded = try? JSONDecoder().decode([SavingsGoal].self, from: data) else { return }
+        userSavingsGoals = decoded
+    }
+
+    private func persistSavingsGoals() {
+        guard let data = try? JSONEncoder().encode(userSavingsGoals) else { return }
+        UserDefaults.standard.set(data, forKey: Self.savingsGoalsKey)
+    }
+
+    func addUserSavingsGoal(name: String, target: Double) {
+        let goal = SavingsGoal(name: name, target: target, current: 0, priority: userSavingsGoals.count + 1)
+        userSavingsGoals.append(goal)
+    }
+
+    func deleteUserSavingsGoal(id: UUID) {
+        userSavingsGoals.removeAll { $0.id == id }
+    }
+
+    func updateSavedAmount(id: UUID, additionalAmount: Double) {
+        guard let index = userSavingsGoals.firstIndex(where: { $0.id == id }) else { return }
+        let goal = userSavingsGoals[index]
+        userSavingsGoals[index].current = min(goal.current + additionalAmount, goal.target)
     }
 }

@@ -13,7 +13,7 @@ import UniformTypeIdentifiers
 // MARK: - Wallet View
 
 struct WalletView: View {
-    @State private var walletViewModel = MainActor.assumeIsolated { WalletViewModel() }
+    @Bindable var walletViewModel: WalletViewModel
     @Bindable var planViewModel: SpendingPlanViewModel
     @State private var showingStatementUpload = false
     @State private var showCategoryEditor = false
@@ -299,6 +299,7 @@ extension View {
 
 #Preview {
     WalletView(
+        walletViewModel: WalletViewModel(),
         planViewModel: SpendingPlanViewModel()
     )
 }

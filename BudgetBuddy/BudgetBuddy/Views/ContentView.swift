@@ -11,6 +11,7 @@ struct ContentView: View {
     @State private var authManager = AuthManager.shared
     @State private var selectedTab = 0
     @State private var planViewModel = SpendingPlanViewModel()
+    @State private var walletViewModel = WalletViewModel()
     @State private var showPlaidLink = false
     @State private var hasCompletedPlaidFlow = false
 
@@ -61,14 +62,14 @@ struct ContentView: View {
                 .tag(0)
 
             // Tab 2: Wallet (Dashboard)
-            WalletView(planViewModel: planViewModel)
+            WalletView(walletViewModel: walletViewModel, planViewModel: planViewModel)
                 .tabItem {
                     Label("Wallet", systemImage: "wallet.pass.fill")
                 }
                 .tag(1)
 
             // Tab 3: Plan (Spending Plan)
-            PlanView(viewModel: planViewModel)
+            PlanView(viewModel: planViewModel, walletViewModel: walletViewModel)
                 .tabItem {
                     Label("Plan", systemImage: "doc.text.fill")
                 }

@@ -190,7 +190,7 @@ struct UpcomingEvent: Codable, Identifiable {
     }
 }
 
-struct SavingsGoal: Codable, Identifiable {
+struct SavingsGoal: Codable, Identifiable, Hashable {
     let id: UUID
     var name: String
     var target: Double
