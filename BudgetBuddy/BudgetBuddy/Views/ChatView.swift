@@ -131,8 +131,8 @@ struct ChatView: View {
 
     /// Computed status for the Pulse Header
     private var pulseStatus: String {
-        if !viewModel.hasStatement {
-            return "No Statement"
+        if !viewModel.hasData {
+            return "No Data"
         } else if viewModel.safeToSpend > 500 {
             return "Looking Good"
         } else if viewModel.safeToSpend > 100 {
@@ -203,11 +203,9 @@ private struct MessageRowView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 18))
                 }
             } else {
-                // AI message: Left-aligned, transparent background (text only)
+                // AI message: Left-aligned, markdown rendered
                 HStack {
-                    Text(message.text)
-                        .font(.roundedBody)
-                        .foregroundStyle(Color.textPrimary)
+                    MarkdownTextView(text: message.text)
                     Spacer(minLength: 60)
                 }
             }
@@ -224,6 +222,179 @@ private struct MessageRowView: View {
                 .foregroundStyle(Color.textSecondary)
         }
         .frame(maxWidth: .infinity, alignment: message.type == .user ? .trailing : .leading)
+    }
+}
+
+// MARK: - Markdown Text View
+
+private struct MarkdownTextView: View {
+    let text: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            ForEach(Array(parseBlocks().enumerated()), id: \.offset) { _, block in
+                switch block {
+                case .heading(let level, let content):
+                    markdownInline(content)
+                        .font(headingFont(level))
+                        .foregroundStyle(Color.textPrimary)
+                case .paragraph(let content):
+                    markdownInline(content)
+                        .font(.roundedBody)
+                        .foregroundStyle(Color.textPrimary)
+                case .listItem(let content):
+                    HStack(alignment: .top, spacing: 6) {
+                        Text("\u{2022}")
+                            .font(.roundedBody)
+                            .foregroundStyle(Color.accent)
+                        markdownInline(content)
+                            .font(.roundedBody)
+                            .foregroundStyle(Color.textPrimary)
+                    }
+                case .numberedItem(let number, let content):
+                    HStack(alignment: .top, spacing: 6) {
+                        Text("\(number).")
+                            .font(.roundedBody)
+                            .foregroundStyle(Color.accent)
+                            .frame(minWidth: 20, alignment: .trailing)
+                        markdownInline(content)
+                            .font(.roundedBody)
+                            .foregroundStyle(Color.textPrimary)
+                    }
+                case .codeBlock(let content):
+                    Text(content)
+                        .font(.system(.caption, design: .monospaced))
+                        .foregroundStyle(Color.textPrimary)
+                        .padding(10)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Color.surface)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                case .divider:
+                    Rectangle()
+                        .fill(Color.textSecondary.opacity(0.3))
+                        .frame(height: 1)
+                }
+            }
+        }
+    }
+
+    private func markdownInline(_ text: String) -> Text {
+        if let attributed = try? AttributedString(markdown: text, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)) {
+            return Text(attributed)
+        }
+        return Text(text)
+    }
+
+    private func headingFont(_ level: Int) -> Font {
+        switch level {
+        case 1: return .system(.title2, design: .rounded, weight: .bold)
+        case 2: return .system(.headline, design: .rounded, weight: .bold)
+        default: return .system(.subheadline, design: .rounded, weight: .semibold)
+        }
+    }
+
+    // MARK: - Block-level markdown parser
+
+    private enum MarkdownBlock {
+        case heading(level: Int, content: String)
+        case paragraph(content: String)
+        case listItem(content: String)
+        case numberedItem(number: Int, content: String)
+        case codeBlock(content: String)
+        case divider
+    }
+
+    private func parseBlocks() -> [MarkdownBlock] {
+        var blocks: [MarkdownBlock] = []
+        let lines = text.components(separatedBy: "\n")
+        var inCodeBlock = false
+        var codeLines: [String] = []
+        var paragraphLines: [String] = []
+
+        func flushParagraph() {
+            let joined = paragraphLines.joined(separator: " ").trimmingCharacters(in: .whitespaces)
+            if !joined.isEmpty {
+                blocks.append(.paragraph(content: joined))
+            }
+            paragraphLines.removeAll()
+        }
+
+        for line in lines {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+
+            // Code fence
+            if trimmed.hasPrefix("```") {
+                if inCodeBlock {
+                    blocks.append(.codeBlock(content: codeLines.joined(separator: "\n")))
+                    codeLines.removeAll()
+                    inCodeBlock = false
+                } else {
+                    flushParagraph()
+                    inCodeBlock = true
+                }
+                continue
+            }
+
+            if inCodeBlock {
+                codeLines.append(line)
+                continue
+            }
+
+            // Empty line = paragraph break
+            if trimmed.isEmpty {
+                flushParagraph()
+                continue
+            }
+
+            // Divider
+            if trimmed.allSatisfy({ $0 == "-" || $0 == "*" || $0 == "_" }) && trimmed.count >= 3 {
+                flushParagraph()
+                blocks.append(.divider)
+                continue
+            }
+
+            // Heading (e.g. "## Title")
+            if trimmed.hasPrefix("#") {
+                let hashes = trimmed.prefix(while: { $0 == "#" })
+                let level = min(hashes.count, 3)
+                let rest = trimmed.dropFirst(level).trimmingCharacters(in: .whitespaces)
+                if !rest.isEmpty {
+                    flushParagraph()
+                    blocks.append(.heading(level: level, content: rest))
+                    continue
+                }
+            }
+
+            // Unordered list item (e.g. "- item" or "* item")
+            if (trimmed.hasPrefix("- ") || trimmed.hasPrefix("* ") || trimmed.hasPrefix("+ ")) && trimmed.count > 2 {
+                flushParagraph()
+                let content = String(trimmed.dropFirst(2))
+                blocks.append(.listItem(content: content))
+                continue
+            }
+
+            // Numbered list item (e.g. "1. item" or "1) item")
+            if let dotIndex = trimmed.firstIndex(where: { $0 == "." || $0 == ")" }),
+               let num = Int(trimmed[trimmed.startIndex..<dotIndex]),
+               trimmed.index(after: dotIndex) < trimmed.endIndex,
+               trimmed[trimmed.index(after: dotIndex)] == " " {
+                flushParagraph()
+                let content = String(trimmed[trimmed.index(dotIndex, offsetBy: 2)...])
+                blocks.append(.numberedItem(number: num, content: content))
+                continue
+            }
+
+            // Regular text line — accumulate into paragraph
+            paragraphLines.append(trimmed)
+        }
+
+        // Flush remaining
+        if inCodeBlock && !codeLines.isEmpty {
+            blocks.append(.codeBlock(content: codeLines.joined(separator: "\n")))
+        }
+        flushParagraph()
+
+        return blocks
     }
 }
 

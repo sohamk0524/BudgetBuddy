@@ -6,6 +6,10 @@
 	objectVersion = 70;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		A34CDD402F3E7F0000B9B328 /* LinkKit in Frameworks */ = {isa = PBXBuildFile; productRef = A34CDD3F2F3E7F0000B9B328 /* LinkKit */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		ACEBD1B42F2BE42700FA1D26 /* BudgetBuddy.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BudgetBuddy.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -29,6 +33,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A34CDD402F3E7F0000B9B328 /* LinkKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -71,6 +76,7 @@
 			);
 			name = BudgetBuddy;
 			packageProductDependencies = (
+				A34CDD3F2F3E7F0000B9B328 /* LinkKit */,
 			);
 			productName = BudgetBuddy;
 			productReference = ACEBD1B42F2BE42700FA1D26 /* BudgetBuddy.app */;
@@ -101,6 +107,9 @@
 			);
 			mainGroup = ACEBD1AB2F2BE42700FA1D26;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				A34CDD3E2F3E7F0000B9B328 /* XCRemoteSwiftPackageReference "plaid-link-ios-spm" */,
+			);
 			productRefGroup = ACEBD1B52F2BE42700FA1D26 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -338,6 +347,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		A34CDD3E2F3E7F0000B9B328 /* XCRemoteSwiftPackageReference "plaid-link-ios-spm" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/plaid/plaid-link-ios-spm";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 6.0.4;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		A34CDD3F2F3E7F0000B9B328 /* LinkKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A34CDD3E2F3E7F0000B9B328 /* XCRemoteSwiftPackageReference "plaid-link-ios-spm" */;
+			productName = LinkKit;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = ACEBD1AC2F2BE42700FA1D26 /* Project object */;
 }

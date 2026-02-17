@@ -306,10 +306,11 @@ struct ChatMessage: Identifiable, Equatable {
     }
 }
 
-// MARK: - Financial Summary (from saved statement)
+// MARK: - Financial Summary (from Plaid or saved statement)
 
 struct FinancialSummary: Codable {
-    let hasStatement: Bool
+    let hasData: Bool
+    let source: String?
     let netWorth: Double?
     let safeToSpend: Double?
     let statementInfo: StatementInfo?
@@ -326,4 +327,155 @@ struct SpendingCategory: Codable, Identifiable {
     var id: String { category }
     let category: String
     let amount: Double
+}
+
+// MARK: - Plaid Integration Models
+
+struct PlaidLinkTokenResponse: Codable {
+    let linkToken: String
+    let expiration: String
+}
+
+struct PlaidExchangeRequest: Codable {
+    let userId: Int
+    let publicToken: String
+    let institutionId: String?
+    let institutionName: String?
+}
+
+struct PlaidExchangeResponse: Codable {
+    let success: Bool
+    let itemId: String
+    let accounts: [PlaidAccountInfo]
+    let transactionCount: Int
+}
+
+struct PlaidAccountInfo: Codable, Identifiable {
+    var id: String { accountId }
+    let accountId: String
+    let name: String
+    let type: String?
+    let subtype: String?
+    let mask: String?
+    let balanceCurrent: Double?
+    let balanceAvailable: Double?
+}
+
+struct PlaidAccountsResponse: Codable {
+    let items: [PlaidItemInfo]
+}
+
+struct PlaidItemInfo: Codable, Identifiable {
+    var id: String { itemId }
+    let itemId: String
+    let institutionId: String?
+    let institutionName: String?
+    let status: String
+    let createdAt: String?
+    let accounts: [PlaidAccountDetail]
+}
+
+struct PlaidAccountDetail: Codable, Identifiable {
+    var id: String { accountId }
+    let accountId: String
+    let name: String
+    let officialName: String?
+    let type: String?
+    let subtype: String?
+    let mask: String?
+    let balanceAvailable: Double?
+    let balanceCurrent: Double?
+    let balanceLimit: Double?
+}
+
+struct PlaidTransaction: Codable, Identifiable {
+    var id: String { transactionId }
+    let transactionId: String
+    let accountId: String
+    let amount: Double
+    let date: String?
+    let authorizedDate: String?
+    let name: String
+    let merchantName: String?
+    let categoryPrimary: String?
+    let categoryDetailed: String?
+    let pending: Bool
+    let paymentChannel: String?
+}
+
+struct PlaidTransactionsResponse: Codable {
+    let transactions: [PlaidTransaction]
+    let total: Int
+    let hasMore: Bool
+}
+
+struct PlaidSyncResponse: Codable {
+    let added: Int
+    let modified: Int
+    let removed: Int
+}
+
+// MARK: - User Profile Models
+
+struct UserProfile: Codable {
+    let name: String?
+    let phoneNumber: String?
+    let profile: FinancialProfileInfo?
+    let plaidItems: [PlaidItemInfo]
+}
+
+struct FinancialProfileInfo: Codable {
+    let isStudent: Bool?
+    let budgetingGoal: String?
+    let strictnessLevel: String?
+}
+
+struct UserProfileUpdateRequest: Codable {
+    var name: String?
+    var isStudent: Bool?
+    var budgetingGoal: String?
+    var strictnessLevel: String?
+}
+
+// MARK: - Top Expenses Models
+
+struct TopExpensesResponse: Codable {
+    let source: String
+    let topExpenses: [TopExpense]
+    let totalSpending: Double
+    let period: Int
+}
+
+struct TopExpense: Codable, Identifiable {
+    var id: String { category }
+    let category: String
+    let amount: Double
+    let transactionCount: Int
+}
+
+// MARK: - Category Preference Models
+
+struct CategoryPreferencesResponse: Codable {
+    let categories: [CategoryPreference]
+}
+
+struct CategoryPreference: Codable, Identifiable {
+    let id: Int
+    let categoryName: String
+    let displayOrder: Int
+}
+
+// MARK: - Smart Nudge Models
+
+struct NudgesResponse: Codable {
+    let nudges: [SmartNudge]
+}
+
+struct SmartNudge: Codable, Identifiable {
+    var id: String { (type ?? "unknown") + (title ?? "untitled") }
+    let type: String?
+    let title: String?
+    let message: String?
+    let potentialSavings: Double?
+    let category: String?
 }

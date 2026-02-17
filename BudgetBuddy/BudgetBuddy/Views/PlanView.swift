@@ -26,11 +26,15 @@ struct PlanView: View {
                 .padding()
             }
             .background(Color.appBackground)
-            .navigationTitle("My Plan")
-            .navigationBarTitleDisplayMode(.large)
+            .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(Color.appBackground, for: .navigationBar)
             .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Text("My Plan")
+                        .font(.system(size: 22, weight: .bold, design: .rounded))
+                        .foregroundStyle(Color.textPrimary)
+                }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     if viewModel.hasPlan {
                         Button {
@@ -179,15 +183,15 @@ struct PlanView: View {
             )
 
             // Summary text
-            if !plan.summary.isEmpty {
-                Text(plan.summary)
-                    .font(.roundedBody)
-                    .foregroundStyle(Color.textSecondary)
-                    .padding()
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color.surface)
-                    .clipShape(RoundedRectangle(cornerRadius: 16))
-            }
+//            if !plan.summary.isEmpty {
+//                Text(plan.summary)
+//                    .font(.roundedBody)
+//                    .foregroundStyle(Color.textSecondary)
+//                    .padding()
+//                    .frame(maxWidth: .infinity, alignment: .leading)
+//                    .background(Color.surface)
+//                    .clipShape(RoundedRectangle(cornerRadius: 16))
+//            }
 
             // Budget Breakdown
             BudgetBreakdownCard(
@@ -249,6 +253,22 @@ struct PlanView: View {
                 .background(Color.danger.opacity(0.1))
                 .clipShape(RoundedRectangle(cornerRadius: 16))
             }
+
+            // Edit button
+            Button {
+                viewModel.startQuestionFlow()
+            } label: {
+                HStack {
+                    Image(systemName: "pencil")
+                    Text("Update Your Plan")
+                }
+                .font(.roundedBody)
+                .foregroundStyle(Color.accent)
+                .frame(maxWidth: .infinity)
+                .padding()
+            }
+            .background(Color.surface)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
         }
     }
 

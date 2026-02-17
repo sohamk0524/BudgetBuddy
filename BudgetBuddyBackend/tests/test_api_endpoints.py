@@ -31,97 +31,173 @@ class TestHealthAndIndex:
 
 
 @pytest.mark.integration
-class TestAuthEndpoints:
-    """Tests for authentication endpoints."""
+class TestSMSAuthEndpoints:
+    """Tests for SMS authentication endpoints."""
 
-    def test_register_new_user(self, client):
-        """Test registering a new user."""
+    def test_send_sms_code(self, client):
+        """Test sending an SMS verification code."""
         response = client.post(
-            "/register",
-            json={"email": "newuser@test.com", "password": "secure123"}
+            "/v1/send_sms_code",
+            json={"phone_number": "+15555550400"}
         )
 
         assert response.status_code == 200
         data = json.loads(response.data)
         assert data["status"] == "success"
-        assert "token" in data
-        assert isinstance(data["token"], int)
 
-    def test_register_duplicate_email(self, client, sample_user):
-        """Test registering with existing email."""
+    def test_send_sms_code_missing_phone(self, client):
+        """Test sending code without phone number."""
         response = client.post(
-            "/register",
-            json={"email": "test@example.com", "password": "password"}
+            "/v1/send_sms_code",
+            json={}
         )
 
-        assert response.status_code == 409
-        data = json.loads(response.data)
-        assert "already registered" in data["error"].lower()
+        assert response.status_code == 400
 
-    def test_register_missing_fields(self, client):
-        """Test registration with missing fields."""
+    def test_send_sms_code_invalid_format(self, client):
+        """Test sending code with invalid phone format."""
         response = client.post(
-            "/register",
-            json={"email": "test@test.com"}
+            "/v1/send_sms_code",
+            json={"phone_number": "not-a-phone"}
         )
 
         assert response.status_code == 400
         data = json.loads(response.data)
-        assert "required" in data["error"].lower()
+        assert "invalid" in data["error"].lower() or "format" in data["error"].lower()
 
-    def test_register_invalid_json(self, client):
-        """Test registration with invalid JSON."""
+    def test_send_sms_code_invalid_json(self, client):
+        """Test sending code with invalid JSON."""
         response = client.post(
-            "/register",
+            "/v1/send_sms_code",
             data="not json",
             content_type="application/json"
         )
 
         assert response.status_code == 400
 
-    def test_login_success(self, client, sample_user):
-        """Test successful login."""
+    def test_verify_code_success(self, client):
+        """Test verifying a valid code creates/returns user."""
+        # First send a code
+        client.post(
+            "/v1/send_sms_code",
+            json={"phone_number": "+15555550401"}
+        )
+
+        # Get the OTP from the database
+        from db_models import OTPCode
+        with client.application.app_context():
+            otp = OTPCode.query.filter_by(phone_number="+15555550401").first()
+            code = otp.code
+
+        # Verify the code
         response = client.post(
-            "/login",
-            json={"email": "test@example.com", "password": "password123"}
+            "/v1/verify_code",
+            json={"phone_number": "+15555550401", "code": code}
         )
 
         assert response.status_code == 200
         data = json.loads(response.data)
         assert "token" in data
+        assert isinstance(data["token"], int)
         assert "hasProfile" in data
         assert isinstance(data["hasProfile"], bool)
 
-    def test_login_invalid_password(self, client, sample_user):
-        """Test login with wrong password."""
+    def test_verify_code_wrong_code(self, client):
+        """Test verifying with wrong code."""
+        # First send a code
+        client.post(
+            "/v1/send_sms_code",
+            json={"phone_number": "+15555550402"}
+        )
+
+        # Verify with wrong code
         response = client.post(
-            "/login",
-            json={"email": "test@example.com", "password": "wrongpassword"}
+            "/v1/verify_code",
+            json={"phone_number": "+15555550402", "code": "000000"}
         )
 
         assert response.status_code == 401
+
+    def test_verify_code_no_code_sent(self, client):
+        """Test verifying when no code was sent."""
+        response = client.post(
+            "/v1/verify_code",
+            json={"phone_number": "+15555550403", "code": "123456"}
+        )
+
+        assert response.status_code == 400
+
+    def test_verify_code_returns_name(self, client):
+        """Test that verify_code returns user name when set."""
+        # Send and verify to create user
+        client.post(
+            "/v1/send_sms_code",
+            json={"phone_number": "+15555550404"}
+        )
+
+        from db_models import OTPCode
+        with client.application.app_context():
+            otp = OTPCode.query.filter_by(phone_number="+15555550404").first()
+            code = otp.code
+
+        response = client.post(
+            "/v1/verify_code",
+            json={"phone_number": "+15555550404", "code": code}
+        )
+
         data = json.loads(response.data)
-        assert "invalid" in data["error"].lower()
+        assert "name" in data
 
-    def test_login_nonexistent_user(self, client):
-        """Test login with non-existent user."""
-        response = client.post(
-            "/login",
-            json={"email": "nobody@test.com", "password": "password"}
+    def test_verify_code_has_profile_flag(self, client, sample_user_with_profile):
+        """Test that verify returns correct hasProfile flag for existing user with profile."""
+        # Get the phone number for this user
+        from db_models import User
+        with client.application.app_context():
+            user = User.query.get(sample_user_with_profile)
+            phone = user.phone_number
+
+        # Send code to existing user
+        client.post(
+            "/v1/send_sms_code",
+            json={"phone_number": phone}
         )
 
-        assert response.status_code == 401
+        from db_models import OTPCode
+        with client.application.app_context():
+            otp = OTPCode.query.filter_by(phone_number=phone).first()
+            code = otp.code
 
-    def test_login_has_profile_flag(self, client, sample_user_with_profile):
-        """Test that login returns correct hasProfile flag."""
         response = client.post(
-            "/login",
-            json={"email": "profile@example.com", "password": "password123"}
+            "/v1/verify_code",
+            json={"phone_number": phone, "code": code}
         )
 
         assert response.status_code == 200
         data = json.loads(response.data)
         assert data["hasProfile"] is True
+
+
+@pytest.mark.integration
+class TestDeleteUserEndpoint:
+    """Tests for user deletion endpoint."""
+
+    def test_delete_user(self, client, sample_user):
+        """Test deleting a user."""
+        response = client.delete(f"/v1/user?userId={sample_user}")
+
+        assert response.status_code == 204
+
+    def test_delete_nonexistent_user(self, client):
+        """Test deleting non-existent user returns 204 (idempotent)."""
+        response = client.delete("/v1/user?userId=99999")
+
+        assert response.status_code == 204
+
+    def test_delete_user_missing_id(self, client):
+        """Test delete without userId."""
+        response = client.delete("/v1/user")
+
+        assert response.status_code == 400
 
 
 @pytest.mark.integration
@@ -134,15 +210,10 @@ class TestOnboardingEndpoint:
             "/onboarding",
             json={
                 "userId": sample_user,
-                "income": 5000.0,
-                "expenses": 2000.0,
-                "goalName": "Vacation",
-                "goalTarget": 3000.0,
-                "incomeFrequency": "monthly",
-                "housingSituation": "rent",
-                "debtTypes": ["student_loans"],
-                "financialPersonality": "balanced",
-                "primaryGoal": "save_purchase"
+                "name": "Test User",
+                "isStudent": True,
+                "budgetingGoal": "save_purchase",
+                "strictnessLevel": "moderate"
             }
         )
 
@@ -156,15 +227,9 @@ class TestOnboardingEndpoint:
             "/onboarding",
             json={
                 "userId": sample_user_with_profile,
-                "income": 6000.0,
-                "expenses": 2500.0,
-                "goalName": "House",
-                "goalTarget": 50000.0,
-                "incomeFrequency": "biweekly",
-                "housingSituation": "own",
-                "debtTypes": [],
-                "financialPersonality": "aggressive_saver",
-                "primaryGoal": "save_purchase"
+                "isStudent": False,
+                "budgetingGoal": "pay_debt",
+                "strictnessLevel": "strict"
             }
         )
 
@@ -407,12 +472,12 @@ class TestCORS:
     def test_cors_post_request(self, client):
         """Test CORS on POST requests."""
         response = client.post(
-            "/register",
-            json={"email": "test@test.com", "password": "pass"},
+            "/v1/send_sms_code",
+            json={"phone_number": "+15555550500"},
             headers={"Origin": "http://localhost:3000"}
         )
 
-        assert response.status_code in [200, 409]  # Success or duplicate
+        assert response.status_code == 200
 
 
 @pytest.mark.integration
@@ -427,14 +492,14 @@ class TestErrorHandling:
 
     def test_method_not_allowed(self, client):
         """Test wrong HTTP method."""
-        response = client.get("/register")  # Should be POST
+        response = client.get("/v1/send_sms_code")  # Should be POST
 
         assert response.status_code == 405
 
     def test_malformed_json(self, client):
         """Test endpoints handle malformed JSON."""
         response = client.post(
-            "/register",
+            "/v1/send_sms_code",
             data="{invalid json",
             content_type="application/json"
         )

@@ -4,8 +4,7 @@ Unit tests for db_models.py - Database models and ORM.
 
 import pytest
 import json
-from werkzeug.security import generate_password_hash, check_password_hash
-from db_models import db, User, FinancialProfile, BudgetPlan
+from db_models import db, User, FinancialProfile, BudgetPlan, OTPCode
 
 
 @pytest.mark.unit
@@ -13,77 +12,117 @@ class TestUserModel:
     """Tests for User database model."""
 
     def test_create_user(self, app):
-        """Test creating a user."""
+        """Test creating a user with phone number."""
         with app.app_context():
             user = User(
-                email="newuser@example.com",
-                password_hash=generate_password_hash("mypassword")
+                phone_number="+15555550200"
             )
             db.session.add(user)
             db.session.commit()
 
             assert user.id is not None
-            assert user.email == "newuser@example.com"
-            assert user.password_hash is not None
+            assert user.phone_number == "+15555550200"
 
-    def test_user_email_unique(self, app):
-        """Test that email must be unique."""
+    def test_user_phone_unique(self, app):
+        """Test that phone_number must be unique."""
         with app.app_context():
             user1 = User(
-                email="duplicate@example.com",
-                password_hash=generate_password_hash("pass1")
+                phone_number="+15555550201"
             )
             db.session.add(user1)
             db.session.commit()
 
             user2 = User(
-                email="duplicate@example.com",
-                password_hash=generate_password_hash("pass2")
+                phone_number="+15555550201"
             )
             db.session.add(user2)
 
             with pytest.raises(Exception):
                 db.session.commit()
 
-    def test_user_password_hash(self, app):
-        """Test password hashing and verification."""
+    def test_user_with_name(self, app):
+        """Test creating a user with a name."""
         with app.app_context():
-            password = "secure_password_123"
             user = User(
-                email="hashtest@example.com",
-                password_hash=generate_password_hash(password)
+                phone_number="+15555550202",
+                name="Test User"
             )
             db.session.add(user)
             db.session.commit()
 
-            # Correct password should verify
-            assert check_password_hash(user.password_hash, password)
+            assert user.name == "Test User"
 
-            # Wrong password should not verify
-            assert not check_password_hash(user.password_hash, "wrong_password")
+    def test_user_name_nullable(self, app):
+        """Test that name can be null."""
+        with app.app_context():
+            user = User(
+                phone_number="+15555550203"
+            )
+            db.session.add(user)
+            db.session.commit()
+
+            assert user.name is None
 
     def test_user_profile_relationship(self, app):
         """Test the relationship between User and FinancialProfile."""
         with app.app_context():
             user = User(
-                email="profile_test@example.com",
-                password_hash=generate_password_hash("password")
+                phone_number="+15555550204"
             )
             db.session.add(user)
             db.session.flush()
 
             profile = FinancialProfile(
                 user_id=user.id,
-                monthly_income=5000.0,
-                fixed_expenses=2000.0
+                is_student=True,
+                budgeting_goal="stability",
+                strictness_level="moderate"
             )
             db.session.add(profile)
             db.session.commit()
 
             # Test relationship
             assert user.profile is not None
-            assert user.profile.monthly_income == 5000.0
-            assert profile.user.email == "profile_test@example.com"
+            assert user.profile.is_student is True
+            assert profile.user.phone_number == "+15555550204"
+
+
+@pytest.mark.unit
+class TestOTPCodeModel:
+    """Tests for OTPCode database model."""
+
+    def test_create_otp(self, app):
+        """Test creating an OTP code."""
+        from datetime import datetime, timedelta
+
+        with app.app_context():
+            otp = OTPCode(
+                phone_number="+15555550300",
+                code="123456",
+                expires_at=datetime.utcnow() + timedelta(minutes=5)
+            )
+            db.session.add(otp)
+            db.session.commit()
+
+            assert otp.id is not None
+            assert otp.phone_number == "+15555550300"
+            assert otp.code == "123456"
+            assert otp.verified is False
+
+    def test_otp_verified_default(self, app):
+        """Test that verified defaults to False."""
+        from datetime import datetime, timedelta
+
+        with app.app_context():
+            otp = OTPCode(
+                phone_number="+15555550301",
+                code="654321",
+                expires_at=datetime.utcnow() + timedelta(minutes=5)
+            )
+            db.session.add(otp)
+            db.session.commit()
+
+            assert otp.verified is False
 
 
 @pytest.mark.unit
@@ -95,22 +134,21 @@ class TestFinancialProfileModel:
         with app.app_context():
             profile = FinancialProfile(
                 user_id=sample_user,
-                monthly_income=6000.0,
-                fixed_expenses=2500.0,
+                is_student=True,
+                budgeting_goal="save_purchase",
+                strictness_level="strict",
                 savings_goal_name="Vacation",
                 savings_goal_target=5000.0,
-                income_frequency="biweekly",
                 housing_situation="own",
-                debt_types=json.dumps(["car_loan"]),
-                financial_personality="aggressive_saver",
-                primary_goal="save_purchase"
+                debt_types=json.dumps(["car_loan"])
             )
             db.session.add(profile)
             db.session.commit()
 
             assert profile.id is not None
-            assert profile.monthly_income == 6000.0
-            assert profile.savings_goal_name == "Vacation"
+            assert profile.is_student is True
+            assert profile.budgeting_goal == "save_purchase"
+            assert profile.strictness_level == "strict"
 
     def test_profile_defaults(self, app, sample_user):
         """Test default values for profile fields."""
@@ -119,7 +157,7 @@ class TestFinancialProfileModel:
             db.session.add(profile)
             db.session.commit()
 
-            assert profile.monthly_income == 0.0
+            assert profile.is_student is False
             assert profile.fixed_expenses == 0.0
             assert profile.savings_goal_target == 0.0
 
@@ -148,13 +186,13 @@ class TestFinancialProfileModel:
             profile = user.profile
 
             # Update values
-            profile.monthly_income = 6500.0
+            profile.strictness_level = "strict"
             profile.savings_goal_name = "New Car"
             db.session.commit()
 
             # Verify updates
             updated_profile = user.profile
-            assert updated_profile.monthly_income == 6500.0
+            assert updated_profile.strictness_level == "strict"
             assert updated_profile.savings_goal_name == "New Car"
 
 

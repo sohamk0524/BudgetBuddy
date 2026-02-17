@@ -75,84 +75,26 @@ class TestExtractAmount:
 
 @pytest.mark.unit
 class TestHandlePersonalizedQuery:
-    """Tests for _handle_personalized_query function."""
+    """Tests for _handle_personalized_query function.
 
-    @patch('services.orchestrator.get_user_profile')
-    def test_afford_query_within_budget(self, mock_get_profile):
-        """Test afford query when user can afford the item."""
-        mock_get_profile.return_value = {
-            "monthly_income": 5000,
-            "fixed_expenses": 2000,
-            "discretionary": 3000,
-            "savings_goal_name": "Car",
-            "savings_goal_target": 10000
-        }
+    After the 4-question protocol refactor, the profile no longer stores
+    income/expenses so _handle_personalized_query always returns None,
+    deferring to the LLM + tools for financial queries.
+    """
 
+    def test_always_returns_none(self):
+        """Test that function always returns None (defers to LLM tools)."""
         response = _handle_personalized_query("Can I afford $500?", "user123")
-
-        assert response is not None
-        assert isinstance(response, AssistantResponse)
-        assert "$500" in response.text_message
-        assert "can afford" in response.text_message.lower()
-        assert response.visual_payload is not None
-
-    @patch('services.orchestrator.get_user_profile')
-    def test_afford_query_exceeds_budget(self, mock_get_profile):
-        """Test afford query when item exceeds budget."""
-        mock_get_profile.return_value = {
-            "monthly_income": 3000,
-            "fixed_expenses": 2500,
-            "discretionary": 500,
-            "savings_goal_name": None,
-            "savings_goal_target": 0
-        }
-
-        response = _handle_personalized_query("Can I afford $1000?", "user123")
-
-        assert response is not None
-        assert "exceed" in response.text_message.lower()
-        assert response.visual_payload is not None
-
-    @patch('services.orchestrator.get_user_profile')
-    def test_plan_query(self, mock_get_profile):
-        """Test plan-related query."""
-        mock_get_profile.return_value = {
-            "monthly_income": 5000,
-            "fixed_expenses": 2000,
-            "discretionary": 3000,
-            "savings_goal_name": "Emergency Fund",
-            "savings_goal_target": 5000
-        }
-
-        response = _handle_personalized_query("Show me my plan", "user123")
-
-        assert response is not None
-        assert "financial plan" in response.text_message.lower()
-        assert response.visual_payload is not None
-        assert response.visual_payload["type"] == "sankeyFlow"
-
-    @patch('services.orchestrator.get_user_profile')
-    def test_no_profile_returns_none(self, mock_get_profile):
-        """Test that function returns None when user has no profile."""
-        mock_get_profile.return_value = None
-
-        response = _handle_personalized_query("Can I afford $100?", "user123")
-
         assert response is None
 
-    @patch('services.orchestrator.get_user_profile')
-    def test_unrecognized_query_returns_none(self, mock_get_profile):
-        """Test that unrecognized queries return None."""
-        mock_get_profile.return_value = {
-            "monthly_income": 5000,
-            "fixed_expenses": 2000,
-            "discretionary": 3000,
-            "savings_goal_name": None,
-            "savings_goal_target": 0
-        }
+    def test_plan_query_returns_none(self):
+        """Test that plan queries return None (handled by LLM tools)."""
+        response = _handle_personalized_query("Show me my plan", "user123")
+        assert response is None
 
+    def test_greeting_returns_none(self):
+        """Test that greetings return None."""
         response = _handle_personalized_query("Hello", "user123")
-
         assert response is None
 
 
@@ -319,9 +261,10 @@ class TestGetUserProfile:
             profile = get_user_profile(sample_user_with_profile)
 
             assert profile is not None
-            assert "monthly_income" in profile
-            assert "discretionary" in profile
-            assert profile["monthly_income"] == 5000.0
+            assert "is_student" in profile
+            assert "budgeting_goal" in profile
+            assert "strictness_level" in profile
+            assert profile["budgeting_goal"] == "emergency_fund"
 
     def test_get_profile_user_not_found(self, app):
         """Test getting profile for non-existent user."""
