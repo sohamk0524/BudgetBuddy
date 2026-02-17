@@ -398,3 +398,58 @@ She has to login into her account to analyze expenses. Sometimes she doesn't wan
   
 
 Notifications would be very helpful without manually having to go into the app. She only has individual expenses.
+
+## Interview 11:
+
+1. When was the last time you struggled with your finances?
+
+Has never struggled with finances, in general just, looks at payday, credit card payments and rent, sees that she mostly spends on rent and food
+
+2. How have you been managing your finances?
+
+Just using the calculator app and keeping track in brain to spend less than she earns, looked at transaction history on cards
+3. Why was that hard?
+
+Since everything was on different platforms, it was hard to keep track.
+
+4. Have you tried other methods before, like a budgeting app or spreadsheet?	
+
+Same at Q2, not tried budgeting apps or spreadsheets, mostly mental calculations
+
+5. Why haven’t you tried anything like that?
+
+Looked at them, didn’t find any that matched her needs, lots take personal information
+
+6. What would you like to see from a budgeting app that you want?
+
+Savings, general budgeting, putting aside goals for savings, ensuring it can handle biweekly pay schedule
+
+
+## Interview 12:
+
+1. When was the last time you struggled with your finances?
+
+Struggling when she was new to managing money
+
+2. How were you managing your finances at this time?
+
+Tried to use templates online but would not fit college needs and expectations
+
+3. Why was that hard?
+
+Once she found right framework it was not hard to manage
+
+4. How are you keeping up with finances currently?
+
+Made her own notion template that she’s worked on since freshman year to work with her own needs and usage
+
+5. Have you tried other methods before, like a budgeting app or spreadsheet?
+
+Used the banking apps inbuilt budgeting but it wasn’t user friendly, used spreadsheets but were too generalized.
+6. How did you customize notion templates for your own use cases?
+
+Incorporated components from other templates and learned how to use notion tools as well so she could create her own templates without relying on other people. More of the niche categories that were specific to her life and were important to her. Templates had different budgeting goals that were differently planned out as compared to what she actually wanted to do.
+
+7. What would you want to see from a budgeting app if you were to download one:
+
+Inbuilt templates for if you don’t know what you want, but you can also make your own if you have clearer goals. Have specific categories for things college students want.
