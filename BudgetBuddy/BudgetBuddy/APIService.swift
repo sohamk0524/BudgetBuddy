@@ -462,15 +462,18 @@ actor APIService {
         return try JSONDecoder().decode(MerchantClassificationsResponse.self, from: data)
     }
 
-    /// Gets unclassified merchants sorted by total spend
-    func getUnclassifiedMerchants(userId: Int) async throws -> UnclassifiedMerchantsResponse {
-        let url = baseURL.appendingPathComponent("expenses/unclassified/\(userId)")
+    /// Gets unclassified transactions sorted by merchant impact (round-robin)
+    func getUnclassifiedTransactions(userId: Int, limit: Int = 10) async throws -> UnclassifiedTransactionsResponse {
+        var urlComponents = URLComponents(url: baseURL.appendingPathComponent("expenses/unclassified/\(userId)"), resolvingAgainstBaseURL: false)!
+        urlComponents.queryItems = [URLQueryItem(name: "limit", value: String(limit))]
+
+        guard let url = urlComponents.url else { throw APIError.invalidResponse }
 
         let (data, response) = try await URLSession.shared.data(from: url)
         guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
             throw APIError.invalidResponse
         }
-        return try JSONDecoder().decode(UnclassifiedMerchantsResponse.self, from: data)
+        return try JSONDecoder().decode(UnclassifiedTransactionsResponse.self, from: data)
     }
 
     // MARK: - Device Token API

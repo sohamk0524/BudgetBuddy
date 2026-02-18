@@ -2,7 +2,7 @@
 //  ExpensesView.swift
 //  BudgetBuddy
 //
-//  Expenses tab with smart sub-categorization and classification
+//  Expenses tab with smart sub-categorization and swipe-to-classify
 //
 
 import SwiftUI
@@ -28,19 +28,27 @@ struct ExpensesView: View {
                         Task { await viewModel.fetchExpenses() }
                     }
 
-                    // Classification prompt for top unclassified merchant
-                    if let merchant = viewModel.unclassifiedMerchants.first {
-                        ClassificationPromptCard(merchant: merchant) { classification in
+                    // Swipe classification card
+                    if viewModel.currentClassifyIndex < viewModel.unclassifiedTransactions.count {
+                        let txn = viewModel.unclassifiedTransactions[viewModel.currentClassifyIndex]
+                        SwipeClassificationCard(
+                            transaction: txn,
+                            remainingCount: viewModel.totalUnclassifiedCount
+                        ) { classification, ratio in
                             Task {
-                                await viewModel.classifyMerchant(
-                                    merchantName: merchant.merchantName,
-                                    classification: classification
+                                await viewModel.classifyViaSwipe(
+                                    transactionId: txn.id,
+                                    classification: classification,
+                                    essentialRatio: ratio
                                 )
                             }
+                        } onSplitRequest: {
+                            viewModel.splitTransaction = txn
+                            viewModel.showSplitSheet = true
                         }
 
-                        // AI auto-classify button when multiple unclassified merchants
-                        if viewModel.unclassifiedMerchants.count > 1 {
+                        // AI auto-classify button when enough unclassified
+                        if viewModel.totalUnclassifiedCount > 5 {
                             Button {
                                 Task { await viewModel.autoClassifyWithAI() }
                             } label: {
@@ -128,17 +136,33 @@ struct ExpensesView: View {
                     .presentationDragIndicator(.visible)
                 }
             }
+            .sheet(isPresented: $viewModel.showSplitSheet) {
+                if let transaction = viewModel.splitTransaction {
+                    SplitHalfSheet(transaction: transaction) { ratio in
+                        viewModel.showSplitSheet = false
+                        Task {
+                            await viewModel.classifyViaSwipe(
+                                transactionId: transaction.id,
+                                classification: "mixed",
+                                essentialRatio: ratio
+                            )
+                        }
+                    }
+                    .presentationDetents([.medium])
+                    .presentationDragIndicator(.visible)
+                }
+            }
         }
     }
 }
 
-// MARK: - Summary Card
+// MARK: - Summary Card (3 segments: Essential / Fun Money / Unclassified)
 
 struct ExpensesSummaryCard: View {
     let summary: ExpensesSummary
 
     private var total: Double {
-        summary.totalEssential + summary.totalDiscretionary + summary.totalMixed + summary.totalUnclassified
+        summary.totalEssential + summary.totalDiscretionary + summary.totalUnclassified
     }
 
     var body: some View {
@@ -151,10 +175,9 @@ struct ExpensesSummaryCard: View {
             if total > 0 {
                 GeometryReader { geometry in
                     HStack(spacing: 2) {
-                        let width = geometry.size.width - 6 // account for spacing
+                        let width = geometry.size.width - 4 // account for spacing
                         segmentRect(color: .green, fraction: summary.totalEssential / total, width: width)
                         segmentRect(color: Color.danger, fraction: summary.totalDiscretionary / total, width: width)
-                        segmentRect(color: .yellow, fraction: summary.totalMixed / total, width: width)
                         segmentRect(color: .gray, fraction: summary.totalUnclassified / total, width: width)
                     }
                 }
@@ -162,13 +185,10 @@ struct ExpensesSummaryCard: View {
                 .clipShape(Capsule())
             }
 
-            // Legend
+            // Legend — single row
             HStack(spacing: 16) {
                 legendItem(color: .green, label: "Essential", amount: summary.totalEssential)
                 legendItem(color: Color.danger, label: "Fun Money", amount: summary.totalDiscretionary)
-            }
-            HStack(spacing: 16) {
-                legendItem(color: .yellow, label: "Mixed", amount: summary.totalMixed)
                 legendItem(color: .gray, label: "Unclassified", amount: summary.totalUnclassified)
             }
         }
@@ -190,7 +210,6 @@ struct ExpensesSummaryCard: View {
             Text(label)
                 .font(.roundedCaption)
                 .foregroundStyle(Color.textSecondary)
-            Spacer()
             Text("$\(amount, specifier: "%.0f")")
                 .font(.roundedCaption)
                 .foregroundStyle(Color.textPrimary)
@@ -199,54 +218,281 @@ struct ExpensesSummaryCard: View {
     }
 }
 
-// MARK: - Classification Prompt Card
+// MARK: - Swipe Classification Card
 
-struct ClassificationPromptCard: View {
-    let merchant: UnclassifiedMerchant
-    let onClassify: (String) -> Void
+struct SwipeClassificationCard: View {
+    let transaction: UnclassifiedTransactionItem
+    let remainingCount: Int
+    let onClassify: (String, Double?) -> Void
+    let onSplitRequest: () -> Void
+
+    @State private var offset: CGSize = .zero
+
+    private var swipeDirection: SwipeDirection {
+        if offset.height < -80 { return .up }
+        if offset.width > 100 { return .right }
+        if offset.width < -100 { return .left }
+        return .none
+    }
+
+    private enum SwipeDirection {
+        case none, left, right, up
+    }
+
+    private var overlayColor: Color {
+        switch swipeDirection {
+        case .right: return .green
+        case .left: return Color.danger
+        case .up: return Color.accent
+        case .none:
+            if abs(offset.width) > abs(offset.height) {
+                return offset.width > 0 ? .green : Color.danger
+            } else if offset.height < 0 {
+                return Color.accent
+            }
+            return .clear
+        }
+    }
+
+    private var overlayOpacity: Double {
+        let progress = max(abs(offset.width) / 100, abs(min(offset.height, 0)) / 80)
+        return min(progress * 0.3, 0.3)
+    }
+
+    private var overlayLabel: String {
+        switch swipeDirection {
+        case .right: return "Essential"
+        case .left: return "Fun Money"
+        case .up: return "Split"
+        case .none: return ""
+        }
+    }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Image(systemName: "questionmark.circle.fill")
-                    .foregroundStyle(Color.accent)
-                Text("Classify Merchant")
+        VStack(spacing: 8) {
+            // Card
+            VStack(spacing: 12) {
+                Text(transaction.merchantName ?? transaction.name)
                     .font(.roundedHeadline)
                     .foregroundStyle(Color.textPrimary)
+
+                Text("$\(transaction.amount, specifier: "%.2f")")
+                    .font(.rounded(.title2, weight: .bold))
+                    .foregroundStyle(Color.accent)
+                    .monospacedDigit()
+
+                if let dateStr = transaction.date {
+                    Text(formatDate(dateStr))
+                        .font(.roundedCaption)
+                        .foregroundStyle(Color.textSecondary)
+                }
+
+                if let ctx = transaction.merchantContext, ctx.totalUnclassified > 1 {
+                    Text("\(ctx.totalUnclassified - 1) more from this merchant")
+                        .font(.roundedCaption)
+                        .foregroundStyle(Color.textSecondary)
+                }
+
+                // Overlay label during drag
+                if !overlayLabel.isEmpty {
+                    Text(overlayLabel)
+                        .font(.rounded(.title3, weight: .bold))
+                        .foregroundStyle(overlayColor)
+                        .opacity(min(max(abs(offset.width) / 100, abs(min(offset.height, 0)) / 80), 1.0))
+                }
             }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 20)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color.surface)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .fill(overlayColor.opacity(overlayOpacity))
+                    )
+            )
+            .offset(x: offset.width, y: offset.height)
+            .rotationEffect(.degrees(Double(offset.width) / 20))
+            .gesture(
+                DragGesture()
+                    .onChanged { value in
+                        offset = value.translation
+                    }
+                    .onEnded { value in
+                        let dir = swipeDirection
+                        withAnimation(.spring(response: 0.3)) {
+                            switch dir {
+                            case .right:
+                                offset = CGSize(width: 500, height: 0)
+                                onClassify("essential", nil)
+                            case .left:
+                                offset = CGSize(width: -500, height: 0)
+                                onClassify("discretionary", nil)
+                            case .up:
+                                offset = CGSize(width: 0, height: -500)
+                                onSplitRequest()
+                            case .none:
+                                offset = .zero
+                            }
+                        }
+                        // Reset offset after animation
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                            offset = .zero
+                        }
+                    }
+            )
 
-            Text("How would you classify **\(merchant.merchantName)**?")
-                .font(.roundedBody)
-                .foregroundStyle(Color.textSecondary)
+            // Hint icons
+            HStack {
+                HStack(spacing: 4) {
+                    Image(systemName: "arrow.left")
+                    Text("Fun Money")
+                }
+                .font(.roundedCaption)
+                .foregroundStyle(Color.danger.opacity(0.6))
 
-            Text("\(merchant.transactionCount) transactions totaling $\(merchant.totalSpent, specifier: "%.2f")")
+                Spacer()
+
+                HStack(spacing: 4) {
+                    Image(systemName: "arrow.up")
+                    Text("Split")
+                }
+                .font(.roundedCaption)
+                .foregroundStyle(Color.accent.opacity(0.6))
+
+                Spacer()
+
+                HStack(spacing: 4) {
+                    Text("Essential")
+                    Image(systemName: "arrow.right")
+                }
+                .font(.roundedCaption)
+                .foregroundStyle(Color.green.opacity(0.6))
+            }
+            .padding(.horizontal, 4)
+
+            // Counter
+            Text("\(remainingCount) transactions to classify")
                 .font(.roundedCaption)
                 .foregroundStyle(Color.textSecondary)
-
-            HStack(spacing: 10) {
-                classifyButton("Essential", color: .green, classification: "essential")
-                classifyButton("Fun Money", color: Color.danger, classification: "discretionary")
-                classifyButton("Mixed", color: .yellow, classification: "mixed")
-            }
         }
         .walletCard()
         .padding(.horizontal)
     }
 
-    private func classifyButton(_ label: String, color: Color, classification: String) -> some View {
-        Button {
-            onClassify(classification)
-        } label: {
-            Text(label)
-                .font(.roundedCaption)
-                .fontWeight(.semibold)
-                .foregroundStyle(color == .yellow ? .black : .white)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .frame(maxWidth: .infinity)
-                .background(color.opacity(0.8))
-                .clipShape(RoundedRectangle(cornerRadius: 10))
+    private func formatDate(_ dateStr: String) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        guard let date = formatter.date(from: dateStr) else { return dateStr }
+        formatter.dateFormat = "MMM d, yyyy"
+        return formatter.string(from: date)
+    }
+}
+
+// MARK: - Split Half-Sheet
+
+struct SplitHalfSheet: View {
+    let transaction: UnclassifiedTransactionItem
+    let onConfirm: (Double) -> Void
+
+    @State private var essentialRatio: Double = 0.5
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 20) {
+                // Transaction details
+                VStack(spacing: 6) {
+                    Text(transaction.merchantName ?? transaction.name)
+                        .font(.roundedHeadline)
+                        .foregroundStyle(Color.textPrimary)
+
+                    Text("$\(transaction.amount, specifier: "%.2f")")
+                        .font(.rounded(.title, weight: .bold))
+                        .foregroundStyle(Color.accent)
+                        .monospacedDigit()
+                }
+                .padding(.top)
+
+                // Slider
+                VStack(spacing: 8) {
+                    HStack {
+                        Text("Essential")
+                            .font(.roundedCaption)
+                            .foregroundStyle(.green)
+                        Spacer()
+                        Text("\(Int(essentialRatio * 100))%")
+                            .font(.roundedBody)
+                            .fontWeight(.medium)
+                            .foregroundStyle(Color.textPrimary)
+                            .monospacedDigit()
+                        Spacer()
+                        Text("Fun Money")
+                            .font(.roundedCaption)
+                            .foregroundStyle(Color.danger)
+                    }
+
+                    Slider(value: $essentialRatio, in: 0...1, step: 0.05)
+                        .tint(Color.accent)
+
+                    // Live split preview
+                    HStack {
+                        Text("$\(transaction.amount * essentialRatio, specifier: "%.2f") Essential")
+                            .font(.roundedCaption)
+                            .foregroundStyle(.green)
+                        Spacer()
+                        Text("$\(transaction.amount * (1 - essentialRatio), specifier: "%.2f") Fun Money")
+                            .font(.roundedCaption)
+                            .foregroundStyle(Color.danger)
+                    }
+                }
+                .padding(.horizontal)
+
+                // Confirm button
+                Button {
+                    onConfirm(essentialRatio)
+                } label: {
+                    Text("Confirm Split")
+                        .font(.roundedBody)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(Color.accent)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                }
+                .padding(.horizontal)
+
+                Spacer()
+            }
+            .background(Color.appBackground)
+            .navigationTitle("Split Transaction")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbarColorScheme(.dark, for: .navigationBar)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                        .foregroundStyle(Color.accent)
+                }
+            }
         }
+    }
+}
+
+// MARK: - Proportional Split Badge
+
+struct SplitBadge: View {
+    let essentialRatio: Double
+
+    var body: some View {
+        GeometryReader { geo in
+            HStack(spacing: 0) {
+                Color.green.frame(width: geo.size.width * essentialRatio)
+                Color.danger.frame(width: geo.size.width * (1 - essentialRatio))
+            }
+        }
+        .frame(width: 48, height: 14)
+        .clipShape(Capsule())
     }
 }
 
@@ -254,22 +500,6 @@ struct ClassificationPromptCard: View {
 
 struct ExpenseTransactionRow: View {
     let transaction: ExpenseTransaction
-
-    private var badgeColor: Color {
-        switch transaction.subCategory {
-        case "essential": return .green
-        case "discretionary": return Color.danger
-        case "mixed": return .yellow
-        default: return .gray
-        }
-    }
-
-    private var badgeLabel: String {
-        switch transaction.subCategory {
-        case "discretionary": return "Fun Money"
-        default: return transaction.subCategory.capitalized
-        }
-    }
 
     var body: some View {
         HStack(spacing: 12) {
@@ -295,18 +525,41 @@ struct ExpenseTransactionRow: View {
                     .foregroundStyle(Color.textPrimary)
                     .monospacedDigit()
 
-                Text(badgeLabel)
-                    .font(.system(size: 10, weight: .semibold, design: .rounded))
-                    .foregroundStyle(badgeColor == .yellow ? .black : .white)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 3)
-                    .background(badgeColor.opacity(0.8))
-                    .clipShape(Capsule())
+                transactionBadge
             }
         }
         .padding(12)
         .background(Color.surface)
         .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+
+    @ViewBuilder
+    private var transactionBadge: some View {
+        switch transaction.subCategory {
+        case "essential":
+            textBadge("Essential", color: .green)
+        case "discretionary":
+            textBadge("Fun Money", color: Color.danger)
+        case "mixed":
+            SplitBadge(essentialRatio: splitRatio)
+        default:
+            textBadge("Unclassified", color: .gray)
+        }
+    }
+
+    private var splitRatio: Double {
+        guard let ea = transaction.essentialAmount, transaction.amount > 0 else { return 0.5 }
+        return ea / abs(transaction.amount)
+    }
+
+    private func textBadge(_ label: String, color: Color) -> some View {
+        Text(label)
+            .font(.system(size: 10, weight: .semibold, design: .rounded))
+            .foregroundStyle(.white)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(color.opacity(0.8))
+            .clipShape(Capsule())
     }
 
     private func formatDate(_ dateStr: String) -> String {
@@ -362,11 +615,11 @@ struct TransactionClassificationSheet: View {
                 }
                 .padding(.top)
 
-                // Category picker
+                // Category picker — Essential | Fun Money | Split
                 Picker("Classification", selection: $selectedCategory) {
                     Text("Essential").tag("essential")
                     Text("Fun Money").tag("discretionary")
-                    Text("Mixed").tag("mixed")
+                    Text("Split").tag("mixed")
                 }
                 .pickerStyle(.segmented)
                 .padding(.horizontal)
@@ -378,7 +631,7 @@ struct TransactionClassificationSheet: View {
                     }
                 }
 
-                // Slider for mixed
+                // Slider for split
                 if selectedCategory == "mixed" {
                     VStack(spacing: 8) {
                         HStack {
@@ -420,19 +673,23 @@ struct TransactionClassificationSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
-                        .foregroundStyle(Color.accent)
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                        .foregroundStyle(Color.textSecondary)
                 }
-            }
-            .onDisappear {
-                let ratio: Double? = selectedCategory == "mixed" ? essentialRatio : nil
-                Task {
-                    await viewModel.classifyTransaction(
-                        transactionId: transaction.id,
-                        subCategory: selectedCategory,
-                        essentialRatio: ratio
-                    )
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") {
+                        let ratio: Double? = selectedCategory == "mixed" ? essentialRatio : nil
+                        Task {
+                            await viewModel.classifyTransaction(
+                                transactionId: transaction.id,
+                                subCategory: selectedCategory,
+                                essentialRatio: ratio
+                            )
+                        }
+                        dismiss()
+                    }
+                    .foregroundStyle(Color.accent)
                 }
             }
         }

@@ -11,7 +11,7 @@ enum ExpenseFilter: String, CaseIterable {
     case all = "All"
     case essential = "Essential"
     case discretionary = "Fun Money"
-    case mixed = "Mixed"
+    case unclassified = "Unclassified"
 }
 
 @Observable
@@ -24,7 +24,7 @@ class ExpensesViewModel {
     var errorMessage: String?
 
     var transactions: [ExpenseTransaction] = []
-    var summary = ExpensesSummary(totalEssential: 0, totalDiscretionary: 0, totalMixed: 0, totalUnclassified: 0)
+    var summary = ExpensesSummary(totalEssential: 0, totalDiscretionary: 0, totalFunMoney: 0, totalMixed: 0, totalUnclassified: 0)
     var total = 0
     var hasMore = false
 
@@ -32,7 +32,13 @@ class ExpensesViewModel {
     var startDate: String?
     var endDate: String?
 
-    var unclassifiedMerchants: [UnclassifiedMerchant] = []
+    // Swipe classification state
+    var unclassifiedTransactions: [UnclassifiedTransactionItem] = []
+    var totalUnclassifiedCount: Int = 0
+    var currentClassifyIndex: Int = 0
+    var showSplitSheet = false
+    var splitTransaction: UnclassifiedTransactionItem?
+
     var selectedTransaction: ExpenseTransaction?
     var showClassificationSheet = false
     var isAutoClassifying = false
@@ -56,7 +62,7 @@ class ExpensesViewModel {
         case .all: nil
         case .essential: "essential"
         case .discretionary: "discretionary"
-        case .mixed: "mixed"
+        case .unclassified: "unclassified"
         }
 
         do {
@@ -88,7 +94,7 @@ class ExpensesViewModel {
         case .all: nil
         case .essential: "essential"
         case .discretionary: "discretionary"
-        case .mixed: "mixed"
+        case .unclassified: "unclassified"
         }
 
         do {
@@ -108,14 +114,44 @@ class ExpensesViewModel {
         }
     }
 
-    func fetchUnclassifiedMerchants() async {
+    func fetchUnclassifiedTransactions() async {
         guard let userId = AuthManager.shared.authToken else { return }
 
         do {
-            let response = try await apiService.getUnclassifiedMerchants(userId: userId)
-            unclassifiedMerchants = response.merchants
+            let response = try await apiService.getUnclassifiedTransactions(userId: userId, limit: 10)
+            unclassifiedTransactions = response.transactions
+            totalUnclassifiedCount = response.totalUnclassified
+            currentClassifyIndex = 0
         } catch {
-            print("Failed to fetch unclassified merchants: \(error)")
+            print("Failed to fetch unclassified transactions: \(error)")
+        }
+    }
+
+    func classifyViaSwipe(transactionId: Int, classification: String, essentialRatio: Double? = nil) async {
+        do {
+            let response = try await apiService.classifyTransaction(
+                transactionId: transactionId,
+                subCategory: classification,
+                essentialRatio: essentialRatio
+            )
+
+            // Advance to next card
+            currentClassifyIndex += 1
+
+            // If auto-applied, reduce the unclassified count
+            let autoApplied = response.autoApplied ?? 0
+            totalUnclassifiedCount -= (1 + autoApplied)
+            if totalUnclassifiedCount < 0 { totalUnclassifiedCount = 0 }
+
+            // Refresh summary to reflect the new classification
+            await fetchExpenses()
+
+            // If we've gone through all loaded cards, fetch more
+            if currentClassifyIndex >= unclassifiedTransactions.count {
+                await fetchUnclassifiedTransactions()
+            }
+        } catch {
+            print("Failed to classify via swipe: \(error)")
         }
     }
 
@@ -129,9 +165,6 @@ class ExpensesViewModel {
                 classification: classification,
                 essentialRatio: essentialRatio
             )
-            // Remove from unclassified list
-            unclassifiedMerchants.removeAll { $0.merchantName == merchantName }
-            // Refresh expenses to show updated classifications
             await fetchExpenses()
         } catch {
             print("Failed to classify merchant: \(error)")
@@ -189,7 +222,7 @@ class ExpensesViewModel {
 
     func refresh() async {
         async let expenses: () = fetchExpenses()
-        async let merchants: () = fetchUnclassifiedMerchants()
-        _ = await (expenses, merchants)
+        async let unclassified: () = fetchUnclassifiedTransactions()
+        _ = await (expenses, unclassified)
     }
 }

@@ -15,7 +15,7 @@ from services.orchestrator import process_message
 from services.statement_analyzer import analyze_statement
 from services.plan_generator import generate_plan, save_plan_to_db
 from services import plaid_service
-from services.classification_service import classify_transaction, retroactively_reclassify, classify_new_transactions, normalize_merchant_name, llm_classify_merchants_batch
+from services.classification_service import classify_transaction, retroactively_reclassify, classify_new_transactions, normalize_merchant_name, llm_classify_merchants_batch, CONFIDENCE_THRESHOLD
 from services.push_service import notify_new_transactions, notify_classification_needed
 
 app = Flask(__name__)
@@ -1549,10 +1549,11 @@ def get_expenses(user_id):
             "hasMore": False
         })
 
-    # Lazy backfill: auto-classify unclassified transactions
+    # Lazy backfill: auto-classify unclassified expense transactions
     unclassified = Transaction.query.filter(
         Transaction.plaid_account_id.in_(account_ids),
-        ((Transaction.sub_category == 'unclassified') | (Transaction.sub_category.is_(None)))
+        ((Transaction.sub_category == 'unclassified') | (Transaction.sub_category.is_(None))),
+        Transaction.amount > 0  # Only expenses, not income
     ).all()
 
     if unclassified:
@@ -1584,13 +1585,26 @@ def get_expenses(user_id):
         query = query.filter(Transaction.category_primary == category)
 
     if sub_category:
-        query = query.filter(Transaction.sub_category == sub_category)
+        if sub_category == 'essential':
+            # Include essential + mixed transactions with essential_amount > 0
+            query = query.filter(
+                (Transaction.sub_category == 'essential') |
+                ((Transaction.sub_category == 'mixed') & (Transaction.essential_amount > 0))
+            )
+        elif sub_category == 'discretionary':
+            # Include discretionary + mixed transactions with discretionary_amount > 0
+            query = query.filter(
+                (Transaction.sub_category == 'discretionary') |
+                ((Transaction.sub_category == 'mixed') & (Transaction.discretionary_amount > 0))
+            )
+        else:
+            query = query.filter(Transaction.sub_category == sub_category)
 
     # Compute summary from filtered query (before pagination)
     all_filtered = query.all()
-    total_essential = sum(t.essential_amount or 0 for t in all_filtered if t.sub_category == 'essential')
-    total_discretionary = sum(t.discretionary_amount or 0 for t in all_filtered if t.sub_category == 'discretionary')
-    total_mixed = sum(t.amount for t in all_filtered if t.sub_category == 'mixed')
+    # Fold mixed into Essential/Fun Money totals
+    total_essential = sum(t.essential_amount or 0 for t in all_filtered if t.sub_category in ('essential', 'mixed'))
+    total_discretionary = sum(t.discretionary_amount or 0 for t in all_filtered if t.sub_category in ('discretionary', 'mixed'))
     total_unclassified = sum(t.amount for t in all_filtered if t.sub_category == 'unclassified' or t.sub_category is None)
 
     total = len(all_filtered)
@@ -1623,7 +1637,8 @@ def get_expenses(user_id):
         "summary": {
             "totalEssential": round(total_essential, 2),
             "totalDiscretionary": round(total_discretionary, 2),
-            "totalMixed": round(total_mixed, 2),
+            "totalFunMoney": round(total_discretionary, 2),
+            "totalMixed": 0,
             "totalUnclassified": round(total_unclassified, 2)
         },
         "total": total,
@@ -1649,8 +1664,12 @@ def classify_merchant():
     if not user_id or not merchant_name or not classification:
         return jsonify({"error": "userId, merchantName, and classification are required"}), 400
 
+    # Accept "split" as user-facing alias for "mixed"
+    if classification == 'split':
+        classification = 'mixed'
+
     if classification not in ('essential', 'discretionary', 'mixed'):
-        return jsonify({"error": "classification must be essential, discretionary, or mixed"}), 400
+        return jsonify({"error": "classification must be essential, discretionary, mixed, or split"}), 400
 
     # Default essential_ratio based on classification
     if essential_ratio is None:
@@ -1708,8 +1727,12 @@ def classify_single_transaction(transaction_id):
     sub_category = data.get("subCategory")
     essential_ratio = data.get("essentialRatio")
 
+    # Accept "split" as user-facing alias for "mixed"
+    if sub_category == 'split':
+        sub_category = 'mixed'
+
     if not sub_category or sub_category not in ('essential', 'discretionary', 'mixed'):
-        return jsonify({"error": "subCategory must be essential, discretionary, or mixed"}), 400
+        return jsonify({"error": "subCategory must be essential, discretionary, mixed, or split"}), 400
 
     if essential_ratio is None:
         if sub_category == 'essential':
@@ -1731,6 +1754,7 @@ def classify_single_transaction(transaction_id):
 
     # Update merchant running average
     updated_merchant_ratio = essential_ratio
+    auto_applied = 0
     merchant = normalize_merchant_name(transaction.merchant_name)
     if merchant:
         # Get user_id from the transaction's account chain
@@ -1751,6 +1775,7 @@ def classify_single_transaction(transaction_id):
                     mc.essential_ratio = round(((mc.essential_ratio * mc.classification_count) + essential_ratio) / new_count, 4)
                     mc.classification_count = new_count
                     mc.classification = sub_category
+                    mc.confidence = 'user_set'
                     updated_merchant_ratio = mc.essential_ratio
                 else:
                     mc = MerchantClassification(
@@ -1762,6 +1787,14 @@ def classify_single_transaction(transaction_id):
                         classification_count=1
                     )
                     db.session.add(mc)
+                    db.session.flush()
+
+                # Auto-apply: if threshold reached, classify all remaining unclassified from this merchant
+                if mc.classification_count >= CONFIDENCE_THRESHOLD and mc.confidence == 'user_set':
+                    auto_applied = retroactively_reclassify(user_id, merchant, mc.classification, mc.essential_ratio)
+                    # Restore this transaction's exact user-set ratio (not the running average)
+                    transaction.essential_amount = round(amount * essential_ratio, 2)
+                    transaction.discretionary_amount = round(amount * (1.0 - essential_ratio), 2)
 
     db.session.commit()
 
@@ -1773,7 +1806,8 @@ def classify_single_transaction(transaction_id):
             "essentialAmount": transaction.essential_amount,
             "discretionaryAmount": transaction.discretionary_amount
         },
-        "updatedMerchantRatio": updated_merchant_ratio
+        "updatedMerchantRatio": updated_merchant_ratio,
+        "autoApplied": auto_applied
     })
 
 
@@ -1801,11 +1835,13 @@ def get_merchant_classifications(user_id):
 
 
 @app.route("/expenses/unclassified/<int:user_id>", methods=["GET"])
-def get_unclassified_merchants(user_id):
-    """Get distinct unclassified merchants sorted by total spend."""
+def get_unclassified_transactions(user_id):
+    """Get individual unclassified transactions sorted by merchant impact, round-robin."""
     user = User.query.get(user_id)
     if not user:
         return jsonify({"error": "User not found"}), 404
+
+    limit = request.args.get("limit", 10, type=int)
 
     plaid_items = PlaidItem.query.filter_by(user_id=user_id).all()
     account_ids = []
@@ -1814,39 +1850,97 @@ def get_unclassified_merchants(user_id):
             account_ids.append(account.id)
 
     if not account_ids:
-        return jsonify({"merchants": []})
+        return jsonify({"transactions": [], "totalUnclassified": 0})
 
-    # Get unclassified transactions grouped by merchant
+    # Get all unclassified transactions (expenses only)
     unclassified = Transaction.query.filter(
         Transaction.plaid_account_id.in_(account_ids),
         ((Transaction.sub_category == 'unclassified') | (Transaction.sub_category.is_(None))),
-        Transaction.merchant_name.isnot(None),
         Transaction.amount > 0
     ).all()
 
+    total_unclassified = len(unclassified)
+
+    # Skip merchants where user has classification_count >= CONFIDENCE_THRESHOLD
+    high_confidence_merchants = set()
+    merchant_classifications = MerchantClassification.query.filter_by(user_id=user_id).all()
+    for mc in merchant_classifications:
+        if mc.classification_count >= CONFIDENCE_THRESHOLD and mc.confidence == 'user_set':
+            high_confidence_merchants.add(mc.merchant_name)
+
     # Group by merchant
-    merchant_data = {}
+    merchant_txns = {}
     for txn in unclassified:
+        name = normalize_merchant_name(txn.merchant_name)
+        if name in high_confidence_merchants:
+            continue
+        if name not in merchant_txns:
+            merchant_txns[name] = []
+        merchant_txns[name].append(txn)
+
+    # Sort merchants by total unclassified spend (highest first)
+    sorted_merchants = sorted(
+        merchant_txns.items(),
+        key=lambda x: sum(t.amount for t in x[1]),
+        reverse=True
+    )
+
+    # Within each merchant, sort by date descending
+    for name, txns in sorted_merchants:
+        txns.sort(key=lambda t: t.date or date.min, reverse=True)
+
+    # Build merchant context for each merchant
+    # Also count already-classified transactions per merchant
+    merchant_context_data = {}
+    all_transactions = Transaction.query.filter(
+        Transaction.plaid_account_id.in_(account_ids),
+        Transaction.amount > 0
+    ).all()
+
+    for txn in all_transactions:
         name = normalize_merchant_name(txn.merchant_name)
         if not name:
             continue
-        if name not in merchant_data:
-            merchant_data[name] = {"totalSpent": 0, "transactionCount": 0, "displayName": txn.merchant_name}
-        merchant_data[name]["totalSpent"] += txn.amount
-        merchant_data[name]["transactionCount"] += 1
+        if name not in merchant_context_data:
+            merchant_context_data[name] = {"totalSpent": 0, "classified": 0, "unclassified": 0}
+        merchant_context_data[name]["totalSpent"] += txn.amount
+        if txn.sub_category and txn.sub_category != 'unclassified':
+            merchant_context_data[name]["classified"] += 1
+        else:
+            merchant_context_data[name]["unclassified"] += 1
 
-    # Sort by total spend descending
-    sorted_merchants = sorted(merchant_data.items(), key=lambda x: x[1]["totalSpent"], reverse=True)
+    # Round-robin: take one transaction per merchant in order, repeat
+    result_txns = []
+    pointers = {name: 0 for name, _ in sorted_merchants}
+
+    while len(result_txns) < limit:
+        added_any = False
+        for name, txns in sorted_merchants:
+            if pointers[name] < len(txns) and len(result_txns) < limit:
+                txn = txns[pointers[name]]
+                pointers[name] += 1
+                added_any = True
+
+                ctx = merchant_context_data.get(name, {})
+                result_txns.append({
+                    "id": txn.id,
+                    "transactionId": txn.transaction_id,
+                    "merchantName": txn.merchant_name,
+                    "amount": txn.amount,
+                    "date": txn.date.isoformat() if txn.date else None,
+                    "name": txn.name,
+                    "merchantContext": {
+                        "totalUnclassified": ctx.get("unclassified", 0),
+                        "totalSpent": round(ctx.get("totalSpent", 0), 2),
+                        "alreadyClassified": ctx.get("classified", 0)
+                    }
+                })
+        if not added_any:
+            break
 
     return jsonify({
-        "merchants": [
-            {
-                "merchantName": data["displayName"],
-                "totalSpent": round(data["totalSpent"], 2),
-                "transactionCount": data["transactionCount"]
-            }
-            for _, data in sorted_merchants
-        ]
+        "transactions": result_txns,
+        "totalUnclassified": total_unclassified
     })
 
 

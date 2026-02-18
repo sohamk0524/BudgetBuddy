@@ -442,6 +442,7 @@ struct ExpenseTransaction: Codable, Identifiable {
 struct ExpensesSummary: Codable {
     let totalEssential: Double
     let totalDiscretionary: Double
+    let totalFunMoney: Double?
     let totalMixed: Double
     let totalUnclassified: Double
 }
@@ -482,6 +483,7 @@ struct ClassifyTransactionResponse: Codable {
     let success: Bool
     let transaction: ClassifiedTransactionInfo
     let updatedMerchantRatio: Double
+    let autoApplied: Int?
 }
 
 struct UnclassifiedMerchant: Codable, Identifiable {
@@ -493,6 +495,27 @@ struct UnclassifiedMerchant: Codable, Identifiable {
 
 struct UnclassifiedMerchantsResponse: Codable {
     let merchants: [UnclassifiedMerchant]
+}
+
+struct MerchantContext: Codable {
+    let totalUnclassified: Int
+    let totalSpent: Double
+    let alreadyClassified: Int
+}
+
+struct UnclassifiedTransactionItem: Codable, Identifiable {
+    let id: Int
+    let transactionId: String
+    let merchantName: String?
+    let amount: Double
+    let date: String?
+    let name: String
+    let merchantContext: MerchantContext?
+}
+
+struct UnclassifiedTransactionsResponse: Codable {
+    let transactions: [UnclassifiedTransactionItem]
+    let totalUnclassified: Int
 }
 
 struct AutoClassifyMerchantResult: Codable {

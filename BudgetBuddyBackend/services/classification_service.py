@@ -8,75 +8,33 @@ import json
 from typing import Optional, Tuple, List, Dict, Any
 
 
+# Confidence threshold: after N consistent user classifications of the same
+# merchant, auto-apply to remaining unclassified transactions from that merchant.
+CONFIDENCE_THRESHOLD = 3
+
 # Pre-seeded defaults by Plaid detailed category
-# Maps category_detailed → (classification, essential_ratio)
+# Only unambiguous essentials — everything else stays unclassified until user teaches.
 PRE_SEEDED_DEFAULTS = {
-    # Essential
-    "GROCERIES": ("essential", 1.0),
-    "SUPERMARKETS_AND_GROCERIES": ("essential", 1.0),
     "PHARMACIES": ("essential", 1.0),
-    "MEDICAL": ("essential", 1.0),
     "RENT": ("essential", 1.0),
     "MORTGAGE": ("essential", 1.0),
     "UTILITIES": ("essential", 1.0),
     "INTERNET_AND_CABLE": ("essential", 1.0),
     "PHONE": ("essential", 1.0),
     "INSURANCE": ("essential", 1.0),
-    "GAS_STATIONS": ("essential", 0.9),
-    "GAS": ("essential", 0.9),
-    "PUBLIC_TRANSIT": ("essential", 0.9),
+    "MEDICAL": ("essential", 1.0),
     "EDUCATION": ("essential", 1.0),
     "CHILDCARE": ("essential", 1.0),
     "VETERINARY_SERVICES": ("essential", 0.9),
-
-    # Discretionary
-    "COFFEE_SHOPS": ("discretionary", 0.0),
-    "COFFEE": ("discretionary", 0.0),
-    "FAST_FOOD": ("discretionary", 0.1),
-    "ALCOHOL_AND_BARS": ("discretionary", 0.0),
-    "ENTERTAINMENT": ("discretionary", 0.0),
-    "GAMBLING": ("discretionary", 0.0),
-    "SPORTING_GOODS": ("discretionary", 0.0),
-    "ELECTRONICS": ("discretionary", 0.0),
-    "CLOTHING_AND_ACCESSORIES": ("discretionary", 0.1),
-    "CLOTHING": ("discretionary", 0.1),
-    "GYMS_AND_FITNESS_CENTERS": ("discretionary", 0.2),
-    "GYM_AND_FITNESS": ("discretionary", 0.2),
-    "SUBSCRIPTION": ("discretionary", 0.1),
-    "AIRLINES": ("discretionary", 0.0),
-    "LODGING": ("discretionary", 0.0),
-    "RIDESHARE": ("discretionary", 0.2),
-    "PARKING": ("discretionary", 0.2),
-
-    # Mixed
-    "RESTAURANTS": ("mixed", 0.5),
-    "FOOD_AND_DRINK_OTHER": ("mixed", 0.5),
-    "GENERAL_MERCHANDISE": ("mixed", 0.5),
-    "GENERAL_SERVICES": ("mixed", 0.5),
-    "HOME_IMPROVEMENT": ("mixed", 0.6),
-    "PERSONAL_CARE": ("mixed", 0.4),
-    "PETS": ("mixed", 0.6),
-    "TAXI": ("mixed", 0.3),
+    "LOAN_PAYMENTS": ("essential", 1.0),
 }
 
-# Fallback defaults by Plaid primary category
+# Fallback defaults by Plaid primary category — only unambiguous essentials
 PRIMARY_CATEGORY_DEFAULTS = {
-    "FOOD_AND_DRINK": ("mixed", 0.5),
     "RENT_AND_UTILITIES": ("essential", 1.0),
-    "TRANSPORTATION": ("mixed", 0.6),
     "TRANSFER_IN": ("essential", 1.0),
-    "TRANSFER_OUT": ("mixed", 0.5),
     "LOAN_PAYMENTS": ("essential", 1.0),
-    "BANK_FEES": ("essential", 1.0),
-    "ENTERTAINMENT": ("discretionary", 0.0),
-    "GENERAL_MERCHANDISE": ("mixed", 0.5),
-    "HOME_IMPROVEMENT": ("mixed", 0.6),
     "MEDICAL": ("essential", 1.0),
-    "PERSONAL_CARE": ("mixed", 0.4),
-    "GENERAL_SERVICES": ("mixed", 0.5),
-    "GOVERNMENT_AND_NON_PROFIT": ("essential", 0.8),
-    "TRAVEL": ("discretionary", 0.0),
-    "INCOME": ("essential", 1.0),
 }
 
 
@@ -87,11 +45,16 @@ def normalize_merchant_name(name: Optional[str]) -> str:
     return name.lower().strip()
 
 
-def classify_transaction(transaction, user_id: int, use_llm: bool = True) -> None:
+def classify_transaction(transaction, user_id: int, use_llm: bool = False) -> None:
     """
     Classify a single transaction in-place.
     Priority: user MerchantClassification → pre-seeded by detailed → pre-seeded by primary → LLM inference → unclassified.
+    Skips income transactions (amount <= 0).
     """
+    # Skip income / credits — only classify expenses
+    if transaction.amount is not None and transaction.amount <= 0:
+        return
+
     from db_models import MerchantClassification
 
     merchant = normalize_merchant_name(transaction.merchant_name)
