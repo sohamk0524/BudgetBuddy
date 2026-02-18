@@ -10,11 +10,13 @@ from dotenv import load_dotenv
 # Load environment variables from .env file
 load_dotenv()
 
-from db_models import db, User, FinancialProfile, BudgetPlan, SavedStatement, OTPCode, PlaidItem, PlaidAccount, Transaction, UserCategoryPreference
+from db_models import db, User, FinancialProfile, BudgetPlan, SavedStatement, OTPCode, PlaidItem, PlaidAccount, Transaction, UserCategoryPreference, MerchantClassification, DeviceToken
 from services.orchestrator import process_message
 from services.statement_analyzer import analyze_statement
 from services.plan_generator import generate_plan, save_plan_to_db
 from services import plaid_service
+from services.classification_service import classify_transaction, retroactively_reclassify, classify_new_transactions, normalize_merchant_name, llm_classify_merchants_batch
+from services.push_service import notify_new_transactions, notify_classification_needed
 
 app = Flask(__name__)
 
@@ -41,6 +43,23 @@ with app.app_context():
                 conn.execute("ALTER TABLE user ADD COLUMN name VARCHAR(100)")
                 conn.commit()
                 print("Migration: added 'name' column to user table")
+
+            # Migrate: add classification columns to transaction table
+            cursor = conn.execute("PRAGMA table_info('transaction')")
+            tx_columns = [row[1] for row in cursor.fetchall()]
+            if tx_columns and 'sub_category' not in tx_columns:
+                conn.execute("ALTER TABLE 'transaction' ADD COLUMN sub_category VARCHAR(20) DEFAULT 'unclassified'")
+                conn.commit()
+                print("Migration: added 'sub_category' column to transaction table")
+            if tx_columns and 'essential_amount' not in tx_columns:
+                conn.execute("ALTER TABLE 'transaction' ADD COLUMN essential_amount FLOAT")
+                conn.commit()
+                print("Migration: added 'essential_amount' column to transaction table")
+            if tx_columns and 'discretionary_amount' not in tx_columns:
+                conn.execute("ALTER TABLE 'transaction' ADD COLUMN discretionary_amount FLOAT")
+                conn.commit()
+                print("Migration: added 'discretionary_amount' column to transaction table")
+
             conn.close()
     except Exception as e:
         print(f"Migration warning (non-fatal): {e}")
@@ -888,6 +907,7 @@ def exchange_plaid_token():
                     payment_channel=txn_data["payment_channel"]
                 )
                 db.session.add(transaction)
+                classify_transaction(transaction, user_id)
                 transaction_count += 1
 
         db.session.commit()
@@ -1117,6 +1137,7 @@ def sync_plaid_transactions(user_id):
                                 payment_channel=txn_data["payment_channel"]
                             )
                             db.session.add(transaction)
+                            classify_transaction(transaction, user_id)
                             total_added += 1
 
                 # Process modified transactions
@@ -1487,6 +1508,642 @@ def get_nudges(user_id):
     nudges = generate_nudges(user_id)
 
     return jsonify({"nudges": nudges})
+
+
+# =============================================================================
+# Expense Classification Endpoints
+# =============================================================================
+
+@app.route("/expenses/<int:user_id>", methods=["GET"])
+def get_expenses(user_id):
+    """
+    Get expenses with sub-category classification data.
+    Auto-classifies any unclassified transactions on first access (lazy backfill).
+
+    Query params:
+        startDate, endDate, category, subCategory, limit, offset
+    """
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
+    start_date = request.args.get("startDate")
+    end_date = request.args.get("endDate")
+    category = request.args.get("category")
+    sub_category = request.args.get("subCategory")
+    limit = request.args.get("limit", 100, type=int)
+    offset = request.args.get("offset", 0, type=int)
+
+    # Get all account IDs for this user
+    plaid_items = PlaidItem.query.filter_by(user_id=user_id).all()
+    account_ids = []
+    for item in plaid_items:
+        for account in item.accounts:
+            account_ids.append(account.id)
+
+    if not account_ids:
+        return jsonify({
+            "transactions": [],
+            "summary": {"totalEssential": 0, "totalDiscretionary": 0, "totalMixed": 0, "totalUnclassified": 0},
+            "total": 0,
+            "hasMore": False
+        })
+
+    # Lazy backfill: auto-classify unclassified transactions
+    unclassified = Transaction.query.filter(
+        Transaction.plaid_account_id.in_(account_ids),
+        ((Transaction.sub_category == 'unclassified') | (Transaction.sub_category.is_(None)))
+    ).all()
+
+    if unclassified:
+        for txn in unclassified:
+            classify_transaction(txn, user_id)
+        db.session.commit()
+
+    # Build query with filters
+    query = Transaction.query.filter(
+        Transaction.plaid_account_id.in_(account_ids),
+        Transaction.amount > 0  # Only expenses (positive = money out)
+    )
+
+    if start_date:
+        try:
+            start = datetime.strptime(start_date, "%Y-%m-%d").date()
+            query = query.filter(Transaction.date >= start)
+        except ValueError:
+            pass
+
+    if end_date:
+        try:
+            end = datetime.strptime(end_date, "%Y-%m-%d").date()
+            query = query.filter(Transaction.date <= end)
+        except ValueError:
+            pass
+
+    if category:
+        query = query.filter(Transaction.category_primary == category)
+
+    if sub_category:
+        query = query.filter(Transaction.sub_category == sub_category)
+
+    # Compute summary from filtered query (before pagination)
+    all_filtered = query.all()
+    total_essential = sum(t.essential_amount or 0 for t in all_filtered if t.sub_category == 'essential')
+    total_discretionary = sum(t.discretionary_amount or 0 for t in all_filtered if t.sub_category == 'discretionary')
+    total_mixed = sum(t.amount for t in all_filtered if t.sub_category == 'mixed')
+    total_unclassified = sum(t.amount for t in all_filtered if t.sub_category == 'unclassified' or t.sub_category is None)
+
+    total = len(all_filtered)
+
+    # Apply pagination and ordering
+    transactions = query.order_by(Transaction.date.desc()).offset(offset).limit(limit).all()
+
+    result = []
+    for txn in transactions:
+        result.append({
+            "id": txn.id,
+            "transactionId": txn.transaction_id,
+            "accountId": txn.plaid_account.account_id,
+            "amount": txn.amount,
+            "date": txn.date.isoformat() if txn.date else None,
+            "authorizedDate": txn.authorized_date.isoformat() if txn.authorized_date else None,
+            "name": txn.name,
+            "merchantName": txn.merchant_name,
+            "categoryPrimary": txn.category_primary,
+            "categoryDetailed": txn.category_detailed,
+            "pending": txn.pending,
+            "paymentChannel": txn.payment_channel,
+            "subCategory": txn.sub_category or "unclassified",
+            "essentialAmount": txn.essential_amount,
+            "discretionaryAmount": txn.discretionary_amount
+        })
+
+    return jsonify({
+        "transactions": result,
+        "summary": {
+            "totalEssential": round(total_essential, 2),
+            "totalDiscretionary": round(total_discretionary, 2),
+            "totalMixed": round(total_mixed, 2),
+            "totalUnclassified": round(total_unclassified, 2)
+        },
+        "total": total,
+        "hasMore": offset + limit < total
+    })
+
+
+@app.route("/merchant/classify", methods=["POST"])
+def classify_merchant():
+    """
+    User classifies a merchant. Creates/updates MerchantClassification
+    and retroactively reclassifies all past transactions for that merchant.
+    """
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "Request body must be JSON"}), 400
+
+    user_id = data.get("userId")
+    merchant_name = data.get("merchantName")
+    classification = data.get("classification")
+    essential_ratio = data.get("essentialRatio")
+
+    if not user_id or not merchant_name or not classification:
+        return jsonify({"error": "userId, merchantName, and classification are required"}), 400
+
+    if classification not in ('essential', 'discretionary', 'mixed'):
+        return jsonify({"error": "classification must be essential, discretionary, or mixed"}), 400
+
+    # Default essential_ratio based on classification
+    if essential_ratio is None:
+        if classification == 'essential':
+            essential_ratio = 1.0
+        elif classification == 'discretionary':
+            essential_ratio = 0.0
+        else:
+            essential_ratio = 0.5
+
+    normalized = normalize_merchant_name(merchant_name)
+
+    # Create or update MerchantClassification
+    mc = MerchantClassification.query.filter_by(
+        user_id=user_id,
+        merchant_name=normalized
+    ).first()
+
+    if mc:
+        mc.classification = classification
+        mc.essential_ratio = essential_ratio
+        mc.confidence = 'user_set'
+        mc.classification_count += 1
+    else:
+        mc = MerchantClassification(
+            user_id=user_id,
+            merchant_name=normalized,
+            classification=classification,
+            essential_ratio=essential_ratio,
+            confidence='user_set',
+            classification_count=1
+        )
+        db.session.add(mc)
+
+    # Retroactively reclassify
+    count = retroactively_reclassify(user_id, merchant_name, classification, essential_ratio)
+    db.session.commit()
+
+    return jsonify({
+        "success": True,
+        "reclassifiedCount": count
+    })
+
+
+@app.route("/transaction/<int:transaction_id>/classify", methods=["PUT"])
+def classify_single_transaction(transaction_id):
+    """
+    User adjusts classification of a single transaction.
+    Also updates the merchant's running average.
+    """
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "Request body must be JSON"}), 400
+
+    sub_category = data.get("subCategory")
+    essential_ratio = data.get("essentialRatio")
+
+    if not sub_category or sub_category not in ('essential', 'discretionary', 'mixed'):
+        return jsonify({"error": "subCategory must be essential, discretionary, or mixed"}), 400
+
+    if essential_ratio is None:
+        if sub_category == 'essential':
+            essential_ratio = 1.0
+        elif sub_category == 'discretionary':
+            essential_ratio = 0.0
+        else:
+            essential_ratio = 0.5
+
+    transaction = Transaction.query.get(transaction_id)
+    if not transaction:
+        return jsonify({"error": "Transaction not found"}), 404
+
+    # Apply classification to transaction
+    amount = abs(transaction.amount) if transaction.amount else 0.0
+    transaction.sub_category = sub_category
+    transaction.essential_amount = round(amount * essential_ratio, 2)
+    transaction.discretionary_amount = round(amount * (1.0 - essential_ratio), 2)
+
+    # Update merchant running average
+    updated_merchant_ratio = essential_ratio
+    merchant = normalize_merchant_name(transaction.merchant_name)
+    if merchant:
+        # Get user_id from the transaction's account chain
+        account = transaction.plaid_account
+        if account:
+            plaid_item = account.plaid_item
+            if plaid_item:
+                user_id = plaid_item.user_id
+
+                mc = MerchantClassification.query.filter_by(
+                    user_id=user_id,
+                    merchant_name=merchant
+                ).first()
+
+                if mc:
+                    # Running average: new_avg = ((old_avg * count) + new_ratio) / (count + 1)
+                    new_count = mc.classification_count + 1
+                    mc.essential_ratio = round(((mc.essential_ratio * mc.classification_count) + essential_ratio) / new_count, 4)
+                    mc.classification_count = new_count
+                    mc.classification = sub_category
+                    updated_merchant_ratio = mc.essential_ratio
+                else:
+                    mc = MerchantClassification(
+                        user_id=user_id,
+                        merchant_name=merchant,
+                        classification=sub_category,
+                        essential_ratio=essential_ratio,
+                        confidence='user_set',
+                        classification_count=1
+                    )
+                    db.session.add(mc)
+
+    db.session.commit()
+
+    return jsonify({
+        "success": True,
+        "transaction": {
+            "id": transaction.id,
+            "subCategory": transaction.sub_category,
+            "essentialAmount": transaction.essential_amount,
+            "discretionaryAmount": transaction.discretionary_amount
+        },
+        "updatedMerchantRatio": updated_merchant_ratio
+    })
+
+
+@app.route("/merchant/classifications/<int:user_id>", methods=["GET"])
+def get_merchant_classifications(user_id):
+    """Get all merchant classifications for a user."""
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
+    classifications = MerchantClassification.query.filter_by(user_id=user_id).all()
+
+    return jsonify({
+        "classifications": [
+            {
+                "merchantName": mc.merchant_name,
+                "classification": mc.classification,
+                "essentialRatio": mc.essential_ratio,
+                "confidence": mc.confidence,
+                "classificationCount": mc.classification_count
+            }
+            for mc in classifications
+        ]
+    })
+
+
+@app.route("/expenses/unclassified/<int:user_id>", methods=["GET"])
+def get_unclassified_merchants(user_id):
+    """Get distinct unclassified merchants sorted by total spend."""
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
+    plaid_items = PlaidItem.query.filter_by(user_id=user_id).all()
+    account_ids = []
+    for item in plaid_items:
+        for account in item.accounts:
+            account_ids.append(account.id)
+
+    if not account_ids:
+        return jsonify({"merchants": []})
+
+    # Get unclassified transactions grouped by merchant
+    unclassified = Transaction.query.filter(
+        Transaction.plaid_account_id.in_(account_ids),
+        ((Transaction.sub_category == 'unclassified') | (Transaction.sub_category.is_(None))),
+        Transaction.merchant_name.isnot(None),
+        Transaction.amount > 0
+    ).all()
+
+    # Group by merchant
+    merchant_data = {}
+    for txn in unclassified:
+        name = normalize_merchant_name(txn.merchant_name)
+        if not name:
+            continue
+        if name not in merchant_data:
+            merchant_data[name] = {"totalSpent": 0, "transactionCount": 0, "displayName": txn.merchant_name}
+        merchant_data[name]["totalSpent"] += txn.amount
+        merchant_data[name]["transactionCount"] += 1
+
+    # Sort by total spend descending
+    sorted_merchants = sorted(merchant_data.items(), key=lambda x: x[1]["totalSpent"], reverse=True)
+
+    return jsonify({
+        "merchants": [
+            {
+                "merchantName": data["displayName"],
+                "totalSpent": round(data["totalSpent"], 2),
+                "transactionCount": data["transactionCount"]
+            }
+            for _, data in sorted_merchants
+        ]
+    })
+
+
+@app.route("/expenses/auto-classify/<int:user_id>", methods=["POST"])
+def auto_classify_with_llm(user_id):
+    """
+    Trigger LLM-based batch classification for unclassified merchants.
+    Classifies up to 20 merchants at once using AI inference.
+    """
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
+    plaid_items = PlaidItem.query.filter_by(user_id=user_id).all()
+    account_ids = []
+    for item in plaid_items:
+        for account in item.accounts:
+            account_ids.append(account.id)
+
+    if not account_ids:
+        return jsonify({"classified": 0, "merchants": []})
+
+    # Get unclassified transactions grouped by merchant
+    unclassified = Transaction.query.filter(
+        Transaction.plaid_account_id.in_(account_ids),
+        ((Transaction.sub_category == 'unclassified') | (Transaction.sub_category.is_(None))),
+        Transaction.merchant_name.isnot(None),
+        Transaction.amount > 0
+    ).all()
+
+    merchant_info = {}
+    for txn in unclassified:
+        name = normalize_merchant_name(txn.merchant_name)
+        if not name or name in merchant_info:
+            continue
+        merchant_info[name] = {
+            "name": txn.merchant_name,
+            "category_primary": txn.category_primary,
+            "category_detailed": txn.category_detailed
+        }
+
+    if not merchant_info:
+        return jsonify({"classified": 0, "merchants": []})
+
+    # Batch classify via LLM
+    merchants_to_classify = list(merchant_info.values())[:20]
+    results = llm_classify_merchants_batch(merchants_to_classify, user_id)
+
+    classified_count = 0
+    classified_merchants = []
+
+    for result in results:
+        merchant_name = result.get("name", "")
+        classification = result["classification"]
+        essential_ratio = result["essential_ratio"]
+        normalized = normalize_merchant_name(merchant_name)
+
+        if not normalized:
+            continue
+
+        # Store the classification
+        existing = MerchantClassification.query.filter_by(
+            user_id=user_id, merchant_name=normalized
+        ).first()
+
+        if not existing:
+            mc = MerchantClassification(
+                user_id=user_id,
+                merchant_name=normalized,
+                classification=classification,
+                essential_ratio=essential_ratio,
+                confidence='inferred',
+                classification_count=1
+            )
+            db.session.add(mc)
+
+        # Retroactively classify transactions
+        count = retroactively_reclassify(user_id, merchant_name, classification, essential_ratio)
+        classified_count += count
+        classified_merchants.append({
+            "merchantName": merchant_name,
+            "classification": classification,
+            "essentialRatio": essential_ratio,
+            "transactionsUpdated": count
+        })
+
+    db.session.commit()
+
+    return jsonify({
+        "classified": classified_count,
+        "merchants": classified_merchants
+    })
+
+
+# =============================================================================
+# Push Notifications & Webhooks
+# =============================================================================
+
+@app.route("/device/register", methods=["POST"])
+def register_device_token():
+    """
+    Register a device token for push notifications.
+
+    Expected body:
+    {
+        "userId": 1,
+        "token": "abc123...",
+        "platform": "ios"
+    }
+    """
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "Request body must be JSON"}), 400
+
+    user_id = data.get("userId")
+    token = data.get("token", "").strip()
+    platform = data.get("platform", "ios")
+
+    if not user_id or not token:
+        return jsonify({"error": "userId and token are required"}), 400
+
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
+    # Upsert device token
+    existing = DeviceToken.query.filter_by(user_id=user_id, token=token).first()
+    if existing:
+        existing.is_active = True
+        existing.platform = platform
+    else:
+        device = DeviceToken(
+            user_id=user_id,
+            token=token,
+            platform=platform,
+            is_active=True
+        )
+        db.session.add(device)
+
+    db.session.commit()
+    return jsonify({"success": True})
+
+
+@app.route("/device/unregister", methods=["POST"])
+def unregister_device_token():
+    """Unregister a device token (e.g., on logout)."""
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "Request body must be JSON"}), 400
+
+    user_id = data.get("userId")
+    token = data.get("token", "").strip()
+
+    if not user_id or not token:
+        return jsonify({"error": "userId and token are required"}), 400
+
+    existing = DeviceToken.query.filter_by(user_id=user_id, token=token).first()
+    if existing:
+        existing.is_active = False
+        db.session.commit()
+
+    return jsonify({"success": True})
+
+
+@app.route("/plaid/webhook", methods=["POST"])
+def plaid_webhook():
+    """
+    Handle Plaid webhook events.
+    Plaid sends webhooks for transaction updates, item errors, etc.
+
+    Key webhook types:
+    - TRANSACTIONS: DEFAULT_UPDATE, SYNC_UPDATES_AVAILABLE
+    - ITEM: ERROR, PENDING_EXPIRATION
+    """
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "Invalid request"}), 400
+
+    webhook_type = data.get("webhook_type")
+    webhook_code = data.get("webhook_code")
+    item_id = data.get("item_id")
+
+    print(f"[WEBHOOK] type={webhook_type}, code={webhook_code}, item_id={item_id}")
+
+    if webhook_type == "TRANSACTIONS":
+        if webhook_code in ("DEFAULT_UPDATE", "SYNC_UPDATES_AVAILABLE"):
+            # Find the PlaidItem by item_id
+            plaid_item = PlaidItem.query.filter_by(item_id=item_id).first()
+            if not plaid_item:
+                print(f"[WEBHOOK] Unknown item_id: {item_id}")
+                return jsonify({"received": True}), 200
+
+            user_id = plaid_item.user_id
+
+            try:
+                # Sync new transactions
+                account_map = {acc.account_id: acc for acc in plaid_item.accounts}
+                has_more = True
+                cursor = plaid_item.transactions_cursor
+                new_transactions = []
+
+                while has_more:
+                    result = plaid_service.sync_transactions(
+                        plaid_item.access_token_encrypted,
+                        cursor
+                    )
+
+                    for txn_data in result["added"]:
+                        account = account_map.get(txn_data["account_id"])
+                        if account:
+                            existing = Transaction.query.filter_by(
+                                transaction_id=txn_data["transaction_id"]
+                            ).first()
+                            if not existing:
+                                transaction = Transaction(
+                                    plaid_account_id=account.id,
+                                    transaction_id=txn_data["transaction_id"],
+                                    amount=txn_data["amount"],
+                                    date=datetime.strptime(txn_data["date"], "%Y-%m-%d").date() if txn_data["date"] else None,
+                                    authorized_date=datetime.strptime(txn_data["authorized_date"], "%Y-%m-%d").date() if txn_data["authorized_date"] else None,
+                                    name=txn_data["name"],
+                                    merchant_name=txn_data["merchant_name"],
+                                    category_primary=txn_data["category"],
+                                    category_detailed=txn_data["category_detailed"],
+                                    category_confidence=txn_data["category_confidence"],
+                                    pending=txn_data["pending"],
+                                    payment_channel=txn_data["payment_channel"]
+                                )
+                                db.session.add(transaction)
+                                classify_transaction(transaction, user_id)
+                                new_transactions.append(transaction)
+
+                    # Handle modified transactions
+                    for txn_data in result["modified"]:
+                        existing = Transaction.query.filter_by(
+                            transaction_id=txn_data["transaction_id"]
+                        ).first()
+                        if existing:
+                            existing.amount = txn_data["amount"]
+                            existing.date = datetime.strptime(txn_data["date"], "%Y-%m-%d").date() if txn_data["date"] else None
+                            existing.name = txn_data["name"]
+                            existing.merchant_name = txn_data["merchant_name"]
+                            existing.category_primary = txn_data["category"]
+                            existing.category_detailed = txn_data["category_detailed"]
+                            existing.pending = txn_data["pending"]
+                            classify_transaction(existing, user_id)
+
+                    # Handle removed transactions
+                    for removed in result["removed"]:
+                        existing = Transaction.query.filter_by(
+                            transaction_id=removed["transaction_id"]
+                        ).first()
+                        if existing:
+                            db.session.delete(existing)
+
+                    cursor = result["next_cursor"]
+                    has_more = result["has_more"]
+
+                plaid_item.transactions_cursor = cursor
+                db.session.commit()
+
+                # Send push notification for new transactions
+                if new_transactions:
+                    notify_new_transactions(user_id, new_transactions)
+
+                    # Check if any are unclassified and prompt
+                    for txn in new_transactions:
+                        if txn.sub_category == 'unclassified' and txn.merchant_name:
+                            notify_classification_needed(user_id, txn.merchant_name, abs(txn.amount))
+                            break  # Only one prompt at a time
+
+                print(f"[WEBHOOK] Synced {len(new_transactions)} new transactions for user {user_id}")
+
+            except Exception as e:
+                print(f"[WEBHOOK] Error processing transactions: {e}")
+                db.session.rollback()
+
+        elif webhook_code == "INITIAL_UPDATE":
+            print(f"[WEBHOOK] Initial historical update for item {item_id}")
+
+    elif webhook_type == "ITEM":
+        if webhook_code == "ERROR":
+            error = data.get("error", {})
+            print(f"[WEBHOOK] Item error for {item_id}: {error}")
+            plaid_item = PlaidItem.query.filter_by(item_id=item_id).first()
+            if plaid_item:
+                plaid_item.status = "error"
+                db.session.commit()
+
+        elif webhook_code == "PENDING_EXPIRATION":
+            print(f"[WEBHOOK] Item pending expiration: {item_id}")
+            plaid_item = PlaidItem.query.filter_by(item_id=item_id).first()
+            if plaid_item:
+                plaid_item.status = "pending_expiration"
+                db.session.commit()
+
+    return jsonify({"received": True}), 200
 
 
 if __name__ == "__main__":

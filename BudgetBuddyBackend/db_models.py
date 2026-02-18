@@ -188,6 +188,57 @@ class Transaction(db.Model):
     pending = db.Column(db.Boolean, default=False)
     payment_channel = db.Column(db.String(50), nullable=True)  # online, in store, other
 
+    # Smart classification
+    sub_category = db.Column(db.String(20), default='unclassified')  # essential/discretionary/mixed/unclassified
+    essential_amount = db.Column(db.Float, nullable=True)
+    discretionary_amount = db.Column(db.Float, nullable=True)
+
     # Timestamps
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class MerchantClassification(db.Model):
+    """
+    Stores per-user merchant classification preferences.
+    Tracks whether a merchant is essential, discretionary, or mixed spending.
+    """
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    merchant_name = db.Column(db.String(200), nullable=False)  # normalized lowercase
+    plaid_category_detailed = db.Column(db.String(100), nullable=True)
+
+    classification = db.Column(db.String(20), nullable=False)  # essential/discretionary/mixed
+    essential_ratio = db.Column(db.Float, default=0.5)  # 0.0 = fully discretionary, 1.0 = fully essential
+    classification_count = db.Column(db.Integer, default=1)  # for running average
+    confidence = db.Column(db.String(20), default='pre_seeded')  # pre_seeded/inferred/user_set
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        db.UniqueConstraint('user_id', 'merchant_name', name='uq_user_merchant'),
+    )
+
+    user = db.relationship('User', backref='merchant_classifications')
+
+
+class DeviceToken(db.Model):
+    """
+    Stores APNs device tokens for push notifications.
+    Each user can have multiple devices.
+    """
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    token = db.Column(db.String(200), nullable=False)
+    platform = db.Column(db.String(10), default='ios')  # ios/android
+    is_active = db.Column(db.Boolean, default=True)
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        db.UniqueConstraint('user_id', 'token', name='uq_user_device_token'),
+    )
+
+    user = db.relationship('User', backref='device_tokens')
