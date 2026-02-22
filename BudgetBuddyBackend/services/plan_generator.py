@@ -74,27 +74,29 @@ Be encouraging but honest. Adapt recommendations to their financial personality.
 def get_full_user_profile(user_id: int) -> Optional[Dict[str, Any]]:
     """Fetch user's complete financial profile from database."""
     try:
-        from db_models import User
-        user = User.query.get(user_id)
-        if user and user.profile:
-            profile = user.profile
-            debt_types = []
-            if profile.debt_types:
-                try:
-                    debt_types = json.loads(profile.debt_types)
-                except:
-                    debt_types = []
+        from db_models import get_user, get_profile
+        user = get_user(user_id)
+        if user:
+            profile = get_profile(user_id)
+            if profile:
+                debt_types = []
+                raw_debt = profile.get('debt_types')
+                if raw_debt:
+                    try:
+                        debt_types = json.loads(raw_debt)
+                    except Exception:
+                        debt_types = []
 
-            return {
-                "is_student": profile.is_student or False,
-                "budgeting_goal": profile.budgeting_goal or "stability",
-                "strictness_level": profile.strictness_level or "moderate",
-                "fixed_expenses": profile.fixed_expenses or 0,
-                "savings_goal_name": profile.savings_goal_name or "",
-                "savings_goal_target": profile.savings_goal_target or 0,
-                "housing_situation": profile.housing_situation or "rent",
-                "debt_types": debt_types
-            }
+                return {
+                    "is_student": profile.get('is_student') or False,
+                    "budgeting_goal": profile.get('budgeting_goal') or "stability",
+                    "strictness_level": profile.get('strictness_level') or "moderate",
+                    "fixed_expenses": profile.get('fixed_expenses') or 0,
+                    "savings_goal_name": profile.get('savings_goal_name') or "",
+                    "savings_goal_target": profile.get('savings_goal_target') or 0,
+                    "housing_situation": profile.get('housing_situation') or "rent",
+                    "debt_types": debt_types,
+                }
     except Exception as e:
         print(f"Error fetching user profile: {e}")
     return None
@@ -450,16 +452,9 @@ def generate_fallback_plan(profile: Dict[str, Any], deep_dive_data: Dict[str, An
 def save_plan_to_db(user_id: int, plan: Dict[str, Any]) -> bool:
     """Save the generated plan to the database."""
     try:
-        from db_models import db, BudgetPlan
+        from db_models import create_plan
         from datetime import datetime
-
-        plan_record = BudgetPlan(
-            user_id=user_id,
-            plan_json=json.dumps(plan),
-            month_year=datetime.now().strftime("%Y-%m")
-        )
-        db.session.add(plan_record)
-        db.session.commit()
+        create_plan(user_id, json.dumps(plan), datetime.now().strftime("%Y-%m"))
         return True
     except Exception as e:
         print(f"Error saving plan to database: {e}")

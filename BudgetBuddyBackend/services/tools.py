@@ -138,81 +138,69 @@ def _get_plaid_transactions(user_id: Optional[int], days: int = 30) -> Dict[str,
         return {"error": "No user ID provided", "has_plaid": False}
 
     try:
-        from db_models import PlaidItem, PlaidAccount, Transaction
+        from db_models import get_active_plaid_items, get_accounts_for_item, get_transactions_since
         from datetime import datetime, timedelta
 
-        # Check if user has linked accounts
-        plaid_items = PlaidItem.query.filter_by(user_id=user_id, status="active").all()
-
+        plaid_items = get_active_plaid_items(user_id)
         if not plaid_items:
             return {
                 "has_plaid": False,
                 "message": "No bank accounts linked. The user should connect their bank via Plaid for transaction data."
             }
 
-        # Get all account IDs
         account_ids = []
         accounts_info = []
         for item in plaid_items:
-            for account in item.accounts:
-                account_ids.append(account.id)
+            for account in get_accounts_for_item(item.key.id):
+                account_ids.append(account.key.id)
                 accounts_info.append({
-                    "name": account.name,
-                    "type": account.account_type,
-                    "balance": account.balance_current
+                    "name": account.get('name'),
+                    "type": account.get('account_type'),
+                    "balance": account.get('balance_current'),
                 })
 
         if not account_ids:
             return {
                 "has_plaid": True,
                 "has_transactions": False,
-                "message": "Bank accounts linked but no account data available."
+                "message": "Bank accounts linked but no account data available.",
             }
 
-        # Get transactions from the last N days
-        start_date = (datetime.now() - timedelta(days=days)).date()
-        transactions = Transaction.query.filter(
-            Transaction.plaid_account_id.in_(account_ids),
-            Transaction.date >= start_date
-        ).order_by(Transaction.date.desc()).limit(100).all()
+        since_date = (datetime.now() - timedelta(days=days)).date()
+        transactions = get_transactions_since(account_ids, since_date)
+        # Sort and cap at 100
+        transactions.sort(key=lambda t: t.get('date', ''), reverse=True)
+        transactions = transactions[:100]
 
         if not transactions:
             return {
                 "has_plaid": True,
                 "has_transactions": False,
                 "accounts": accounts_info,
-                "message": f"No transactions found in the last {days} days."
+                "message": f"No transactions found in the last {days} days.",
             }
 
-        # Aggregate by category
         category_totals = {}
         transaction_list = []
 
         for txn in transactions:
-            category = txn.category_primary or "Uncategorized"
-
-            # Sum up spending by category (positive amounts are spending)
-            if txn.amount > 0:
-                category_totals[category] = category_totals.get(category, 0) + txn.amount
+            category = txn.get('category_primary') or "Uncategorized"
+            amount = txn.get('amount') or 0
+            if amount > 0:
+                category_totals[category] = category_totals.get(category, 0) + amount
 
             transaction_list.append({
-                "date": txn.date.isoformat() if txn.date else None,
-                "name": txn.name,
-                "merchant": txn.merchant_name,
-                "amount": txn.amount,
+                "date": txn.get('date'),
+                "name": txn.get('name'),
+                "merchant": txn.get('merchant_name'),
+                "amount": amount,
                 "category": category,
-                "pending": txn.pending
+                "pending": txn.get('pending'),
             })
 
-        # Sort categories by total
-        sorted_categories = sorted(
-            category_totals.items(),
-            key=lambda x: x[1],
-            reverse=True
-        )
-
+        sorted_categories = sorted(category_totals.items(), key=lambda x: x[1], reverse=True)
         total_spending = sum(category_totals.values())
-        total_income = sum(-txn.amount for txn in transactions if txn.amount < 0)
+        total_income = sum(-(txn.get('amount') or 0) for txn in transactions if (txn.get('amount') or 0) < 0)
 
         return {
             "has_plaid": True,
@@ -227,7 +215,7 @@ def _get_plaid_transactions(user_id: Optional[int], days: int = 30) -> Dict[str,
             ],
             "recent_transactions": transaction_list[:20],
             "transaction_count": len(transactions),
-            "summary": f"Found {len(transactions)} transactions in the last {days} days. Total spending: ${total_spending:.2f}, Total income: ${total_income:.2f}"
+            "summary": f"Found {len(transactions)} transactions in the last {days} days. Total spending: ${total_spending:.2f}, Total income: ${total_income:.2f}",
         }
 
     except Exception as e:
@@ -243,39 +231,35 @@ def _get_user_budget_plan(user_id: Optional[int]) -> Dict[str, Any]:
         return {"error": "No user ID provided", "has_plan": False}
 
     try:
-        from db_models import BudgetPlan, User
+        from db_models import get_user, get_latest_plan
 
-        user = User.query.get(user_id)
+        user = get_user(user_id)
         if not user:
             return {"error": "User not found", "has_plan": False}
 
-        plan_record = BudgetPlan.query.filter_by(user_id=user_id).order_by(
-            BudgetPlan.created_at.desc()
-        ).first()
-
+        plan_record = get_latest_plan(user_id)
         if not plan_record:
             return {
                 "has_plan": False,
-                "message": "No budget plan found. The user should create a plan first."
+                "message": "No budget plan found. The user should create a plan first.",
             }
 
-        plan_data = json.loads(plan_record.plan_json)
-
-        # Extract key information for the AI to use
+        plan_data = json.loads(plan_record['plan_json'])
         categories = plan_data.get("categories", [])
         recommendations = plan_data.get("recommendations", [])
         warnings = plan_data.get("warnings", [])
         safe_to_spend = plan_data.get("safeToSpend", 0)
+        created_at = plan_record.get('created_at')
 
         return {
             "has_plan": True,
-            "created_at": plan_record.created_at.isoformat() if plan_record.created_at else None,
-            "month_year": plan_record.month_year,
+            "created_at": created_at.isoformat() if created_at else None,
+            "month_year": plan_record.get('month_year'),
             "safe_to_spend": safe_to_spend,
             "categories": categories,
             "recommendations": recommendations,
             "warnings": warnings,
-            "summary": f"User has a budget plan with {len(categories)} categories and ${safe_to_spend:.2f} safe to spend."
+            "summary": f"User has a budget plan with {len(categories)} categories and ${safe_to_spend:.2f} safe to spend.",
         }
 
     except Exception as e:
@@ -291,44 +275,44 @@ def _get_user_spending_analysis(user_id: Optional[int]) -> Dict[str, Any]:
         return {"error": "No user ID provided", "has_statement": False}
 
     try:
-        from db_models import SavedStatement, User
+        from db_models import get_user, get_statement
 
-        user = User.query.get(user_id)
+        user = get_user(user_id)
         if not user:
             return {"error": "User not found", "has_statement": False}
 
-        statement = SavedStatement.query.filter_by(user_id=user_id).first()
-
+        statement = get_statement(user_id)
         if not statement:
             return {
                 "has_statement": False,
-                "message": "No bank statement uploaded. The user should upload a statement for spending analysis."
+                "message": "No bank statement uploaded. The user should upload a statement for spending analysis.",
             }
 
-        # Parse the LLM analysis
         analysis = {}
-        if statement.llm_analysis:
+        if statement.get('llm_analysis'):
             try:
-                analysis = json.loads(statement.llm_analysis)
+                analysis = json.loads(statement['llm_analysis'])
             except json.JSONDecodeError:
                 pass
 
-        # Get spending breakdown by category
         top_categories = analysis.get("top_categories", [])
         transactions = analysis.get("transactions", [])
+        total_income = statement.get('total_income') or 0
+        total_expenses = statement.get('total_expenses') or 0
+        ending_balance = statement.get('ending_balance') or 0
 
         return {
             "has_statement": True,
-            "total_income": statement.total_income,
-            "total_expenses": statement.total_expenses,
-            "ending_balance": statement.ending_balance,
+            "total_income": total_income,
+            "total_expenses": total_expenses,
+            "ending_balance": ending_balance,
             "statement_period": {
-                "start": statement.statement_start_date.isoformat() if statement.statement_start_date else None,
-                "end": statement.statement_end_date.isoformat() if statement.statement_end_date else None
+                "start": statement.get('statement_start_date'),
+                "end": statement.get('statement_end_date'),
             },
             "spending_by_category": top_categories,
             "transaction_count": len(transactions),
-            "summary": f"From statement: ${statement.total_income:.2f} income, ${statement.total_expenses:.2f} expenses, ${statement.ending_balance:.2f} ending balance."
+            "summary": f"From statement: ${total_income:.2f} income, ${total_expenses:.2f} expenses, ${ending_balance:.2f} ending balance.",
         }
 
     except Exception as e:
@@ -344,35 +328,34 @@ def _get_user_financial_summary(user_id: Optional[int]) -> Dict[str, Any]:
         return {"error": "No user ID provided"}
 
     try:
-        from db_models import User, SavedStatement
+        from db_models import get_user, get_profile, get_statement
 
-        user = User.query.get(user_id)
+        user = get_user(user_id)
         if not user:
             return {"error": "User not found"}
 
-        result = {
+        result: Dict[str, Any] = {
             "has_profile": False,
             "has_statement": False,
             "net_worth": 0,
-            "safe_to_spend": 0
+            "safe_to_spend": 0,
         }
 
-        # Get profile data
-        if user.profile:
+        profile = get_profile(user_id)
+        if profile:
             result["has_profile"] = True
-            result["is_student"] = user.profile.is_student
-            result["budgeting_goal"] = user.profile.budgeting_goal
-            result["strictness_level"] = user.profile.strictness_level
+            result["is_student"] = profile.get('is_student')
+            result["budgeting_goal"] = profile.get('budgeting_goal')
+            result["strictness_level"] = profile.get('strictness_level')
 
-        # Get statement data
-        statement = SavedStatement.query.filter_by(user_id=user_id).first()
+        statement = get_statement(user_id)
         if statement:
+            ending_balance = statement.get('ending_balance') or 0
             result["has_statement"] = True
-            result["net_worth"] = statement.ending_balance
-            result["total_income"] = statement.total_income
-            result["total_expenses"] = statement.total_expenses
-            # Safe to spend calculation (8% of net worth as per app.py)
-            result["safe_to_spend"] = max(0, statement.ending_balance * 0.08)
+            result["net_worth"] = ending_balance
+            result["total_income"] = statement.get('total_income') or 0
+            result["total_expenses"] = statement.get('total_expenses') or 0
+            result["safe_to_spend"] = max(0, ending_balance * 0.08)
 
         result["summary"] = f"Net worth: ${result['net_worth']:.2f}, Safe to spend: ${result['safe_to_spend']:.2f}"
         return result
@@ -416,36 +399,33 @@ def _get_user_spending_status(user_id: Optional[int]) -> Dict[str, Any]:
         return {"has_status": False, "message": "No user ID provided."}
 
     try:
-        from db_models import SavedStatement, BudgetPlan
-        import json
+        from db_models import get_statement, get_latest_plan
 
-        statement = SavedStatement.query.filter_by(user_id=user_id).first()
-        plan_record = BudgetPlan.query.filter_by(user_id=user_id).order_by(
-            BudgetPlan.created_at.desc()
-        ).first()
+        statement = get_statement(user_id)
+        plan_record = get_latest_plan(user_id)
 
         if not plan_record and not statement:
             return {
                 "has_status": False,
-                "message": "No budget plan or bank statement found. The user needs to create a plan and upload a statement first."
+                "message": "No budget plan or bank statement found. The user needs to create a plan and upload a statement first.",
             }
         if not plan_record:
             return {
                 "has_status": False,
-                "message": "No budget plan found. The user should create a plan first to track spending status."
+                "message": "No budget plan found. The user should create a plan first to track spending status.",
             }
         if not statement:
             return {
                 "has_status": False,
-                "message": "No bank statement found. The user should upload a statement to track spending status."
+                "message": "No bank statement found. The user should upload a statement to track spending status.",
             }
 
-        plan_data = json.loads(plan_record.plan_json)
+        plan_data = json.loads(plan_record['plan_json'])
         total_budget = sum(
             cat.get("amount", 0)
             for cat in plan_data.get("categories", [])
         )
-        total_spent = statement.total_expenses
+        total_spent = statement.get('total_expenses') or 0
 
         # Calculate status
         if total_budget > 0:
@@ -486,39 +466,44 @@ def _get_user_savings_progress(user_id: Optional[int]) -> Dict[str, Any]:
         return {"has_savings_data": False, "message": "No user ID provided."}
 
     try:
-        from db_models import User
+        from db_models import get_user, get_profile, get_statement
 
-        user = User.query.get(user_id)
-        if not user or not user.profile:
+        user = get_user(user_id)
+        if not user:
             return {
                 "has_savings_data": False,
-                "message": "No financial profile found. The user should complete onboarding first."
+                "message": "No financial profile found. The user should complete onboarding first.",
             }
 
-        profile = user.profile
-        if not profile.savings_goal_name or not profile.savings_goal_target:
+        profile = get_profile(user_id)
+        if not profile:
             return {
                 "has_savings_data": False,
-                "message": "No savings goals set up. The user should set a savings goal in their profile."
+                "message": "No financial profile found. The user should complete onboarding first.",
             }
 
-        from db_models import SavedStatement
-        statement = SavedStatement.query.filter_by(user_id=user_id).first()
+        goal_name = profile.get('savings_goal_name')
+        goal_target = profile.get('savings_goal_target') or 0
+        if not goal_name or not goal_target:
+            return {
+                "has_savings_data": False,
+                "message": "No savings goals set up. The user should set a savings goal in their profile.",
+            }
 
-        current_savings = statement.ending_balance if statement else 0
-        target = profile.savings_goal_target
+        statement = get_statement(user_id)
+        current_savings = (statement.get('ending_balance') or 0) if statement else 0
 
         return {
             "has_savings_data": True,
             "source": "user_data",
             "goals": [{
-                "name": profile.savings_goal_name,
-                "target": target,
+                "name": goal_name,
+                "target": goal_target,
                 "current": current_savings,
-                "progress_percent": round((current_savings / target) * 100, 1) if target > 0 else 0
+                "progress_percent": round((current_savings / goal_target) * 100, 1) if goal_target > 0 else 0,
             }],
-            "budgeting_goal": profile.budgeting_goal,
-            "summary": f"Saving for {profile.savings_goal_name}: ${current_savings:.2f} of ${target:.2f} target"
+            "budgeting_goal": profile.get('budgeting_goal'),
+            "summary": f"Saving for {goal_name}: ${current_savings:.2f} of ${goal_target:.2f} target",
         }
     except Exception as e:
         return {"has_savings_data": False, "message": f"Error fetching savings progress: {str(e)}"}

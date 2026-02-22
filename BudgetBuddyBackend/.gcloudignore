@@ -1,0 +1,12 @@
+.gcloudignore
+.git
+.gitignore
+*.pyc
+__pycache__/
+venv/
+.venv
+.env
+instance/
+tests/
+pytest.ini
+*.sh

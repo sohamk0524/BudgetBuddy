@@ -16,16 +16,19 @@ def get_user_profile(user_id):
     Returns None if user or profile doesn't exist.
     """
     try:
-        from db_models import User
-        user = User.query.get(user_id)
-        if user and user.profile:
-            return {
-                "is_student": user.profile.is_student,
-                "budgeting_goal": user.profile.budgeting_goal,
-                "strictness_level": user.profile.strictness_level,
-                "savings_goal_name": user.profile.savings_goal_name,
-                "savings_goal_target": user.profile.savings_goal_target
-            }
+        from db_models import get_user, get_profile
+        user_id_int = int(user_id)
+        user = get_user(user_id_int)
+        if user:
+            profile = get_profile(user_id_int)
+            if profile:
+                return {
+                    "is_student": profile.get('is_student'),
+                    "budgeting_goal": profile.get('budgeting_goal'),
+                    "strictness_level": profile.get('strictness_level'),
+                    "savings_goal_name": profile.get('savings_goal_name'),
+                    "savings_goal_target": profile.get('savings_goal_target'),
+                }
     except Exception:
         pass
     return None
@@ -113,29 +116,31 @@ def _build_user_context(user_id_int: Optional[int]) -> Optional[str]:
         return None
 
     try:
-        from db_models import User, BudgetPlan, SavedStatement, PlaidItem
+        from db_models import (
+            get_user, get_profile, get_latest_plan,
+            get_statement, get_active_plaid_items, get_accounts_for_item,
+        )
         import json
 
-        user = User.query.get(user_id_int)
+        user = get_user(user_id_int)
         if not user:
             return None
 
         context_parts = []
 
         # Profile info
-        if user.profile:
-            goal = (user.profile.budgeting_goal or "").replace("_", " ").title()
-            context_parts.append(f"- Financial profile: goal={goal}, strictness={user.profile.strictness_level}, student={user.profile.is_student}")
+        profile = get_profile(user_id_int)
+        if profile:
+            goal = (profile.get('budgeting_goal') or "").replace("_", " ").title()
+            context_parts.append(f"- Financial profile: goal={goal}, strictness={profile.get('strictness_level')}, student={profile.get('is_student')}")
         else:
             context_parts.append("- No financial profile (user has NOT completed onboarding)")
 
         # Budget plan summary
-        plan = BudgetPlan.query.filter_by(user_id=user_id_int).order_by(
-            BudgetPlan.created_at.desc()
-        ).first()
+        plan = get_latest_plan(user_id_int)
         if plan:
             try:
-                plan_data = json.loads(plan.plan_json)
+                plan_data = json.loads(plan['plan_json'])
                 safe_to_spend = plan_data.get("safeToSpend", 0)
                 categories = plan_data.get("categoryAllocations", plan_data.get("categories", []))
                 total_budget = sum(c.get("amount", 0) for c in categories)
@@ -150,20 +155,20 @@ def _build_user_context(user_id_int: Optional[int]) -> Optional[str]:
             context_parts.append("- No budget plan created yet")
 
         # Bank statement summary
-        statement = SavedStatement.query.filter_by(user_id=user_id_int).first()
+        statement = get_statement(user_id_int)
         if statement:
             context_parts.append(
-                f"- Has bank statement: income=${statement.total_income:.2f}, "
-                f"expenses=${statement.total_expenses:.2f}, balance=${statement.ending_balance:.2f}"
+                f"- Has bank statement: income=${statement.get('total_income', 0):.2f}, "
+                f"expenses=${statement.get('total_expenses', 0):.2f}, balance=${statement.get('ending_balance', 0):.2f}"
             )
         else:
             context_parts.append("- No bank statement uploaded")
 
         # Plaid connection status
-        plaid_items = PlaidItem.query.filter_by(user_id=user_id_int, status="active").all()
+        plaid_items = get_active_plaid_items(user_id_int)
         if plaid_items:
-            account_count = sum(len(item.accounts) for item in plaid_items)
-            institution_names = [item.institution_name or "Unknown" for item in plaid_items]
+            account_count = sum(len(get_accounts_for_item(item.key.id)) for item in plaid_items)
+            institution_names = [item.get('institution_name') or "Unknown" for item in plaid_items]
             context_parts.append(
                 f"- Plaid linked: {account_count} account(s) at {', '.join(institution_names)}"
             )
