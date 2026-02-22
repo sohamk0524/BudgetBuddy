@@ -47,7 +47,7 @@ struct ExpensesView: View {
                             viewModel.showSplitSheet = true
                         }
 
-                        // AI auto-classify button when enough unclassified
+                        // Auto-classify button when enough unclassified
                         if viewModel.totalUnclassifiedCount > 5 {
                             Button {
                                 Task { await viewModel.autoClassifyWithAI() }
@@ -56,10 +56,10 @@ struct ExpensesView: View {
                                     if viewModel.isAutoClassifying {
                                         ProgressView()
                                             .tint(.white)
-                                    } else {
-                                        Image(systemName: "sparkles")
+                                    // } else {
+                                    //     Image(systemName: "sparkles")
                                     }
-                                    Text(viewModel.isAutoClassifying ? "Classifying..." : "Auto-Classify All with AI")
+                                    Text(viewModel.isAutoClassifying ? "Classifying..." : "Auto-Classify All")
                                         .font(.roundedBody)
                                         .fontWeight(.medium)
                                 }

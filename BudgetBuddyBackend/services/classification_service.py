@@ -12,27 +12,42 @@ from typing import Optional, Tuple, List, Dict, Any
 # merchant, auto-apply to remaining unclassified transactions from that merchant.
 CONFIDENCE_THRESHOLD = 3
 
-# Pre-seeded defaults by Plaid detailed category
+# Pre-seeded defaults by Plaid detailed category (personal_finance_category.detailed)
 # Only unambiguous essentials — everything else stays unclassified until user teaches.
+# See: https://plaid.com/documents/transactions-personal-finance-category-taxonomy.csv
 PRE_SEEDED_DEFAULTS = {
-    "PHARMACIES": ("essential", 1.0),
-    "RENT": ("essential", 1.0),
-    "MORTGAGE": ("essential", 1.0),
-    "UTILITIES": ("essential", 1.0),
-    "INTERNET_AND_CABLE": ("essential", 1.0),
-    "PHONE": ("essential", 1.0),
-    "INSURANCE": ("essential", 1.0),
-    "MEDICAL": ("essential", 1.0),
-    "EDUCATION": ("essential", 1.0),
-    "CHILDCARE": ("essential", 1.0),
-    "VETERINARY_SERVICES": ("essential", 0.9),
-    "LOAN_PAYMENTS": ("essential", 1.0),
+    # Rent & Utilities
+    "RENT_AND_UTILITIES_RENT": ("essential", 1.0),
+    "RENT_AND_UTILITIES_GAS_AND_ELECTRICITY": ("essential", 1.0),
+    "RENT_AND_UTILITIES_WATER": ("essential", 1.0),
+    "RENT_AND_UTILITIES_SEWAGE_AND_WASTE_MANAGEMENT": ("essential", 1.0),
+    "RENT_AND_UTILITIES_INTERNET_AND_CABLE": ("essential", 1.0),
+    "RENT_AND_UTILITIES_TELEPHONE": ("essential", 1.0),
+    "RENT_AND_UTILITIES_OTHER_UTILITIES": ("essential", 1.0),
+    # Loan Payments
+    "LOAN_PAYMENTS_MORTGAGE_PAYMENT": ("essential", 1.0),
+    "LOAN_PAYMENTS_STUDENT_LOAN_PAYMENT": ("essential", 1.0),
+    "LOAN_PAYMENTS_CAR_PAYMENT": ("essential", 1.0),
+    "LOAN_PAYMENTS_CREDIT_CARD_PAYMENT": ("essential", 1.0),
+    "LOAN_PAYMENTS_PERSONAL_LOAN_PAYMENT": ("essential", 1.0),
+    "LOAN_PAYMENTS_OTHER_PAYMENT": ("essential", 1.0),
+    # Medical
+    "MEDICAL_DENTAL_CARE": ("essential", 1.0),
+    "MEDICAL_EYE_CARE": ("essential", 1.0),
+    "MEDICAL_NURSING_CARE": ("essential", 1.0),
+    "MEDICAL_PHARMACIES_AND_SUPPLEMENTS": ("essential", 1.0),
+    "MEDICAL_PRIMARY_CARE": ("essential", 1.0),
+    "MEDICAL_OTHER_MEDICAL": ("essential", 1.0),
+    # General Services (essential subset)
+    "GENERAL_SERVICES_INSURANCE": ("essential", 1.0),
+    "GENERAL_SERVICES_EDUCATION": ("essential", 1.0),
+    "GENERAL_SERVICES_CHILDCARE": ("essential", 1.0),
 }
 
-# Fallback defaults by Plaid primary category — only unambiguous essentials
+# Fallback defaults by Plaid primary category (personal_finance_category.primary)
+# Only unambiguous essentials
 PRIMARY_CATEGORY_DEFAULTS = {
     "RENT_AND_UTILITIES": ("essential", 1.0),
-    "TRANSFER_IN": ("essential", 1.0),
     "LOAN_PAYMENTS": ("essential", 1.0),
     "MEDICAL": ("essential", 1.0),
 }
