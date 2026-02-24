@@ -62,75 +62,71 @@ def normalize_merchant_name(name: Optional[str]) -> str:
 
 def classify_transaction(transaction, user_id: int, use_llm: bool = False) -> None:
     """
-    Classify a single transaction in-place.
-    Priority: user MerchantClassification → pre-seeded by detailed → pre-seeded by primary → LLM inference → unclassified.
+    Classify a single Datastore transaction entity in-place and persist.
+    Priority: user MerchantClassification → pre-seeded by detailed → pre-seeded by primary → LLM → unclassified.
     Skips income transactions (amount <= 0).
     """
-    # Skip income / credits — only classify expenses
-    if transaction.amount is not None and transaction.amount <= 0:
+    amount = transaction.get('amount')
+    if amount is not None and amount <= 0:
         return
 
-    from db_models import MerchantClassification
+    from db_models import get_merchant_classification
 
-    merchant = normalize_merchant_name(transaction.merchant_name)
+    merchant = normalize_merchant_name(transaction.get('merchant_name'))
 
     # 1. Check user's merchant classification
     if merchant:
-        mc = MerchantClassification.query.filter_by(
-            user_id=user_id,
-            merchant_name=merchant
-        ).first()
+        mc = get_merchant_classification(user_id, merchant)
         if mc:
-            _apply_classification(transaction, mc.classification, mc.essential_ratio)
+            _apply_classification(transaction, mc['classification'], mc['essential_ratio'])
+            _save_transaction(transaction)
             return
 
     # 2. Check pre-seeded defaults by detailed category
-    detailed = transaction.category_detailed
+    detailed = transaction.get('category_detailed')
     if detailed and detailed in PRE_SEEDED_DEFAULTS:
         classification, ratio = PRE_SEEDED_DEFAULTS[detailed]
         _apply_classification(transaction, classification, ratio)
+        _save_transaction(transaction)
         return
 
     # 3. Check pre-seeded defaults by primary category
-    primary = transaction.category_primary
+    primary = transaction.get('category_primary')
     if primary and primary in PRIMARY_CATEGORY_DEFAULTS:
         classification, ratio = PRIMARY_CATEGORY_DEFAULTS[primary]
         _apply_classification(transaction, classification, ratio)
+        _save_transaction(transaction)
         return
 
     # 4. LLM inference for unknown merchants
     if use_llm and merchant:
-        result = llm_classify_merchant(merchant, transaction.category_primary, transaction.category_detailed, user_id)
+        result = llm_classify_merchant(merchant, primary, detailed, user_id)
         if result:
             classification, ratio = result
             _apply_classification(transaction, classification, ratio)
-            # Store as inferred MerchantClassification for future lookups
-            _store_inferred_classification(user_id, merchant, transaction.category_detailed, classification, ratio)
+            _save_transaction(transaction)
+            _store_inferred_classification(user_id, merchant, detailed, classification, ratio)
             return
 
     # 5. Default to unclassified
-    transaction.sub_category = 'unclassified'
-    transaction.essential_amount = None
-    transaction.discretionary_amount = None
+    transaction['sub_category'] = 'unclassified'
+    transaction['essential_amount'] = None
+    transaction['discretionary_amount'] = None
+    _save_transaction(transaction)
+
+
+def _save_transaction(transaction) -> None:
+    """Persist a Datastore transaction entity."""
+    from db_models import get_client
+    get_client().put(transaction)
 
 
 def _apply_classification(transaction, classification: str, essential_ratio: float) -> None:
-    """Apply classification and compute split amounts on a transaction."""
-    transaction.sub_category = classification
-    amount = abs(transaction.amount) if transaction.amount else 0.0
-
-    if classification == 'essential':
-        transaction.essential_amount = round(amount * essential_ratio, 2)
-        transaction.discretionary_amount = round(amount * (1.0 - essential_ratio), 2)
-    elif classification == 'discretionary':
-        transaction.essential_amount = round(amount * essential_ratio, 2)
-        transaction.discretionary_amount = round(amount * (1.0 - essential_ratio), 2)
-    elif classification == 'mixed':
-        transaction.essential_amount = round(amount * essential_ratio, 2)
-        transaction.discretionary_amount = round(amount * (1.0 - essential_ratio), 2)
-    else:
-        transaction.essential_amount = None
-        transaction.discretionary_amount = None
+    """Apply classification and compute split amounts on a Datastore transaction entity."""
+    transaction['sub_category'] = classification
+    amount = abs(transaction.get('amount') or 0.0)
+    transaction['essential_amount'] = round(amount * essential_ratio, 2)
+    transaction['discretionary_amount'] = round(amount * (1.0 - essential_ratio), 2)
 
 
 def retroactively_reclassify(user_id: int, merchant_name: str, classification: str, essential_ratio: float) -> int:
@@ -138,38 +134,36 @@ def retroactively_reclassify(user_id: int, merchant_name: str, classification: s
     Reclassify all transactions for a user matching a merchant name.
     Returns the count of reclassified transactions.
     """
-    from db_models import db, Transaction, PlaidItem, PlaidAccount
+    from db_models import get_plaid_items, get_accounts_for_item, get_client
 
     normalized = normalize_merchant_name(merchant_name)
     if not normalized:
         return 0
 
-    # Get all account IDs for this user
-    plaid_items = PlaidItem.query.filter_by(user_id=user_id).all()
     account_ids = []
-    for item in plaid_items:
-        for account in item.accounts:
-            account_ids.append(account.id)
+    for item in get_plaid_items(user_id):
+        for account in get_accounts_for_item(item.key.id):
+            account_ids.append(account.key.id)
 
     if not account_ids:
         return 0
 
-    # Find matching transactions
-    transactions = Transaction.query.filter(
-        Transaction.plaid_account_id.in_(account_ids),
-        db.func.lower(Transaction.merchant_name) == normalized
-    ).all()
-
+    client = get_client()
     count = 0
-    for txn in transactions:
-        _apply_classification(txn, classification, essential_ratio)
-        count += 1
+    for account_id in account_ids:
+        query = client.query(kind='Transaction')
+        query.add_filter('plaid_account_id', '=', account_id)
+        for txn in query.fetch():
+            if normalize_merchant_name(txn.get('merchant_name')) == normalized:
+                _apply_classification(txn, classification, essential_ratio)
+                client.put(txn)
+                count += 1
 
     return count
 
 
 def classify_new_transactions(transactions: list, user_id: int) -> None:
-    """Batch classify a list of transactions."""
+    """Batch classify a list of Datastore transaction entities."""
     for txn in transactions:
         classify_transaction(txn, user_id)
 
@@ -195,15 +189,15 @@ Respond with ONLY valid JSON in this exact format:
 
 def _get_user_classification_context(user_id: int) -> str:
     """Build context from user's existing classifications to help LLM infer."""
-    from db_models import MerchantClassification
+    from db_models import get_merchant_classifications_for_user
 
-    classifications = MerchantClassification.query.filter_by(user_id=user_id).limit(20).all()
+    classifications = get_merchant_classifications_for_user(user_id)[:20]
     if not classifications:
         return ""
 
-    essential = [mc.merchant_name for mc in classifications if mc.classification == 'essential']
-    discretionary = [mc.merchant_name for mc in classifications if mc.classification == 'discretionary']
-    mixed = [mc.merchant_name for mc in classifications if mc.classification == 'mixed']
+    essential = [mc['merchant_name'] for mc in classifications if mc.get('classification') == 'essential']
+    discretionary = [mc['merchant_name'] for mc in classifications if mc.get('classification') == 'discretionary']
+    mixed = [mc['merchant_name'] for mc in classifications if mc.get('classification') == 'mixed']
 
     lines = ["This user has classified the following merchants:"]
     if essential:
@@ -235,10 +229,9 @@ def llm_classify_merchant(
         agent = Agent(
             name="MerchantClassifier",
             instructions=system_prompt,
-            model="claude-sonnet-4-5-20250929",  # Use Sonnet for fast, cheap classification
+            model="claude-sonnet-4-5-20250929",
         )
 
-        # Build the user message
         msg_parts = [f"Merchant: {merchant_name}"]
         if category_primary:
             msg_parts.append(f"Plaid primary category: {category_primary}")
@@ -248,7 +241,6 @@ def llm_classify_merchant(
         result = agent.run("\n".join(msg_parts))
         response_text = result.get("content", "")
 
-        # Parse JSON response
         json_text = response_text
         if "```json" in response_text:
             json_text = response_text.split("```json")[1].split("```")[0]
@@ -262,9 +254,7 @@ def llm_classify_merchant(
         if classification not in ('essential', 'discretionary', 'mixed'):
             return None
 
-        # Clamp ratio
         essential_ratio = max(0.0, min(1.0, essential_ratio))
-
         return (classification, essential_ratio)
 
     except Exception as e:
@@ -280,24 +270,17 @@ def _store_inferred_classification(
     essential_ratio: float
 ) -> None:
     """Store an LLM-inferred classification for future lookups."""
-    from db_models import db, MerchantClassification
+    from db_models import get_merchant_classification, upsert_merchant_classification
 
-    existing = MerchantClassification.query.filter_by(
-        user_id=user_id,
-        merchant_name=merchant_name
-    ).first()
-
-    if not existing:
-        mc = MerchantClassification(
-            user_id=user_id,
-            merchant_name=merchant_name,
+    if not get_merchant_classification(user_id, merchant_name):
+        upsert_merchant_classification(
+            user_id, merchant_name,
             plaid_category_detailed=category_detailed,
             classification=classification,
             essential_ratio=essential_ratio,
             confidence='inferred',
-            classification_count=1
+            classification_count=1,
         )
-        db.session.add(mc)
 
 
 def llm_classify_merchants_batch(
@@ -307,7 +290,7 @@ def llm_classify_merchants_batch(
     """
     Classify multiple unknown merchants in a single LLM call.
     Each merchant dict should have: name, category_primary, category_detailed.
-    Returns list of {name, classification, essential_ratio, reasoning}.
+    Returns list of {name, classification, essential_ratio}.
     """
     if not merchants:
         return []
@@ -337,9 +320,8 @@ Respond with ONLY a JSON array:
             model="claude-sonnet-4-5-20250929",
         )
 
-        # Format merchant list
         lines = []
-        for m in merchants[:20]:  # Limit to 20 per batch
+        for m in merchants[:20]:
             line = f"- {m['name']}"
             if m.get('category_primary'):
                 line += f" (category: {m['category_primary']}"
@@ -351,7 +333,6 @@ Respond with ONLY a JSON array:
         result = agent.run("Classify these merchants:\n" + "\n".join(lines))
         response_text = result.get("content", "")
 
-        # Parse JSON
         json_text = response_text
         if "```json" in response_text:
             json_text = response_text.split("```json")[1].split("```")[0]
@@ -362,7 +343,6 @@ Respond with ONLY a JSON array:
         if not isinstance(results, list):
             return []
 
-        # Validate and normalize
         validated = []
         for item in results:
             classification = item.get("classification", "").lower()

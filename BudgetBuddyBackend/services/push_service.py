@@ -6,7 +6,7 @@ Uses PyAPNs2 for Apple Push Notification service.
 
 import os
 import json
-from typing import Optional, List, Dict, Any
+from typing import Optional, Dict, Any
 
 
 def send_push_notification(
@@ -19,22 +19,23 @@ def send_push_notification(
     Send a push notification to all of a user's registered devices.
     Returns the number of notifications sent.
     """
-    from db_models import DeviceToken
+    from db_models import get_active_device_tokens, get_client
 
-    tokens = DeviceToken.query.filter_by(user_id=user_id, is_active=True).all()
+    tokens = get_active_device_tokens(user_id)
     if not tokens:
         return 0
 
+    client = get_client()
     sent = 0
     for device in tokens:
         try:
-            _send_apns(device.token, title, body, data)
+            _send_apns(device['token'], title, body, data)
             sent += 1
         except Exception as e:
-            print(f"Failed to send push to device {device.token[:20]}...: {e}")
-            # Mark token as inactive if it's invalid
+            print(f"Failed to send push to device {device['token'][:20]}...: {e}")
             if "BadDeviceToken" in str(e) or "Unregistered" in str(e):
-                device.is_active = False
+                device['is_active'] = False
+                client.put(device)
 
     return sent
 
@@ -56,7 +57,6 @@ def _send_apns(
     apns_bundle_id = os.environ.get("APNS_BUNDLE_ID", "com.budgetbuddy.app")
 
     if apns_key_path and apns_key_id and apns_team_id:
-        # Production: use PyAPNs2
         try:
             from apns2.client import APNsClient
             from apns2.payload import Payload
@@ -83,7 +83,6 @@ def _send_apns(
         except ImportError:
             print(f"[PUSH] PyAPNs2 not installed. Notification: {title} - {body}")
     else:
-        # Development: log the notification
         print(f"\n{'='*50}")
         print(f"[PUSH NOTIFICATION] to token: {device_token[:20]}...")
         print(f"  Title: {title}")
@@ -96,30 +95,29 @@ def _send_apns(
 def notify_new_transactions(user_id: int, transactions: list) -> None:
     """
     Send push notification summarizing new transactions.
-    Groups by classification for a concise message.
+    Accepts a list of Datastore transaction entities.
     """
     if not transactions:
         return
 
-    total_amount = sum(abs(t.amount) for t in transactions if t.amount > 0)
+    total_amount = sum(abs(t.get('amount') or 0) for t in transactions if (t.get('amount') or 0) > 0)
     count = len(transactions)
 
     if count == 1:
         txn = transactions[0]
-        merchant = txn.merchant_name or txn.name
-        category = txn.sub_category or "unclassified"
+        merchant = txn.get('merchant_name') or txn.get('name')
+        category = txn.get('sub_category') or "unclassified"
         title = "New Transaction"
-        body = f"${abs(txn.amount):.2f} at {merchant}"
+        body = f"${abs(txn.get('amount') or 0):.2f} at {merchant}"
         if category != "unclassified":
             body += f" ({category})"
     else:
         title = f"{count} New Transactions"
         body = f"${total_amount:.2f} total spending detected"
 
-        # Count by sub-category
         cats = {}
         for t in transactions:
-            cat = t.sub_category or "unclassified"
+            cat = t.get('sub_category') or "unclassified"
             cats[cat] = cats.get(cat, 0) + 1
         parts = [f"{v} {k}" for k, v in cats.items() if v > 0]
         if parts:
