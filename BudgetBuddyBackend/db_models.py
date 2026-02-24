@@ -50,6 +50,7 @@ class FinancialProfile(db.Model):
     is_student = db.Column(db.Boolean, default=False)  # "Are you currently a student?"
     budgeting_goal = db.Column(db.String(30))  # "emergency_fund", "pay_debt", "save_purchase", "stability"
     strictness_level = db.Column(db.String(20))  # "relaxed", "moderate", "strict"
+    school = db.Column(db.String(50), nullable=True)  # UC campus, e.g. "uc_davis"
 
     # Legacy fields (kept for backward compatibility, now collected during plan creation)
     fixed_expenses = db.Column(db.Float, default=0.0)

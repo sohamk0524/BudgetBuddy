@@ -45,6 +45,22 @@ with app.app_context():
     except Exception as e:
         print(f"Migration warning (non-fatal): {e}")
 
+    # Migrate: add 'school' column to financial_profile table if it doesn't exist (SQLite)
+    try:
+        import sqlite3 as _sqlite3_fp
+        db_path_fp = os.path.join(app.instance_path, 'budgetbuddy.db')
+        if os.path.exists(db_path_fp):
+            conn_fp = _sqlite3_fp.connect(db_path_fp)
+            cursor_fp = conn_fp.execute("PRAGMA table_info(financial_profile)")
+            columns_fp = [row[1] for row in cursor_fp.fetchall()]
+            if columns_fp and 'school' not in columns_fp:
+                conn_fp.execute("ALTER TABLE financial_profile ADD COLUMN school VARCHAR(50)")
+                conn_fp.commit()
+                print("Migration: added 'school' column to financial_profile table")
+            conn_fp.close()
+    except Exception as e:
+        print(f"Migration warning (non-fatal): {e}")
+
 # Enable CORS for iOS simulator to communicate with localhost
 # Allow all origins and methods for development
 CORS(app, resources={r"/*": {"origins": "*", "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"]}})
@@ -251,6 +267,7 @@ def onboarding():
     is_student = data.get("isStudent", False)
     budgeting_goal = data.get("budgetingGoal", "stability")
     strictness_level = data.get("strictnessLevel", "moderate")
+    school = data.get("school") or None
 
     if not user_id:
         return jsonify({"error": "userId is required"}), 400
@@ -270,13 +287,15 @@ def onboarding():
         user.profile.is_student = is_student
         user.profile.budgeting_goal = budgeting_goal
         user.profile.strictness_level = strictness_level
+        user.profile.school = school
     else:
         # Create new profile
         profile = FinancialProfile(
             user_id=user_id,
             is_student=is_student,
             budgeting_goal=budgeting_goal,
-            strictness_level=strictness_level
+            strictness_level=strictness_level,
+            school=school
         )
         db.session.add(profile)
 
@@ -1217,7 +1236,8 @@ def get_user_profile(user_id):
         profile_data = {
             "isStudent": user.profile.is_student,
             "budgetingGoal": user.profile.budgeting_goal,
-            "strictnessLevel": user.profile.strictness_level
+            "strictnessLevel": user.profile.strictness_level,
+            "school": user.profile.school
         }
 
     plaid_items_data = []
@@ -1272,6 +1292,8 @@ def update_user_profile(user_id):
             user.profile.budgeting_goal = data["budgetingGoal"]
         if "strictnessLevel" in data:
             user.profile.strictness_level = data["strictnessLevel"]
+        if "school" in data:
+            user.profile.school = data["school"]
 
     db.session.commit()
 
@@ -1487,6 +1509,60 @@ def get_nudges(user_id):
     nudges = generate_nudges(user_id)
 
     return jsonify({"nudges": nudges})
+
+
+# =============================================================================
+# School-Specific RAG Endpoint
+# =============================================================================
+
+@app.route("/api/school-advice", methods=["POST"])
+def school_advice():
+    """
+    Get AI-synthesized, school-specific financial advice via web search (RAG).
+
+    Expected request body:
+    {
+        "query": "cheap coffee near campus",
+        "user_id": 1,
+        "school_name": "uc_davis"  (optional — falls back to user's profile)
+    }
+
+    Returns:
+    {
+        "answer": "markdown string...",
+        "sources": [{"title": "...", "url": "..."}]
+    }
+    """
+    from services.school_rag import get_school_advice
+
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "Request body must be JSON"}), 400
+
+    query = data.get("query")
+    user_id = data.get("user_id")
+
+    if not query:
+        return jsonify({"error": "query is required"}), 400
+    if not user_id:
+        return jsonify({"error": "user_id is required"}), 400
+
+    school_name = data.get("school_name")
+
+    # If no school_name provided, look it up from the user's profile
+    if not school_name:
+        profile = FinancialProfile.query.filter_by(user_id=user_id).first()
+        if profile and profile.school:
+            school_name = profile.school
+        else:
+            return jsonify({"error": "No school found. Provide school_name or complete onboarding."}), 400
+
+    result = get_school_advice(query, school_name)
+
+    if "error" in result:
+        return jsonify(result), 500
+
+    return jsonify(result)
 
 
 if __name__ == "__main__":

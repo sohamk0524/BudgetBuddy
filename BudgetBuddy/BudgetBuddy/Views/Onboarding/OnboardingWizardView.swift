@@ -2,8 +2,8 @@
 //  OnboardingWizardView.swift
 //  BudgetBuddy
 //
-//  Onboarding wizard – 4-Question Protocol:
-//  1. Name  2. Student Status  3. Primary Motivation  4. Strictness Level
+//  Onboarding wizard – 4/5-Question Protocol:
+//  1. Name  2. Student Status  (2b. School if student)  3. Primary Motivation  4. Strictness Level
 //
 
 import SwiftUI
@@ -11,15 +11,19 @@ import SwiftUI
 struct OnboardingWizardView: View {
     @State private var currentPage = 0
 
-    // 4-Question Protocol fields
+    // Question fields
     @State private var name: String = ""
     @State private var isStudent: Bool = false
+    @State private var selectedSchool: String = ""
     @State private var userBudgetingGoal: String = "stability"
     @State private var strictnessLevel: String = "moderate"
 
     var authManager = AuthManager.shared
 
-    private let totalPages = 4
+    /// Total pages changes based on whether the school page is shown.
+    private var totalPages: Int {
+        isStudent ? 5 : 4
+    }
 
     private var canFinish: Bool {
         !name.trimmingCharacters(in: .whitespaces).isEmpty
@@ -65,13 +69,27 @@ struct OnboardingWizardView: View {
                     StudentStatusPage(isStudent: $isStudent)
                         .tag(1)
 
-                    // Page 2: Primary Motivation ("Why")
-                    PrimaryMotivationPage(selectedGoal: $userBudgetingGoal)
-                        .tag(2)
+                    if isStudent {
+                        // Page 2: School Selection (conditional)
+                        SchoolSelectionPage(selectedSchool: $selectedSchool)
+                            .tag(2)
 
-                    // Page 3: Strictness Level
-                    StrictnessLevelPage(selectedStrictness: $strictnessLevel)
-                        .tag(3)
+                        // Page 3: Primary Motivation
+                        PrimaryMotivationPage(selectedGoal: $userBudgetingGoal)
+                            .tag(3)
+
+                        // Page 4: Strictness Level
+                        StrictnessLevelPage(selectedStrictness: $strictnessLevel)
+                            .tag(4)
+                    } else {
+                        // Page 2: Primary Motivation
+                        PrimaryMotivationPage(selectedGoal: $userBudgetingGoal)
+                            .tag(2)
+
+                        // Page 3: Strictness Level
+                        StrictnessLevelPage(selectedStrictness: $strictnessLevel)
+                            .tag(3)
+                    }
                 }
                 .tabViewStyle(.page(indexDisplayMode: .never))
 
@@ -136,6 +154,18 @@ struct OnboardingWizardView: View {
                 }
             }
         }
+        .onChange(of: isStudent) {
+            // When toggling student off, reset school and clamp page if needed
+            if !isStudent {
+                selectedSchool = ""
+                if currentPage > 1 {
+                    // Shift page index down since school page was removed
+                    withAnimation {
+                        currentPage = min(currentPage - 1, totalPages - 1)
+                    }
+                }
+            }
+        }
     }
 
     private func finishOnboarding() {
@@ -146,7 +176,8 @@ struct OnboardingWizardView: View {
                 name: trimmedName,
                 isStudent: isStudent,
                 userBudgetingGoal: userBudgetingGoal,
-                strictnessLevel: strictnessLevel
+                strictnessLevel: strictnessLevel,
+                school: selectedSchool
             )
         }
     }
@@ -229,6 +260,58 @@ struct StudentStatusPage: View {
             .padding(.horizontal, 24)
 
             Spacer()
+        }
+        .padding(.top, 24)
+    }
+}
+
+// MARK: - School Selection Page
+
+struct SchoolSelectionPage: View {
+    @Binding var selectedSchool: String
+
+    private let options = [
+        ("uc_berkeley", "UC Berkeley"),
+        ("uc_davis", "UC Davis"),
+        ("uc_irvine", "UC Irvine"),
+        ("uc_los_angeles", "UC Los Angeles"),
+        ("uc_merced", "UC Merced"),
+        ("uc_riverside", "UC Riverside"),
+        ("uc_san_diego", "UC San Diego"),
+        ("uc_santa_barbara", "UC Santa Barbara"),
+        ("uc_santa_cruz", "UC Santa Cruz")
+    ]
+
+    var body: some View {
+        VStack(spacing: 24) {
+            Image(systemName: "building.columns.fill")
+                .font(.system(size: 56))
+                .foregroundStyle(Color.accent)
+
+            Text("Which UC Do You Attend?")
+                .font(.roundedHeadline)
+                .foregroundStyle(Color.textPrimary)
+
+            Text("We'll customize tips for your campus")
+                .font(.roundedBody)
+                .foregroundStyle(Color.textSecondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 32)
+
+            ScrollView {
+                VStack(spacing: 12) {
+                    ForEach(options, id: \.0) { value, title in
+                        SelectableOptionCard(
+                            title: title,
+                            subtitle: "",
+                            isSelected: selectedSchool == value
+                        ) {
+                            selectedSchool = value
+                        }
+                    }
+                }
+                .padding(.horizontal, 24)
+            }
         }
         .padding(.top, 24)
     }
@@ -343,9 +426,11 @@ struct SelectableOptionCard: View {
                         .font(.roundedHeadline)
                         .foregroundStyle(Color.textPrimary)
 
-                    Text(subtitle)
-                        .font(.roundedCaption)
-                        .foregroundStyle(Color.textSecondary)
+                    if !subtitle.isEmpty {
+                        Text(subtitle)
+                            .font(.roundedCaption)
+                            .foregroundStyle(Color.textSecondary)
+                    }
                 }
 
                 Spacer()
