@@ -95,7 +95,9 @@ def create_link_token(user_id: int) -> Dict[str, Any]:
     """
     client = get_plaid_client()
 
-    request = LinkTokenCreateRequest(
+    webhook_url = os.environ.get("PLAID_WEBHOOK_URL")
+
+    kwargs = dict(
         user=LinkTokenCreateRequestUser(
             client_user_id=str(user_id)
         ),
@@ -104,6 +106,10 @@ def create_link_token(user_id: int) -> Dict[str, Any]:
         country_codes=[CountryCode("US")],
         language="en",
     )
+    if webhook_url:
+        kwargs["webhook"] = webhook_url
+
+    request = LinkTokenCreateRequest(**kwargs)
 
     response = client.link_token_create(request)
 

@@ -239,6 +239,8 @@ struct SpendingPlan: Codable {
     let totalIncome: Double
     let totalExpenses: Double
     let totalSavings: Double
+    let totalEssential: Double?
+    let totalDiscretionary: Double?
     let daysRemaining: Int
     let budgetUsedPercent: Double
     let categoryAllocations: [BudgetCategory]
@@ -252,7 +254,9 @@ struct BudgetCategory: Codable, Identifiable, Equatable {
     let name: String
     let amount: Double
     let color: String
-    let items: [BudgetItem]?
+    var items: [BudgetItem]?
+    var essentialAmount: Double? = nil
+    var discretionaryAmount: Double? = nil
 
     static func == (lhs: BudgetCategory, rhs: BudgetCategory) -> Bool {
         lhs.id == rhs.id && lhs.amount == rhs.amount
@@ -413,6 +417,117 @@ struct PlaidSyncResponse: Codable {
     let added: Int
     let modified: Int
     let removed: Int
+}
+
+// MARK: - Expense Classification Models
+
+struct ExpenseTransaction: Codable, Identifiable {
+    let id: Int
+    let transactionId: String
+    let accountId: String
+    let amount: Double
+    let date: String?
+    let authorizedDate: String?
+    let name: String
+    let merchantName: String?
+    let categoryPrimary: String?
+    let categoryDetailed: String?
+    let pending: Bool
+    let paymentChannel: String?
+    let subCategory: String
+    let essentialAmount: Double?
+    let discretionaryAmount: Double?
+}
+
+struct ExpensesSummary: Codable {
+    let totalEssential: Double
+    let totalDiscretionary: Double
+    let totalFunMoney: Double?
+    let totalMixed: Double
+    let totalUnclassified: Double
+}
+
+struct ExpensesResponse: Codable {
+    let transactions: [ExpenseTransaction]
+    let summary: ExpensesSummary
+    let total: Int
+    let hasMore: Bool
+}
+
+struct MerchantClassificationInfo: Codable, Identifiable {
+    var id: String { merchantName }
+    let merchantName: String
+    let classification: String
+    let essentialRatio: Double
+    let confidence: String
+    let classificationCount: Int
+}
+
+struct MerchantClassificationsResponse: Codable {
+    let classifications: [MerchantClassificationInfo]
+}
+
+struct ClassifyMerchantResponse: Codable {
+    let success: Bool
+    let reclassifiedCount: Int
+}
+
+struct ClassifiedTransactionInfo: Codable {
+    let id: Int
+    let subCategory: String
+    let essentialAmount: Double?
+    let discretionaryAmount: Double?
+}
+
+struct ClassifyTransactionResponse: Codable {
+    let success: Bool
+    let transaction: ClassifiedTransactionInfo
+    let updatedMerchantRatio: Double
+    let autoApplied: Int?
+}
+
+struct UnclassifiedMerchant: Codable, Identifiable {
+    var id: String { merchantName }
+    let merchantName: String
+    let totalSpent: Double
+    let transactionCount: Int
+}
+
+struct UnclassifiedMerchantsResponse: Codable {
+    let merchants: [UnclassifiedMerchant]
+}
+
+struct MerchantContext: Codable {
+    let totalUnclassified: Int
+    let totalSpent: Double
+    let alreadyClassified: Int
+}
+
+struct UnclassifiedTransactionItem: Codable, Identifiable {
+    let id: Int
+    let transactionId: String
+    let merchantName: String?
+    let amount: Double
+    let date: String?
+    let name: String
+    let merchantContext: MerchantContext?
+}
+
+struct UnclassifiedTransactionsResponse: Codable {
+    let transactions: [UnclassifiedTransactionItem]
+    let totalUnclassified: Int
+}
+
+struct AutoClassifyMerchantResult: Codable {
+    let merchantName: String
+    let classification: String
+    let essentialRatio: Double
+    let transactionsUpdated: Int
+}
+
+struct AutoClassifyResponse: Codable {
+    let classified: Int
+    let merchants: [AutoClassifyMerchantResult]
 }
 
 // MARK: - User Profile Models
