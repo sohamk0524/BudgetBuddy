@@ -429,3 +429,27 @@ def set_category_prefs(user_id: int, categories: List[str]):
             'created_at': datetime.utcnow(),
         })
         client.put(entity)
+
+
+# ---------------------------------------------------------------------------
+# ManualTransaction (voice-logged)
+# ---------------------------------------------------------------------------
+
+def create_manual_transaction(user_id: int, **kwargs) -> datastore.Entity:
+    client = get_client()
+    key = client.key('ManualTransaction')
+    entity = datastore.Entity(key=key)
+    entity['user_id'] = user_id
+    entity['created_at'] = datetime.utcnow()
+    entity.update(kwargs)
+    client.put(entity)
+    return entity
+
+
+def get_manual_transactions(user_id: int, limit: int = 50) -> List[datastore.Entity]:
+    client = get_client()
+    query = client.query(kind='ManualTransaction')
+    query.add_filter('user_id', '=', user_id)
+    results = list(query.fetch())
+    results.sort(key=lambda e: e.get('created_at', datetime.min), reverse=True)
+    return results[:limit]

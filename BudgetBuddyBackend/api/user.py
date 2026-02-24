@@ -21,6 +21,7 @@ from db_models import (
     get_latest_plan,
     get_category_prefs,
     set_category_prefs,
+    create_manual_transaction,
 )
 
 user_bp = Blueprint('user', __name__)
@@ -407,3 +408,92 @@ def get_nudges(user_id):
     from services.nudge_generator import generate_nudges
     nudges = generate_nudges(user_id)
     return jsonify({"nudges": nudges})
+
+
+@user_bp.route("/user/parse-transaction", methods=["POST"])
+def parse_transaction():
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "Request body must be JSON"}), 400
+
+    statement = data.get("statement", "").strip()
+    if not statement:
+        return jsonify({"error": "statement is required"}), 400
+
+    import litellm
+
+    system_prompt = (
+        "You are a transaction parser. Extract transaction details from the user's spoken statement.\n"
+        "Return ONLY a JSON object with these fields:\n"
+        '  {"amount": <number or null>, "category": <string or null>, "store": <string or null>, "date": <ISO 8601 string or null>, "notes": <string or null>}\n'
+        "Rules:\n"
+        "- amount: the dollar amount spent, as a number (e.g. 10.50). Convert words like \"ten\" to 10.\n"
+        "- category: one of Coffee, Food, Groceries, Transport, Entertainment, Shopping, Gas, or Other.\n"
+        "- store: the merchant/store name if mentioned.\n"
+        "- date: if a date is mentioned, use ISO 8601. If \"today\" or not mentioned, use null.\n"
+        "- notes: any extra detail not captured above, or null.\n"
+        "Return ONLY the JSON object. No markdown, no explanation, no extra text."
+    )
+
+    try:
+        response = litellm.completion(
+            model="claude-sonnet-4-5-20250929",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": statement},
+            ],
+            max_tokens=256,
+        )
+        raw = response.choices[0].message.content or ""
+
+        # Extract JSON from response (find first { to last })
+        start = raw.find("{")
+        end = raw.rfind("}")
+        if start != -1 and end != -1:
+            import json as _json
+            parsed = _json.loads(raw[start:end + 1])
+            return jsonify(parsed)
+
+        return jsonify({"amount": None, "category": None, "store": None, "date": None, "notes": None})
+
+    except Exception as e:
+        print(f"Parse transaction error: {e}")
+        return jsonify({"amount": None, "category": None, "store": None, "date": None, "notes": None})
+
+
+@user_bp.route("/user/transactions", methods=["POST"])
+def save_manual_transaction():
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "Request body must be JSON"}), 400
+
+    user_id = data.get("userId")
+    if not user_id:
+        return jsonify({"error": "userId is required"}), 400
+    try:
+        user_id = int(user_id)
+    except (ValueError, TypeError):
+        return jsonify({"error": "Invalid userId"}), 400
+
+    user = get_user(user_id)
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
+    amount = data.get("amount")
+    if not amount or float(amount) <= 0:
+        return jsonify({"error": "amount must be greater than 0"}), 400
+
+    entity = create_manual_transaction(
+        user_id,
+        amount=float(amount),
+        category=data.get("category", "Other"),
+        store=data.get("store"),
+        date=data.get("date"),
+        notes=data.get("notes"),
+        source="voice",
+    )
+
+    return jsonify({
+        "success": True,
+        "transactionId": str(entity.key.id),
+    }), 201
