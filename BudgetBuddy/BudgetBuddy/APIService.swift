@@ -17,12 +17,12 @@ actor APIService {
 
     /// Shared instance using localhost (for simulator)
     /// For physical devices, change to your Mac's IP address (run: ipconfig getifaddr en0)
-    static let shared = APIService(host: "localhost", port: 5000)
+    static let shared = APIService()
 
     // MARK: - Initialization
 
-    init(host: String, port: Int) {
-        self.baseURL = URL(string: "http://\(host):\(port)")!
+    init() {
+        self.baseURL = AppConfig.baseURL
     }
 
     // MARK: - Chat API

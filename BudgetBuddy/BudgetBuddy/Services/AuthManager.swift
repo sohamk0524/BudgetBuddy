@@ -55,8 +55,7 @@ class AuthManager {
         }
     }
 
-    /// For physical devices, change to your Mac's IP address (run: ipconfig getifaddr en0)
-    private let baseURL = URL(string: "http://localhost:5000")!
+    private let baseURL = AppConfig.baseURL
 
     /// Ephemeral session to avoid caching issues
     @ObservationIgnored
