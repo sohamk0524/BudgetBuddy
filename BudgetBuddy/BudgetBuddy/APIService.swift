@@ -385,6 +385,155 @@ actor APIService {
         }
     }
 
+    // MARK: - Expense Classification API
+
+    /// Gets expenses with sub-category classification data
+    func getExpenses(userId: Int, startDate: String? = nil, endDate: String? = nil, category: String? = nil, subCategory: String? = nil, limit: Int = 100, offset: Int = 0) async throws -> ExpensesResponse {
+        var urlComponents = URLComponents(url: baseURL.appendingPathComponent("expenses/\(userId)"), resolvingAgainstBaseURL: false)!
+        var queryItems = [
+            URLQueryItem(name: "limit", value: String(limit)),
+            URLQueryItem(name: "offset", value: String(offset))
+        ]
+        if let startDate { queryItems.append(URLQueryItem(name: "startDate", value: startDate)) }
+        if let endDate { queryItems.append(URLQueryItem(name: "endDate", value: endDate)) }
+        if let category { queryItems.append(URLQueryItem(name: "category", value: category)) }
+        if let subCategory { queryItems.append(URLQueryItem(name: "subCategory", value: subCategory)) }
+        urlComponents.queryItems = queryItems
+
+        guard let url = urlComponents.url else { throw APIError.invalidResponse }
+
+        let (data, response) = try await URLSession.shared.data(from: url)
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            throw APIError.invalidResponse
+        }
+        return try JSONDecoder().decode(ExpensesResponse.self, from: data)
+    }
+
+    /// Classifies a merchant for a user (retroactive)
+    func classifyMerchant(userId: Int, merchantName: String, classification: String, essentialRatio: Double? = nil) async throws -> ClassifyMerchantResponse {
+        let url = baseURL.appendingPathComponent("merchant/classify")
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        var body: [String: Any] = [
+            "userId": userId,
+            "merchantName": merchantName,
+            "classification": classification
+        ]
+        if let essentialRatio { body["essentialRatio"] = essentialRatio }
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            throw APIError.invalidResponse
+        }
+        return try JSONDecoder().decode(ClassifyMerchantResponse.self, from: data)
+    }
+
+    /// Classifies a single transaction
+    func classifyTransaction(transactionId: Int, subCategory: String, essentialRatio: Double? = nil) async throws -> ClassifyTransactionResponse {
+        let url = baseURL.appendingPathComponent("transaction/\(transactionId)/classify")
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "PUT"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        var body: [String: Any] = ["subCategory": subCategory]
+        if let essentialRatio { body["essentialRatio"] = essentialRatio }
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            throw APIError.invalidResponse
+        }
+        return try JSONDecoder().decode(ClassifyTransactionResponse.self, from: data)
+    }
+
+    /// Gets all merchant classifications for a user
+    func getMerchantClassifications(userId: Int) async throws -> MerchantClassificationsResponse {
+        let url = baseURL.appendingPathComponent("merchant/classifications/\(userId)")
+
+        let (data, response) = try await URLSession.shared.data(from: url)
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            throw APIError.invalidResponse
+        }
+        return try JSONDecoder().decode(MerchantClassificationsResponse.self, from: data)
+    }
+
+    /// Gets unclassified transactions sorted by merchant impact (round-robin)
+    func getUnclassifiedTransactions(userId: Int, limit: Int = 10) async throws -> UnclassifiedTransactionsResponse {
+        var urlComponents = URLComponents(url: baseURL.appendingPathComponent("expenses/unclassified/\(userId)"), resolvingAgainstBaseURL: false)!
+        urlComponents.queryItems = [URLQueryItem(name: "limit", value: String(limit))]
+
+        guard let url = urlComponents.url else { throw APIError.invalidResponse }
+
+        let (data, response) = try await URLSession.shared.data(from: url)
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            throw APIError.invalidResponse
+        }
+        return try JSONDecoder().decode(UnclassifiedTransactionsResponse.self, from: data)
+    }
+
+    // MARK: - Device Token API
+
+    /// Registers a device token for push notifications
+    func registerDeviceToken(userId: Int, token: String) async throws {
+        let url = baseURL.appendingPathComponent("device/register")
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        let body: [String: Any] = [
+            "userId": userId,
+            "token": token,
+            "platform": "ios"
+        ]
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        let (_, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            throw APIError.invalidResponse
+        }
+    }
+
+    /// Unregisters a device token (e.g., on logout)
+    func unregisterDeviceToken(userId: Int, token: String) async throws {
+        let url = baseURL.appendingPathComponent("device/unregister")
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        let body: [String: Any] = [
+            "userId": userId,
+            "token": token
+        ]
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        let (_, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            throw APIError.invalidResponse
+        }
+    }
+
+    /// Triggers LLM-based batch auto-classification for unclassified merchants
+    func autoClassifyMerchants(userId: Int) async throws -> AutoClassifyResponse {
+        let url = baseURL.appendingPathComponent("expenses/auto-classify/\(userId)")
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            throw APIError.invalidResponse
+        }
+        return try JSONDecoder().decode(AutoClassifyResponse.self, from: data)
+    }
+
     /// Gets smart nudges
     func getNudges(userId: Int) async throws -> NudgesResponse {
         let url = baseURL.appendingPathComponent("user/nudges/\(userId)")

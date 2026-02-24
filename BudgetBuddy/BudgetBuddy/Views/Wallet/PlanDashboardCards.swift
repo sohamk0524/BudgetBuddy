@@ -1648,7 +1648,7 @@ struct ActualVsPlannedChart: View {
                 BudgetItem(name: "Groceries", amount: 400),
                 BudgetItem(name: "Transportation", amount: 200)
             ]),
-            BudgetCategory(id: "discretionary", name: "Discretionary", amount: 300, color: "#45B7D1", items: [
+            BudgetCategory(id: "discretionary", name: "Fun Money", amount: 300, color: "#45B7D1", items: [
                 BudgetItem(name: "Dining & Entertainment", amount: 200),
                 BudgetItem(name: "Clothes", amount: 100)
             ]),

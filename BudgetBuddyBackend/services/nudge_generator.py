@@ -11,11 +11,8 @@ from typing import List, Dict, Any, Optional
 
 def _display_name(raw_name: str) -> str:
     """Convert a Plaid category code to a human-readable display name."""
-    try:
-        from app import format_category_name
-        return format_category_name(raw_name)
-    except ImportError:
-        return raw_name.replace("_", " ").title().replace(" And ", " & ")
+    from api.user import format_category_name
+    return format_category_name(raw_name)
 
 
 def generate_nudges(user_id: int) -> List[Dict[str, Any]]:
@@ -25,8 +22,6 @@ def generate_nudges(user_id: int) -> List[Dict[str, Any]]:
     Returns a list of nudge dicts sorted by impact, max 5.
     Each nudge has: type, title, message, category (optional), potentialSavings (optional).
     """
-    from db_models import PlaidItem, Transaction, BudgetPlan, SavedStatement
-
     nudges = []
 
     # 1. Get actual spending from Plaid transactions (last 30 days)
@@ -55,45 +50,42 @@ def generate_nudges(user_id: int) -> List[Dict[str, Any]]:
 
 def _get_actual_spending(user_id: int) -> Dict[str, float]:
     """Get actual spending by category from Plaid transactions (last 30 days)."""
-    from db_models import PlaidItem, Transaction
+    from db_models import get_active_plaid_items, get_accounts_for_item, get_transactions_since
 
-    plaid_items = PlaidItem.query.filter_by(user_id=user_id, status="active").all()
+    plaid_items = get_active_plaid_items(user_id)
     if not plaid_items:
         return {}
 
     account_ids = []
     for item in plaid_items:
-        for account in item.accounts:
-            account_ids.append(account.id)
+        for account in get_accounts_for_item(item.key.id):
+            account_ids.append(account.key.id)
 
     if not account_ids:
         return {}
 
-    start_date = (datetime.now() - timedelta(days=30)).date()
-    transactions = Transaction.query.filter(
-        Transaction.plaid_account_id.in_(account_ids),
-        Transaction.date >= start_date
-    ).all()
+    since_date = (datetime.now() - timedelta(days=30)).date()
+    transactions = get_transactions_since(account_ids, since_date)
 
     category_totals = {}
     for txn in transactions:
-        if txn.amount > 0:  # Positive = spending
-            category = txn.category_primary or "Uncategorized"
-            category_totals[category] = category_totals.get(category, 0) + txn.amount
+        if (txn.get('amount') or 0) > 0:
+            category = txn.get('category_primary') or "Uncategorized"
+            category_totals[category] = category_totals.get(category, 0) + txn['amount']
 
     return category_totals
 
 
 def _get_statement_spending(user_id: int) -> Dict[str, float]:
     """Fallback: get spending by category from uploaded statement."""
-    from db_models import SavedStatement
+    from db_models import get_statement
 
-    statement = SavedStatement.query.filter_by(user_id=user_id).first()
-    if not statement or not statement.llm_analysis:
+    statement = get_statement(user_id)
+    if not statement or not statement.get('llm_analysis'):
         return {}
 
     try:
-        analysis = json.loads(statement.llm_analysis)
+        analysis = json.loads(statement['llm_analysis'])
         top_categories = analysis.get("top_categories", [])
         return {
             cat.get("category", "Other"): float(cat.get("amount", 0))
@@ -105,17 +97,14 @@ def _get_statement_spending(user_id: int) -> Dict[str, float]:
 
 def _get_plan_allocations(user_id: int) -> Dict[str, float]:
     """Get budget category allocations from the latest plan."""
-    from db_models import BudgetPlan
+    from db_models import get_latest_plan
 
-    plan_record = BudgetPlan.query.filter_by(user_id=user_id).order_by(
-        BudgetPlan.created_at.desc()
-    ).first()
-
+    plan_record = get_latest_plan(user_id)
     if not plan_record:
         return {}
 
     try:
-        plan_data = json.loads(plan_record.plan_json)
+        plan_data = json.loads(plan_record['plan_json'])
         categories = plan_data.get("categories", [])
         return {
             cat.get("name", ""): float(cat.get("amount", 0))
@@ -175,17 +164,14 @@ def _compare_spending(
 
 def _get_goal_nudges(user_id: int) -> List[Dict[str, Any]]:
     """Generate nudges about savings goal progress."""
-    from db_models import BudgetPlan
+    from db_models import get_latest_plan
 
-    plan_record = BudgetPlan.query.filter_by(user_id=user_id).order_by(
-        BudgetPlan.created_at.desc()
-    ).first()
-
+    plan_record = get_latest_plan(user_id)
     if not plan_record:
         return []
 
     try:
-        plan_data = json.loads(plan_record.plan_json)
+        plan_data = json.loads(plan_record['plan_json'])
         total_savings = plan_data.get("totalSavings", 0)
 
         if total_savings > 0:
@@ -193,7 +179,7 @@ def _get_goal_nudges(user_id: int) -> List[Dict[str, Any]]:
                 "type": "goal_reminder",
                 "title": "Stay on track",
                 "message": f"Your plan allocates ${total_savings:.0f}/mo toward savings. Make sure to set it aside early in the month.",
-                "potentialSavings": 0
+                "potentialSavings": 0,
             }]
     except (json.JSONDecodeError, TypeError):
         pass
