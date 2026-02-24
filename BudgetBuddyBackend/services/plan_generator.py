@@ -35,6 +35,9 @@ SAVINGS GOALS:
 USER PREFERENCES:
 {preferences}
 
+HISTORICAL SPENDING BREAKDOWN (last 30 days, if available):
+{spending_breakdown}
+
 INSTRUCTIONS:
 1. Calculate total monthly expenses and Safe-to-Spend amount
 2. Allocate funds to each category with specific dollar amounts
@@ -42,6 +45,7 @@ INSTRUCTIONS:
 4. Provide 3-5 actionable, personalized recommendations
 5. Flag any warnings (overspending, income doesn't cover expenses, etc.)
 6. Use the 50/30/20 rule as a guideline but adapt to user's financial personality
+7. For each category, include an "essentialSplit" showing the essential vs. discretionary breakdown based on historical data
 
 OUTPUT FORMAT (respond ONLY with valid JSON, no other text):
 {{
@@ -50,12 +54,14 @@ OUTPUT FORMAT (respond ONLY with valid JSON, no other text):
     "totalIncome": <number>,
     "totalExpenses": <number>,
     "totalSavings": <number>,
+    "totalEssential": <number - total essential spending from all categories>,
+    "totalDiscretionary": <number - total discretionary spending from all categories>,
     "categoryAllocations": [
-        {{"id": "fixed", "name": "Fixed Essentials", "amount": <number>, "color": "#FF6B6B", "items": [{{"name": "Rent", "amount": <number>}}, ...]}},
-        {{"id": "flexible", "name": "Flexible Spending", "amount": <number>, "color": "#4ECDC4", "items": [...]}},
-        {{"id": "discretionary", "name": "Discretionary", "amount": <number>, "color": "#45B7D1", "items": [...]}},
-        {{"id": "savings", "name": "Savings Goals", "amount": <number>, "color": "#96CEB4", "items": [...]}},
-        {{"id": "events", "name": "Upcoming Events", "amount": <number>, "color": "#FFEAA7", "items": [...]}}
+        {{"id": "fixed", "name": "Fixed Essentials", "amount": <number>, "color": "#FF6B6B", "items": [{{"name": "Rent", "amount": <number>}}, ...], "essentialAmount": <number>, "discretionaryAmount": <number>}},
+        {{"id": "flexible", "name": "Flexible Spending", "amount": <number>, "color": "#4ECDC4", "items": [...], "essentialAmount": <number>, "discretionaryAmount": <number>}},
+        {{"id": "discretionary", "name": "Fun Money", "amount": <number>, "color": "#45B7D1", "items": [...], "essentialAmount": 0, "discretionaryAmount": <number>}},
+        {{"id": "savings", "name": "Savings Goals", "amount": <number>, "color": "#96CEB4", "items": [...], "essentialAmount": <number>, "discretionaryAmount": 0}},
+        {{"id": "events", "name": "Upcoming Events", "amount": <number>, "color": "#FFEAA7", "items": [...], "essentialAmount": 0, "discretionaryAmount": <number>}}
     ],
     "recommendations": [
         {{"category": "groceries", "title": "Short actionable title", "description": "Detailed explanation", "potentialSavings": <number or null>}},
@@ -174,6 +180,70 @@ def format_savings_goals(goals: List[Dict[str, Any]]) -> str:
     return "\n".join(lines)
 
 
+def get_spending_breakdown(user_id: int) -> str:
+    """Get essential/discretionary spending breakdown from classified transactions."""
+    try:
+        from db_models import PlaidItem, Transaction
+
+        plaid_items = PlaidItem.query.filter_by(user_id=user_id, status="active").all()
+        account_ids = []
+        for item in plaid_items:
+            for account in item.accounts:
+                account_ids.append(account.id)
+
+        if not account_ids:
+            return "No transaction data available"
+
+        start_date = (datetime.now() - timedelta(days=30)).date()
+        transactions = Transaction.query.filter(
+            Transaction.plaid_account_id.in_(account_ids),
+            Transaction.date >= start_date,
+            Transaction.amount > 0
+        ).all()
+
+        if not transactions:
+            return "No recent transactions"
+
+        # Aggregate by primary category with essential/discretionary splits
+        category_data = {}
+        total_essential = 0.0
+        total_discretionary = 0.0
+
+        for txn in transactions:
+            cat = txn.category_primary or "Uncategorized"
+            if cat not in category_data:
+                category_data[cat] = {"total": 0, "essential": 0, "discretionary": 0, "count": 0}
+
+            category_data[cat]["total"] += txn.amount
+            category_data[cat]["count"] += 1
+
+            if txn.sub_category == 'essential':
+                category_data[cat]["essential"] += txn.essential_amount or txn.amount
+                total_essential += txn.essential_amount or txn.amount
+            elif txn.sub_category == 'discretionary':
+                category_data[cat]["discretionary"] += txn.discretionary_amount or txn.amount
+                total_discretionary += txn.discretionary_amount or txn.amount
+            elif txn.sub_category == 'mixed':
+                category_data[cat]["essential"] += txn.essential_amount or 0
+                category_data[cat]["discretionary"] += txn.discretionary_amount or 0
+                total_essential += txn.essential_amount or 0
+                total_discretionary += txn.discretionary_amount or 0
+
+        lines = [f"Total Essential: ${total_essential:,.2f} | Total Discretionary: ${total_discretionary:,.2f}"]
+        lines.append("")
+
+        sorted_cats = sorted(category_data.items(), key=lambda x: x[1]["total"], reverse=True)
+        for cat, data in sorted_cats[:8]:
+            lines.append(f"  {cat}: ${data['total']:,.2f} total ({data['count']} transactions)")
+            lines.append(f"    Essential: ${data['essential']:,.2f} | Discretionary: ${data['discretionary']:,.2f}")
+
+        return "\n".join(lines)
+
+    except Exception as e:
+        print(f"Error getting spending breakdown: {e}")
+        return "Unable to retrieve spending breakdown"
+
+
 def format_preferences(prefs: Dict[str, Any]) -> str:
     """Format spending preferences for the prompt."""
     if not prefs:
@@ -240,7 +310,8 @@ def generate_plan(user_id: int, deep_dive_data: Dict[str, Any]) -> Dict[str, Any
         "detailed_expenses": format_deep_dive_data(deep_dive_data),
         "upcoming_events": format_upcoming_events(deep_dive_data.get("upcomingEvents", [])),
         "savings_goals": format_savings_goals(deep_dive_data.get("savingsGoals", [])),
-        "preferences": format_preferences(deep_dive_data.get("spendingPreferences", {}))
+        "preferences": format_preferences(deep_dive_data.get("spendingPreferences", {})),
+        "spending_breakdown": get_spending_breakdown(user_id)
     }
 
     system_prompt = PLAN_GENERATION_PROMPT.format(**prompt_data)
@@ -372,7 +443,7 @@ def generate_fallback_plan(profile: Dict[str, Any], deep_dive_data: Dict[str, An
         },
         {
             "id": "discretionary",
-            "name": "Discretionary",
+            "name": "Fun Money",
             "amount": total_discretionary,
             "color": "#45B7D1",
             "items": [

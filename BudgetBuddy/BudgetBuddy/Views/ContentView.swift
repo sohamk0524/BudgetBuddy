@@ -12,6 +12,7 @@ struct ContentView: View {
     @State private var selectedTab = 0
     @State private var planViewModel = SpendingPlanViewModel()
     @State private var walletViewModel = WalletViewModel()
+    @State private var expensesViewModel = ExpensesViewModel()
     @State private var showPlaidLink = false
     @State private var hasCompletedPlaidFlow = false
 
@@ -68,12 +69,19 @@ struct ContentView: View {
                 }
                 .tag(1)
 
-            // Tab 3: Plan (Spending Plan)
+            // Tab 3: Expenses (Classification)
+            ExpensesView(viewModel: expensesViewModel)
+                .tabItem {
+                    Label("Expenses", systemImage: "list.bullet.rectangle.fill")
+                }
+                .tag(2)
+
+            // Tab 4: Plan (Spending Plan)
             PlanView(viewModel: planViewModel, walletViewModel: walletViewModel)
                 .tabItem {
                     Label("Plan", systemImage: "doc.text.fill")
                 }
-                .tag(2)
+                .tag(3)
         }
         .tint(Color.accent)
         .onAppear {
