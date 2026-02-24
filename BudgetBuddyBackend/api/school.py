@@ -40,11 +40,16 @@ def school_advice():
     if not user_id:
         return jsonify({"error": "user_id is required"}), 400
 
+    try:
+        user_id_int = int(user_id)
+    except (TypeError, ValueError):
+        return jsonify({"error": "user_id must be an integer"}), 400
+
     school_name = data.get("school_name")
 
     # If no school_name provided, look it up from the user's profile
     if not school_name:
-        profile = get_profile(user_id)
+        profile = get_profile(user_id_int)
         if profile and profile.get("school"):
             school_name = profile["school"]
         else:

@@ -50,7 +50,7 @@ def get_school_advice(user_query: str, school_slug: str) -> dict:
     # Step 1: Rewrite the query for web search using LLM
     try:
         rewrite_response = litellm.completion(
-            model="claude-sonnet-4-5",
+            model="claude-sonnet-4-5-20250929",
             messages=[
                 {
                     "role": "user",
