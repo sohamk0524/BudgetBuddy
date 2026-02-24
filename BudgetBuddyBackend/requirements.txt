@@ -1,17 +1,12 @@
 flask==3.0.0
 flask-cors==4.0.0
-flask-sqlalchemy==3.1.1
+gunicorn==21.2.0
 requests==2.31.0
 litellm>=1.0.0
 pdfplumber>=0.9.0
 werkzeug>=3.0.0
-
-# Plaid integration
+google-cloud-datastore>=2.19.0
+google-cloud-storage>=2.14.0
 plaid-python>=14.0.0
 cryptography>=41.0.0
 python-dotenv>=1.0.0
-
-# Testing dependencies
-pytest>=7.4.0
-pytest-cov>=4.1.0
-pytest-mock>=3.12.0
