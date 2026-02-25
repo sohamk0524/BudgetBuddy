@@ -385,6 +385,36 @@ actor APIService {
         }
     }
 
+    /// Parses a spoken transaction statement into structured fields via a dedicated LLM endpoint
+    func parseTransaction(statement: String) async throws -> ParsedTransactionResponse {
+        let url = baseURL.appendingPathComponent("user/parse-transaction")
+        var urlRequest = URLRequest(url: url)
+        urlRequest.httpMethod = "POST"
+        urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        let body: [String: Any] = ["statement": statement]
+        urlRequest.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        let (data, response) = try await URLSession.shared.data(for: urlRequest)
+        guard let httpResponse = response as? HTTPURLResponse else { throw APIError.invalidResponse }
+        guard httpResponse.statusCode == 200 else { throw APIError.serverError(statusCode: httpResponse.statusCode) }
+        return try JSONDecoder().decode(ParsedTransactionResponse.self, from: data)
+    }
+
+    /// Saves a manually-entered (voice) transaction
+    func saveManualTransaction(request: SaveTransactionRequest) async throws -> SaveTransactionResponse {
+        let url = baseURL.appendingPathComponent("user/transactions")
+        var urlRequest = URLRequest(url: url)
+        urlRequest.httpMethod = "POST"
+        urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        urlRequest.httpBody = try JSONEncoder().encode(request)
+
+        let (data, response) = try await URLSession.shared.data(for: urlRequest)
+        guard let httpResponse = response as? HTTPURLResponse else { throw APIError.invalidResponse }
+        guard httpResponse.statusCode == 201 else { throw APIError.serverError(statusCode: httpResponse.statusCode) }
+        return try JSONDecoder().decode(SaveTransactionResponse.self, from: data)
+    }
+
     // MARK: - Expense Classification API
 
     /// Gets expenses with sub-category classification data
