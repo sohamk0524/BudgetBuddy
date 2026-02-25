@@ -420,38 +420,34 @@ def parse_transaction():
     if not statement:
         return jsonify({"error": "statement is required"}), 400
 
-    import litellm
+    from services.llm_service import Agent
 
-    system_prompt = (
-        "You are a transaction parser. Extract transaction details from the user's spoken statement.\n"
-        "Return ONLY a JSON object with these fields:\n"
-        '  {"amount": <number or null>, "category": <string or null>, "store": <string or null>, "date": <ISO 8601 string or null>, "notes": <string or null>}\n'
-        "Rules:\n"
-        "- amount: the dollar amount spent, as a number (e.g. 10.50). Convert words like \"ten\" to 10.\n"
-        "- category: one of Coffee, Food, Groceries, Transport, Entertainment, Shopping, Gas, or Other.\n"
-        "- store: the merchant/store name if mentioned.\n"
-        "- date: if a date is mentioned, use ISO 8601. If \"today\" or not mentioned, use null.\n"
-        "- notes: any extra detail not captured above, or null.\n"
-        "Return ONLY the JSON object. No markdown, no explanation, no extra text."
+    parse_agent = Agent(
+        name="TransactionParser",
+        instructions=(
+            "You are a transaction parser. Extract transaction details from the user's spoken statement.\n"
+            "Return ONLY a JSON object with these fields:\n"
+            '  {"amount": <number or null>, "category": <string or null>, "store": <string or null>, "date": <ISO 8601 string or null>, "notes": <string or null>}\n'
+            "Rules:\n"
+            '- amount: the dollar amount spent, as a number (e.g. 10.50). Convert words like "ten" to 10.\n'
+            "- category: one of Coffee, Food, Groceries, Transport, Entertainment, Shopping, Gas, or Other.\n"
+            "- store: the merchant/store name if mentioned.\n"
+            '- date: if a date is mentioned, use ISO 8601. If "today" or not mentioned, use null.\n'
+            "- notes: any extra detail not captured above, or null.\n"
+            "Return ONLY the JSON object. No markdown, no explanation, no extra text."
+        ),
+        tools=None,
     )
 
     try:
-        response = litellm.completion(
-            model="claude-sonnet-4-5-20250929",
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": statement},
-            ],
-            max_tokens=256,
-        )
-        raw = response.choices[0].message.content or ""
+        result = parse_agent.run(statement)
+        raw = result.get("content", "")
 
         # Extract JSON from response (find first { to last })
         start = raw.find("{")
         end = raw.rfind("}")
         if start != -1 and end != -1:
-            import json as _json
-            parsed = _json.loads(raw[start:end + 1])
+            parsed = json.loads(raw[start:end + 1])
             return jsonify(parsed)
 
         return jsonify({"amount": None, "category": None, "store": None, "date": None, "notes": None})
