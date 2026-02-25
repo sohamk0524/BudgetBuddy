@@ -594,3 +594,24 @@ struct SmartNudge: Codable, Identifiable {
     let potentialSavings: Double?
     let category: String?
 }
+
+// MARK: - Recommendation Models
+
+struct RecommendationItem: Codable, Identifiable {
+    var id: String { category + title }
+    let category: String
+    let title: String
+    let description: String
+    let potentialSavings: Double?
+    let priority: Int?
+    let icon: String?
+}
+
+struct RecommendationsResponse: Codable {
+    let recommendations: [RecommendationItem]
+    let safeToSpend: Double?
+    let status: String?
+    let summary: String?
+    let cached: Bool?
+    let generatedAt: String?
+}

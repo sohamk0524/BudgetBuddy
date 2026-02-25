@@ -2,7 +2,7 @@
 //  ContentView.swift
 //  BudgetBuddy
 //
-//  Root view with auth routing and TabView for Chat, Wallet, and Plan
+//  Root view with auth routing and TabView for Tips, Expenses, and Profile
 //
 
 import SwiftUI
@@ -10,8 +10,6 @@ import SwiftUI
 struct ContentView: View {
     @State private var authManager = AuthManager.shared
     @State private var selectedTab = 0
-    @State private var planViewModel = SpendingPlanViewModel()
-    @State private var walletViewModel = WalletViewModel()
     @State private var expensesViewModel = ExpensesViewModel()
     @State private var showPlaidLink = false
     @State private var hasCompletedPlaidFlow = false
@@ -55,33 +53,40 @@ struct ContentView: View {
 
     private var mainTabView: some View {
         TabView(selection: $selectedTab) {
-            // Tab 1: Chat (Command Center)
-            ChatView()
+            // Tab 1: Recommendations (Tips Dashboard)
+            RecommendationsView()
                 .tabItem {
-                    Label("Chat", systemImage: "message.fill")
+                    Label("Tips", systemImage: "lightbulb.fill")
                 }
                 .tag(0)
 
-            // Tab 2: Wallet (Dashboard)
-            WalletView(walletViewModel: walletViewModel, planViewModel: planViewModel)
-                .tabItem {
-                    Label("Wallet", systemImage: "wallet.pass.fill")
-                }
-                .tag(1)
+            // Tab 2: Wallet (Dashboard) — hidden for now
+            // WalletView(walletViewModel: walletViewModel, planViewModel: planViewModel)
+            //     .tabItem {
+            //         Label("Wallet", systemImage: "wallet.pass.fill")
+            //     }
+            //     .tag(1)
 
-            // Tab 3: Expenses (Classification)
+            // Tab 2: Expenses (Classification)
             ExpensesView(viewModel: expensesViewModel)
                 .tabItem {
                     Label("Expenses", systemImage: "list.bullet.rectangle.fill")
                 }
+                .tag(1)
+
+            // Tab 3: Profile
+            ProfileView()
+                .tabItem {
+                    Label("Profile", systemImage: "person.circle")
+                }
                 .tag(2)
 
-            // Tab 4: Plan (Spending Plan)
-            PlanView(viewModel: planViewModel, walletViewModel: walletViewModel)
-                .tabItem {
-                    Label("Plan", systemImage: "doc.text.fill")
-                }
-                .tag(3)
+            // Tab 4: Plan (Spending Plan) — hidden for now
+            // PlanView(viewModel: planViewModel, walletViewModel: walletViewModel)
+            //     .tabItem {
+            //         Label("Plan", systemImage: "doc.text.fill")
+            //     }
+            //     .tag(3)
         }
         .tint(Color.accent)
         .onAppear {
