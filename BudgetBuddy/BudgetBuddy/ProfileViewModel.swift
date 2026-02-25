@@ -86,7 +86,7 @@ class ProfileViewModel {
         guard let userId = AuthManager.shared.authToken else { return }
 
         do {
-            let url = URL(string: "http://localhost:5000/plaid/unlink/\(userId)/\(itemId)")!
+            let url = AppConfig.baseURL.appendingPathComponent("plaid/unlink/\(userId)/\(itemId)")
             var request = URLRequest(url: url)
             request.httpMethod = "DELETE"
 
