@@ -17,6 +17,8 @@ from api.budget import budget_bp
 from api.chat import chat_bp
 from api.user import user_bp
 from api.plaid import plaid_bp
+from api.expenses import expenses_bp
+from api.school import school_bp
 
 app = Flask(__name__)
 
@@ -28,6 +30,8 @@ app.register_blueprint(budget_bp)
 app.register_blueprint(chat_bp)
 app.register_blueprint(user_bp)
 app.register_blueprint(plaid_bp)
+app.register_blueprint(expenses_bp)
+app.register_blueprint(school_bp)
 
 
 @app.route("/")

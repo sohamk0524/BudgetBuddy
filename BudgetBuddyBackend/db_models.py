@@ -453,3 +453,76 @@ def get_manual_transactions(user_id: int, limit: int = 50) -> List[datastore.Ent
     results = list(query.fetch())
     results.sort(key=lambda e: e.get('created_at', datetime.min), reverse=True)
     return results[:limit]
+
+
+# ---------------------------------------------------------------------------
+# MerchantClassification
+# ---------------------------------------------------------------------------
+
+def get_merchant_classification(user_id: int, merchant_name: str) -> Optional[datastore.Entity]:
+    client = get_client()
+    query = client.query(kind='MerchantClassification')
+    query.add_filter('user_id', '=', user_id)
+    query.add_filter('merchant_name', '=', merchant_name)
+    results = list(query.fetch(limit=1))
+    return results[0] if results else None
+
+
+def get_merchant_classifications_for_user(user_id: int) -> List[datastore.Entity]:
+    client = get_client()
+    query = client.query(kind='MerchantClassification')
+    query.add_filter('user_id', '=', user_id)
+    return list(query.fetch())
+
+
+def upsert_merchant_classification(user_id: int, merchant_name: str, **kwargs) -> datastore.Entity:
+    client = get_client()
+    existing = get_merchant_classification(user_id, merchant_name)
+    if existing:
+        entity = existing
+    else:
+        key = client.key('MerchantClassification')
+        entity = datastore.Entity(key=key)
+        entity['user_id'] = user_id
+        entity['merchant_name'] = merchant_name
+        entity['created_at'] = datetime.utcnow()
+    entity.update(kwargs)
+    client.put(entity)
+    return entity
+
+
+# ---------------------------------------------------------------------------
+# DeviceToken
+# ---------------------------------------------------------------------------
+
+def get_active_device_tokens(user_id: int) -> List[datastore.Entity]:
+    client = get_client()
+    query = client.query(kind='DeviceToken')
+    query.add_filter('user_id', '=', user_id)
+    query.add_filter('is_active', '=', True)
+    return list(query.fetch())
+
+
+def get_device_token(user_id: int, token: str) -> Optional[datastore.Entity]:
+    client = get_client()
+    query = client.query(kind='DeviceToken')
+    query.add_filter('user_id', '=', user_id)
+    query.add_filter('token', '=', token)
+    results = list(query.fetch(limit=1))
+    return results[0] if results else None
+
+
+def upsert_device_token(user_id: int, token: str, **kwargs) -> datastore.Entity:
+    client = get_client()
+    existing = get_device_token(user_id, token)
+    if existing:
+        entity = existing
+    else:
+        key = client.key('DeviceToken')
+        entity = datastore.Entity(key=key)
+        entity['user_id'] = user_id
+        entity['token'] = token
+        entity['created_at'] = datetime.utcnow()
+    entity.update(kwargs)
+    client.put(entity)
+    return entity

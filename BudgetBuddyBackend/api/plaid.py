@@ -353,3 +353,119 @@ def unlink_plaid_item(user_id, item_id):
     delete_plaid_item_cascade(plaid_item.key)
 
     return jsonify({"success": True})
+
+
+@plaid_bp.route("/plaid/webhook", methods=["POST"])
+def plaid_webhook():
+    """
+    Handle Plaid webhook events.
+    Key webhook types:
+    - TRANSACTIONS: DEFAULT_UPDATE, SYNC_UPDATES_AVAILABLE
+    - ITEM: ERROR, PENDING_EXPIRATION
+    """
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "Invalid request"}), 400
+
+    webhook_type = data.get("webhook_type")
+    webhook_code = data.get("webhook_code")
+    item_id = data.get("item_id")
+
+    print(f"[WEBHOOK] type={webhook_type}, code={webhook_code}, item_id={item_id}")
+
+    if webhook_type == "TRANSACTIONS":
+        if webhook_code in ("DEFAULT_UPDATE", "SYNC_UPDATES_AVAILABLE"):
+            plaid_item = get_plaid_item_by_item_id(item_id)
+            if not plaid_item:
+                print(f"[WEBHOOK] Unknown item_id: {item_id}")
+                return jsonify({"received": True}), 200
+
+            user_id = plaid_item.get('user_id')
+
+            try:
+                account_map = {
+                    acc['account_id']: acc
+                    for acc in get_accounts_for_item(plaid_item.key.id)
+                }
+                has_more = True
+                cursor = plaid_item.get('transactions_cursor')
+                new_transactions = []
+
+                while has_more:
+                    result = plaid_service.sync_transactions(
+                        plaid_item['access_token_encrypted'],
+                        cursor,
+                    )
+
+                    for txn_data in result["added"]:
+                        account = account_map.get(txn_data["account_id"])
+                        if account:
+                            existing = get_transaction_by_transaction_id(txn_data["transaction_id"])
+                            if not existing:
+                                txn = create_transaction(
+                                    account.key.id,
+                                    transaction_id=txn_data["transaction_id"],
+                                    amount=txn_data["amount"],
+                                    date=txn_data["date"],
+                                    authorized_date=txn_data["authorized_date"],
+                                    name=txn_data["name"],
+                                    merchant_name=txn_data["merchant_name"],
+                                    category_primary=txn_data["category"],
+                                    category_detailed=txn_data["category_detailed"],
+                                    category_confidence=txn_data["category_confidence"],
+                                    pending=txn_data["pending"],
+                                    payment_channel=txn_data["payment_channel"],
+                                )
+                                new_transactions.append(txn)
+
+                    for txn_data in result["modified"]:
+                        update_transaction_by_id(
+                            txn_data["transaction_id"],
+                            amount=txn_data["amount"],
+                            date=txn_data["date"],
+                            name=txn_data["name"],
+                            merchant_name=txn_data["merchant_name"],
+                            category_primary=txn_data["category"],
+                            category_detailed=txn_data["category_detailed"],
+                            pending=txn_data["pending"],
+                        )
+
+                    for removed in result["removed"]:
+                        delete_transaction_by_id(removed["transaction_id"])
+
+                    cursor = result["next_cursor"]
+                    has_more = result["has_more"]
+
+                update_plaid_item(plaid_item.key, transactions_cursor=cursor)
+
+                if new_transactions:
+                    from services.push_service import notify_new_transactions, notify_classification_needed
+                    notify_new_transactions(user_id, new_transactions)
+                    for txn in new_transactions:
+                        if txn.get('sub_category') == 'unclassified' and txn.get('merchant_name'):
+                            notify_classification_needed(user_id, txn['merchant_name'], abs(txn.get('amount') or 0))
+                            break
+
+                print(f"[WEBHOOK] Synced {len(new_transactions)} new transactions for user {user_id}")
+
+            except Exception as e:
+                print(f"[WEBHOOK] Error processing transactions: {e}")
+
+        elif webhook_code == "INITIAL_UPDATE":
+            print(f"[WEBHOOK] Initial historical update for item {item_id}")
+
+    elif webhook_type == "ITEM":
+        if webhook_code == "ERROR":
+            error = data.get("error", {})
+            print(f"[WEBHOOK] Item error for {item_id}: {error}")
+            plaid_item = get_plaid_item_by_item_id(item_id)
+            if plaid_item:
+                update_plaid_item(plaid_item.key, status="error")
+
+        elif webhook_code == "PENDING_EXPIRATION":
+            print(f"[WEBHOOK] Item pending expiration: {item_id}")
+            plaid_item = get_plaid_item_by_item_id(item_id)
+            if plaid_item:
+                update_plaid_item(plaid_item.key, status="pending_expiration")
+
+    return jsonify({"received": True}), 200
