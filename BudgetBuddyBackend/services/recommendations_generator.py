@@ -10,7 +10,6 @@ from typing import Dict, Any, List, Optional
 
 from services.llm_service import Agent
 from services.tools import (
-    _get_user_budget_plan,
     _get_plaid_transactions,
     _get_user_financial_summary,
     _get_user_spending_status,
@@ -36,7 +35,7 @@ You will receive the user's financial context (budget plan, transactions, financ
 }
 
 RULES:
-- Return 3-5 recommendations sorted by priority
+- Return 3 recommendations sorted by priority
 - Use REAL numbers from the provided data — never make up amounts
 - Each recommendation must be specific and actionable
 - potentialSavings should be 0 if not applicable
@@ -47,19 +46,11 @@ RULES:
 ACTION_PROMPTS = {
     "general": "Analyze all the user's financial data and provide general recommendations.",
     "budget_balance": "Focus on how the user's budget allocations compare to actual spending. Highlight categories that are over or under budget.",
-    "spending_habits": "Focus on the user's spending patterns and habits. Identify trends, recurring expenses, and areas where small changes could save money.",
+    "spending_habits": "Focus on the user's spending patterns and habits. Identify trends, recurring expenses, and areas where small changes could save money. If school-specific context is provided, incorporate local student deals and resources into your recommendations.",
 }
 
 # Tool definitions for the recommendations agent (subset — no render_visual)
 _RECO_TOOLS = [
-    {
-        "type": "function",
-        "function": {
-            "name": "get_budget_plan",
-            "description": "Get the user's budget plan with category allocations.",
-            "parameters": {"type": "object", "properties": {}, "required": []},
-        },
-    },
     {
         "type": "function",
         "function": {
@@ -90,16 +81,35 @@ _RECO_TOOLS = [
             "parameters": {"type": "object", "properties": {}, "required": []},
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_school_advice",
+            "description": "Search the web for school-specific financial advice (student discounts, cheap food, campus resources). Use when the user is a student and recommendations could benefit from school-specific context.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "The question to search for (e.g., 'student discounts', 'cheap food near campus')"
+                    }
+                },
+                "required": ["query"],
+            },
+        },
+    },
 ]
 
 
 def _tool_executor(user_id: int):
     """Return a tool executor bound to the given user_id."""
+    from services.tools import _get_school_advice
+
     executors = {
-        "get_budget_plan": lambda _: _get_user_budget_plan(user_id),
         "get_plaid_transactions": lambda args: _get_plaid_transactions(user_id, args.get("days", 30) if args else 30),
         "get_financial_summary": lambda _: _get_user_financial_summary(user_id),
         "get_spending_status": lambda _: _get_user_spending_status(user_id),
+        "get_school_advice": lambda args: _get_school_advice(user_id, args.get("query", "") if args else ""),
     }
 
     def execute(tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
@@ -187,6 +197,34 @@ def generate_recommendations(user_id: int, action: str = "general") -> Dict[str,
         f"{action_prompt}\n\n"
         f"[USER CONTEXT:\n{context}]"
     )
+
+    # For spending_habits, pre-fetch school-specific advice if the user is a student
+    if action == "spending_habits":
+        try:
+            from db_models import get_profile
+            from services.school_rag import get_school_advice
+
+            profile = get_profile(user_id)
+            if profile and profile.get("is_student") and profile.get("school"):
+                # Extract top spending categories from Plaid transactions
+                txn_data = _get_plaid_transactions(user_id, days=30)
+                top_categories = []
+                if txn_data.get("has_transactions"):
+                    spending_by_cat = txn_data.get("spending_by_category", [])
+                    top_categories = [c.get("category", "") for c in spending_by_cat[:3]]
+
+                category_str = ", ".join(top_categories) if top_categories else "food, transportation, entertainment"
+                school_slug = profile.get("school")
+                query = f"student discounts and savings tips for {category_str} near {school_slug}"
+
+                school_result = get_school_advice(query, school_slug)
+                if school_result.get("answer"):
+                    user_message += (
+                        f"\n\n[SCHOOL-SPECIFIC CONTEXT: {school_result['answer']}]"
+                    )
+        except Exception as e:
+            # Don't let school advice failure block recommendations
+            print(f"School advice pre-fetch failed (non-fatal): {e}")
 
     try:
         agent = Agent(
