@@ -19,14 +19,14 @@ class Agent:
             name="BudgetBuddy",
             instructions=system_prompt,
             tools=get_tools(),
-            model="claude-opus-4-6",
+            model="claude-sonnet-4-5-20250929",
             tool_executor=execute_tool,
         )
         result = agent.run("What's my budget?")
     """
     name: str
     instructions: str
-    model: str = "claude-opus-4-6"
+    model: str = "claude-sonnet-4-5-20250929"
     tools: Optional[List[Dict[str, Any]]] = None
     tool_executor: Optional[Callable[[str, Dict], Any]] = None
     max_iterations: int = 5

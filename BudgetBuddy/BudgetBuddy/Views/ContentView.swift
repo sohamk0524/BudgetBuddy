@@ -60,13 +60,6 @@ struct ContentView: View {
                 }
                 .tag(0)
 
-            // Tab 2: Wallet (Dashboard) — hidden for now
-            // WalletView(walletViewModel: walletViewModel, planViewModel: planViewModel)
-            //     .tabItem {
-            //         Label("Wallet", systemImage: "wallet.pass.fill")
-            //     }
-            //     .tag(1)
-
             // Tab 2: Expenses (Classification)
             ExpensesView(viewModel: expensesViewModel)
                 .tabItem {
