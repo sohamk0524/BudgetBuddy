@@ -510,7 +510,10 @@ struct UnclassifiedTransactionItem: Codable, Identifiable {
     let amount: Double
     let date: String?
     let name: String
+    let source: String?
     let merchantContext: MerchantContext?
+
+    var isVoice: Bool { source == "voice" }
 }
 
 struct UnclassifiedTransactionsResponse: Codable {

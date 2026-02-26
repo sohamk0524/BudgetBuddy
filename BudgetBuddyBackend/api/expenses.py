@@ -16,6 +16,7 @@ from db_models import (
     upsert_device_token,
     get_client,
     get_manual_transactions,
+    update_manual_transaction,
 )
 from services.classification_service import (
     classify_transaction,
@@ -150,8 +151,21 @@ def get_expenses(user_id):
             continue
 
         mt_amount = mt.get('amount') or 0
+        mt_sub_category = mt.get('sub_category') or 'unclassified'
+
+        # Apply sub_category filter if set
+        if sub_category and mt_sub_category != sub_category:
+            continue
+
         total += 1
-        total_unclassified += mt_amount
+
+        # Update summary based on actual classification
+        if mt_sub_category in ('essential', 'mixed'):
+            total_essential += mt.get('essential_amount') or mt_amount
+        if mt_sub_category in ('discretionary', 'mixed'):
+            total_discretionary += mt.get('discretionary_amount') or 0
+        if mt_sub_category == 'unclassified':
+            total_unclassified += mt_amount
 
         result.append({
             "id": mt.key.id,
@@ -166,9 +180,9 @@ def get_expenses(user_id):
             "categoryDetailed": mt.get('category'),
             "pending": False,
             "paymentChannel": "voice",
-            "subCategory": "unclassified",
-            "essentialAmount": None,
-            "discretionaryAmount": None,
+            "subCategory": mt_sub_category,
+            "essentialAmount": mt.get('essential_amount'),
+            "discretionaryAmount": mt.get('discretionary_amount'),
             "source": "voice",
         })
 
@@ -269,7 +283,13 @@ def classify_single_transaction(transaction_id):
             essential_ratio = 0.5
 
     client = get_client()
+
+    # Try Plaid Transaction first, then fall back to ManualTransaction
     txn = client.get(client.key('Transaction', transaction_id))
+    is_manual = False
+    if not txn:
+        txn = client.get(client.key('ManualTransaction', transaction_id))
+        is_manual = True
     if not txn:
         return jsonify({"error": "Transaction not found"}), 404
 
@@ -278,6 +298,20 @@ def classify_single_transaction(transaction_id):
     txn['essential_amount'] = round(amount * essential_ratio, 2)
     txn['discretionary_amount'] = round(amount * (1.0 - essential_ratio), 2)
     client.put(txn)
+
+    # Manual transactions: just save classification, no merchant-level propagation
+    if is_manual:
+        return jsonify({
+            "success": True,
+            "transaction": {
+                "id": txn.key.id,
+                "subCategory": txn.get('sub_category'),
+                "essentialAmount": txn.get('essential_amount'),
+                "discretionaryAmount": txn.get('discretionary_amount'),
+            },
+            "updatedMerchantRatio": essential_ratio,
+            "autoApplied": 0,
+        })
 
     # Update merchant running average and check auto-apply threshold
     updated_merchant_ratio = essential_ratio
@@ -380,15 +414,27 @@ def get_unclassified_transactions(user_id):
     limit = request.args.get("limit", 10, type=int)
 
     account_ids, _ = _get_account_ids_and_map(user_id)
-    if not account_ids:
-        return jsonify({"transactions": [], "totalUnclassified": 0})
 
-    all_txns, _ = get_transactions_for_accounts(account_ids, limit=10000)
-    unclassified = [
-        t for t in all_txns
-        if (t.get('amount') or 0) > 0 and t.get('sub_category') in (None, 'unclassified')
+    # Fetch unclassified Plaid transactions (if any linked accounts)
+    plaid_unclassified = []
+    all_plaid_txns = []
+    if account_ids:
+        all_plaid_txns, _ = get_transactions_for_accounts(account_ids, limit=10000)
+        plaid_unclassified = [
+            t for t in all_plaid_txns
+            if (t.get('amount') or 0) > 0 and t.get('sub_category') in (None, 'unclassified')
+        ]
+
+    # Fetch unclassified manual (voice) transactions
+    manual_unclassified = [
+        mt for mt in get_manual_transactions(user_id)
+        if (mt.get('amount') or 0) > 0 and mt.get('sub_category') in (None, 'unclassified')
     ]
-    total_unclassified = len(unclassified)
+
+    total_unclassified = len(plaid_unclassified) + len(manual_unclassified)
+
+    if total_unclassified == 0:
+        return jsonify({"transactions": [], "totalUnclassified": 0})
 
     # Skip merchants where user has already reached the confidence threshold
     high_confidence_merchants = set()
@@ -396,10 +442,10 @@ def get_unclassified_transactions(user_id):
         if (mc.get('classification_count') or 0) >= CONFIDENCE_THRESHOLD and mc.get('confidence') == 'user_set':
             high_confidence_merchants.add(mc.get('merchant_name', ''))
 
-    # Group by merchant
+    # Group Plaid transactions by merchant
     merchant_txns = {}
-    for txn in unclassified:
-        name = normalize_merchant_name(txn.get('merchant_name'))
+    for txn in plaid_unclassified:
+        name = normalize_merchant_name(txn.get('merchant_name') or txn.get('name'))
         if name in high_confidence_merchants:
             continue
         if name not in merchant_txns:
@@ -417,12 +463,12 @@ def get_unclassified_transactions(user_id):
     for _, txns in sorted_merchants:
         txns.sort(key=lambda t: t.get('date') or '', reverse=True)
 
-    # Build merchant context (total spend + classified/unclassified counts)
+    # Build merchant context for Plaid transactions
     merchant_context_data = {}
-    for txn in all_txns:
+    for txn in all_plaid_txns:
         if (txn.get('amount') or 0) <= 0:
             continue
-        name = normalize_merchant_name(txn.get('merchant_name'))
+        name = normalize_merchant_name(txn.get('merchant_name') or txn.get('name'))
         if not name:
             continue
         if name not in merchant_context_data:
@@ -433,7 +479,7 @@ def get_unclassified_transactions(user_id):
         else:
             merchant_context_data[name]["unclassified"] += 1
 
-    # Round-robin: one transaction per merchant in order, repeat until limit
+    # Round-robin: one Plaid transaction per merchant in order, repeat until limit
     result_txns = []
     pointers = {name: 0 for name, _ in sorted_merchants}
 
@@ -452,6 +498,7 @@ def get_unclassified_transactions(user_id):
                     "amount": txn.get('amount'),
                     "date": txn.get('date'),
                     "name": txn.get('name'),
+                    "source": "plaid",
                     "merchantContext": {
                         "totalUnclassified": ctx.get("unclassified", 0),
                         "totalSpent": round(ctx.get("totalSpent", 0), 2),
@@ -460,6 +507,26 @@ def get_unclassified_transactions(user_id):
                 })
         if not added_any:
             break
+
+    # Append unclassified manual transactions (sorted by date descending, up to remaining limit)
+    manual_unclassified.sort(key=lambda t: t.get('date') or '', reverse=True)
+    for mt in manual_unclassified:
+        if len(result_txns) >= limit:
+            break
+        result_txns.append({
+            "id": mt.key.id,
+            "transactionId": f"manual-{mt.key.id}",
+            "merchantName": mt.get('store'),
+            "amount": mt.get('amount'),
+            "date": mt.get('date'),
+            "name": mt.get('notes') or mt.get('category') or 'Voice Transaction',
+            "source": "voice",
+            "merchantContext": {
+                "totalUnclassified": 1,
+                "totalSpent": mt.get('amount') or 0,
+                "alreadyClassified": 0,
+            },
+        })
 
     return jsonify({"transactions": result_txns, "totalUnclassified": total_unclassified})
 

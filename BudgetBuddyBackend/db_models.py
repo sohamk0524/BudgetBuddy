@@ -456,6 +456,16 @@ def get_manual_transactions(user_id: int, limit: int = 50) -> List[datastore.Ent
     return results[:limit]
 
 
+def update_manual_transaction(txn_id: int, **kwargs) -> Optional[datastore.Entity]:
+    client = get_client()
+    entity = client.get(client.key('ManualTransaction', txn_id))
+    if not entity:
+        return None
+    entity.update(kwargs)
+    client.put(entity)
+    return entity
+
+
 # ---------------------------------------------------------------------------
 # MerchantClassification
 # ---------------------------------------------------------------------------
