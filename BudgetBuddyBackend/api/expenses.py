@@ -15,6 +15,7 @@ from db_models import (
     get_device_token,
     upsert_device_token,
     get_client,
+    get_manual_transactions,
 )
 from services.classification_service import (
     classify_transaction,
@@ -59,27 +60,22 @@ def get_expenses(user_id):
 
     account_ids, account_id_map = _get_account_ids_and_map(user_id)
 
-    if not account_ids:
-        return jsonify({
-            "transactions": [],
-            "summary": {"totalEssential": 0, "totalDiscretionary": 0, "totalFunMoney": 0, "totalMixed": 0, "totalUnclassified": 0},
-            "total": 0,
-            "hasMore": False,
-        })
+    # Fetch Plaid transactions (if any linked accounts)
+    all_txns = []
+    if account_ids:
+        # Lazy backfill: classify unclassified expense transactions
+        all_txns, _ = get_transactions_for_accounts(account_ids, limit=10000)
+        unclassified = [
+            t for t in all_txns
+            if (t.get('amount') or 0) > 0 and t.get('sub_category') in (None, 'unclassified')
+        ]
+        for txn in unclassified:
+            classify_transaction(txn, user_id)
 
-    # Lazy backfill: classify unclassified expense transactions
-    all_txns, _ = get_transactions_for_accounts(account_ids, limit=10000)
-    unclassified = [
-        t for t in all_txns
-        if (t.get('amount') or 0) > 0 and t.get('sub_category') in (None, 'unclassified')
-    ]
-    for txn in unclassified:
-        classify_transaction(txn, user_id)
-
-    # Re-fetch to get updated classification values
-    all_txns, _ = get_transactions_for_accounts(
-        account_ids, start_date=start_date, end_date=end_date, limit=10000
-    )
+        # Re-fetch to get updated classification values
+        all_txns, _ = get_transactions_for_accounts(
+            account_ids, start_date=start_date, end_date=end_date, limit=10000
+        )
 
     # Filter: expenses only (positive amount = money out)
     filtered = [t for t in all_txns if (t.get('amount') or 0) > 0]
@@ -139,6 +135,49 @@ def get_expenses(user_id):
             "essentialAmount": txn.get('essential_amount'),
             "discretionaryAmount": txn.get('discretionary_amount'),
         })
+
+    # Merge in manual (voice-logged) transactions
+    manual_txns = get_manual_transactions(user_id)
+    for mt in manual_txns:
+        mt_date = mt.get('date') or ''
+        # Apply date filters if set
+        if start_date and mt_date < start_date:
+            continue
+        if end_date and mt_date > end_date:
+            continue
+        # Apply category filter if set
+        if category and mt.get('category') != category:
+            continue
+
+        mt_amount = mt.get('amount') or 0
+        total += 1
+        total_unclassified += mt_amount
+
+        result.append({
+            "id": mt.key.id,
+            "transactionId": f"manual-{mt.key.id}",
+            "accountId": "",
+            "amount": mt_amount,
+            "date": mt_date,
+            "authorizedDate": mt_date,
+            "name": mt.get('notes') or mt.get('category') or 'Voice Transaction',
+            "merchantName": mt.get('store'),
+            "categoryPrimary": mt.get('category'),
+            "categoryDetailed": mt.get('category'),
+            "pending": False,
+            "paymentChannel": "voice",
+            "subCategory": "unclassified",
+            "essentialAmount": None,
+            "discretionaryAmount": None,
+            "source": "voice",
+        })
+
+    # Sort all results by date descending
+    result.sort(key=lambda t: t.get('date') or '', reverse=True)
+
+    # Re-paginate after merging
+    total = len(result)
+    result = result[offset:offset + limit]
 
     return jsonify({
         "transactions": result,

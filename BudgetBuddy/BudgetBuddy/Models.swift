@@ -615,3 +615,42 @@ struct RecommendationsResponse: Codable {
     let cached: Bool?
     let generatedAt: String?
 }
+
+// MARK: - Voice Transaction Models
+
+struct VoiceTransaction: Codable, Identifiable {
+    let id: UUID
+    var amount: Double?
+    var category: String?
+    var store: String?
+    var date: Date
+    var notes: String?
+
+    init(id: UUID = UUID(), amount: Double? = nil, category: String? = nil,
+         store: String? = nil, date: Date = Date(), notes: String? = nil) {
+        self.id = id; self.amount = amount; self.category = category
+        self.store = store; self.date = date; self.notes = notes
+    }
+}
+
+struct ParsedTransactionResponse: Codable {
+    let amount: Double?
+    let category: String?
+    let store: String?
+    let date: String?
+    let notes: String?
+}
+
+struct SaveTransactionRequest: Codable {
+    let userId: Int
+    let amount: Double
+    let category: String
+    let store: String?
+    let date: String   // ISO 8601
+    let notes: String?
+}
+
+struct SaveTransactionResponse: Codable {
+    let success: Bool
+    let transactionId: String?
+}

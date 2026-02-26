@@ -299,7 +299,8 @@ class AuthManager {
         name: String = "",
         isStudent: Bool = false,
         userBudgetingGoal: String = "stability",
-        strictnessLevel: String = "moderate"
+        strictnessLevel: String = "moderate",
+        school: String = ""
     ) async {
         guard let userId = authToken else { return }
 
@@ -322,6 +323,9 @@ class AuthManager {
             ]
             if !name.isEmpty {
                 body["name"] = name
+            }
+            if !school.isEmpty {
+                body["school"] = school
             }
             request.httpBody = try JSONSerialization.data(withJSONObject: body)
 

@@ -11,5 +11,9 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>BudgetBuddy uses speech recognition to transcribe your voice into transaction details.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>BudgetBuddy needs microphone access to record your voice for transaction logging.</string>
 </dict>
 </plist>
