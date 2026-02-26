@@ -9,111 +9,118 @@ import SwiftUI
 
 struct ExpensesView: View {
     @Bindable var viewModel: ExpensesViewModel
+    @State private var showVoiceRecording = false
+    @State private var voiceViewModel = VoiceTransactionViewModel()
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(spacing: 16) {
-                    ExpensesSummaryCard(summary: viewModel.summary)
+            VStack(spacing: 0) {
+                ScrollView {
+                    VStack(spacing: 16) {
+                        ExpensesSummaryCard(summary: viewModel.summary)
 
-                    // Filter picker
-                    Picker("Filter", selection: $viewModel.selectedFilter) {
-                        ForEach(ExpenseFilter.allCases, id: \.self) { filter in
-                            Text(filter.rawValue).tag(filter)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                    .padding(.horizontal)
-                    .onChange(of: viewModel.selectedFilter) {
-                        Task { await viewModel.fetchExpenses() }
-                    }
-
-                    // Swipe classification card
-                    if viewModel.currentClassifyIndex < viewModel.unclassifiedTransactions.count {
-                        let txn = viewModel.unclassifiedTransactions[viewModel.currentClassifyIndex]
-                        SwipeClassificationCard(
-                            transaction: txn,
-                            remainingCount: viewModel.totalUnclassifiedCount
-                        ) { classification, ratio in
-                            Task {
-                                await viewModel.classifyViaSwipe(
-                                    transactionId: txn.id,
-                                    classification: classification,
-                                    essentialRatio: ratio
-                                )
+                        // Filter picker
+                        Picker("Filter", selection: $viewModel.selectedFilter) {
+                            ForEach(ExpenseFilter.allCases, id: \.self) { filter in
+                                Text(filter.rawValue).tag(filter)
                             }
-                        } onSplitRequest: {
-                            viewModel.splitTransaction = txn
-                            viewModel.showSplitSheet = true
+                        }
+                        .pickerStyle(.segmented)
+                        .padding(.horizontal)
+                        .onChange(of: viewModel.selectedFilter) {
+                            Task { await viewModel.fetchExpenses() }
                         }
 
-                        // Auto-classify button when enough unclassified
-                        if viewModel.totalUnclassifiedCount > 5 {
-                            Button {
-                                Task { await viewModel.autoClassifyWithAI() }
-                            } label: {
-                                HStack(spacing: 8) {
-                                    if viewModel.isAutoClassifying {
-                                        ProgressView()
-                                            .tint(.white)
-                                    // } else {
-                                    //     Image(systemName: "sparkles")
+                        // Swipe classification card
+                        if viewModel.currentClassifyIndex < viewModel.unclassifiedTransactions.count {
+                            let txn = viewModel.unclassifiedTransactions[viewModel.currentClassifyIndex]
+                            SwipeClassificationCard(
+                                transaction: txn,
+                                remainingCount: viewModel.totalUnclassifiedCount
+                            ) { classification, ratio in
+                                Task {
+                                    await viewModel.classifyViaSwipe(
+                                        transactionId: txn.id,
+                                        classification: classification,
+                                        essentialRatio: ratio
+                                    )
+                                }
+                            } onSplitRequest: {
+                                viewModel.splitTransaction = txn
+                                viewModel.showSplitSheet = true
+                            }
+
+                            // Auto-classify button when enough unclassified
+                            if viewModel.totalUnclassifiedCount > 5 {
+                                Button {
+                                    Task { await viewModel.autoClassifyWithAI() }
+                                } label: {
+                                    HStack(spacing: 8) {
+                                        if viewModel.isAutoClassifying {
+                                            ProgressView()
+                                                .tint(.white)
+                                        // } else {
+                                        //     Image(systemName: "sparkles")
+                                        }
+                                        Text(viewModel.isAutoClassifying ? "Classifying..." : "Auto-Classify All")
+                                            .font(.roundedBody)
+                                            .fontWeight(.medium)
                                     }
-                                    Text(viewModel.isAutoClassifying ? "Classifying..." : "Auto-Classify All")
-                                        .font(.roundedBody)
-                                        .fontWeight(.medium)
-                                }
-                                .foregroundStyle(.white)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 12)
-                                .background(Color.accent.opacity(viewModel.isAutoClassifying ? 0.5 : 1.0))
-                                .clipShape(RoundedRectangle(cornerRadius: 12))
-                            }
-                            .disabled(viewModel.isAutoClassifying)
-                            .padding(.horizontal)
-                        }
-                    }
-
-                    // Transaction list
-                    LazyVStack(spacing: 8) {
-                        ForEach(viewModel.transactions) { transaction in
-                            ExpenseTransactionRow(transaction: transaction)
-                                .onTapGesture {
-                                    viewModel.selectedTransaction = transaction
-                                    viewModel.showClassificationSheet = true
-                                }
-                        }
-
-                        if viewModel.hasMore {
-                            Button {
-                                Task { await viewModel.loadMore() }
-                            } label: {
-                                Text("Load More")
-                                    .font(.roundedBody)
-                                    .foregroundStyle(Color.accent)
+                                    .foregroundStyle(.white)
                                     .frame(maxWidth: .infinity)
-                                    .padding()
+                                    .padding(.vertical, 12)
+                                    .background(Color.accent.opacity(viewModel.isAutoClassifying ? 0.5 : 1.0))
+                                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                                }
+                                .disabled(viewModel.isAutoClassifying)
+                                .padding(.horizontal)
                             }
                         }
-                    }
-                    .padding(.horizontal)
 
-                    if viewModel.transactions.isEmpty && !viewModel.isLoading {
-                        VStack(spacing: 12) {
-                            Image(systemName: "tray")
-                                .font(.system(size: 40))
-                                .foregroundStyle(Color.textSecondary)
-                            Text("No expenses found")
-                                .font(.roundedHeadline)
-                                .foregroundStyle(Color.textSecondary)
-                            Text("Link a bank account to see your transactions")
-                                .font(.roundedCaption)
-                                .foregroundStyle(Color.textSecondary)
+                        // Transaction list
+                        LazyVStack(spacing: 8) {
+                            ForEach(viewModel.transactions) { transaction in
+                                ExpenseTransactionRow(transaction: transaction)
+                                    .onTapGesture {
+                                        viewModel.selectedTransaction = transaction
+                                        viewModel.showClassificationSheet = true
+                                    }
+                            }
+
+                            if viewModel.hasMore {
+                                Button {
+                                    Task { await viewModel.loadMore() }
+                                } label: {
+                                    Text("Load More")
+                                        .font(.roundedBody)
+                                        .foregroundStyle(Color.accent)
+                                        .frame(maxWidth: .infinity)
+                                        .padding()
+                                }
+                            }
                         }
-                        .padding(.top, 40)
+                        .padding(.horizontal)
+
+                        if viewModel.transactions.isEmpty && !viewModel.isLoading {
+                            VStack(spacing: 12) {
+                                Image(systemName: "tray")
+                                    .font(.system(size: 40))
+                                    .foregroundStyle(Color.textSecondary)
+                                Text("No expenses found")
+                                    .font(.roundedHeadline)
+                                    .foregroundStyle(Color.textSecondary)
+                                Text("Link a bank account or log an expense by voice")
+                                    .font(.roundedCaption)
+                                    .foregroundStyle(Color.textSecondary)
+                            }
+                            .padding(.top, 40)
+                        }
                     }
+                    .padding(.vertical)
                 }
-                .padding(.vertical)
+
+                // Voice logging button pinned to bottom
+                voiceLogButton
             }
             .background(Color.appBackground)
             .navigationTitle("Expenses")
@@ -152,7 +159,41 @@ struct ExpensesView: View {
                     .presentationDragIndicator(.visible)
                 }
             }
+            .sheet(isPresented: $showVoiceRecording) {
+                VoiceTransactionFlowView(viewModel: voiceViewModel) {
+                    showVoiceRecording = false
+                    Task { await viewModel.refresh() }
+                }
+            }
+            .onChange(of: voiceViewModel.state) { _, newState in
+                if newState == .success {
+                    Task { await viewModel.refresh() }
+                }
+            }
         }
+    }
+
+    // MARK: - Voice Log Button
+
+    private var voiceLogButton: some View {
+        Button {
+            voiceViewModel.reset()
+            showVoiceRecording = true
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "mic.fill")
+                Text("Log Expense by Voice")
+                    .font(.roundedHeadline)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 14)
+            .background(Color.accent)
+            .foregroundStyle(Color.appBackground)
+            .clipShape(Capsule())
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(Color.surface)
     }
 }
 

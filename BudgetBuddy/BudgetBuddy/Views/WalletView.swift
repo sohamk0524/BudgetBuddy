@@ -17,8 +17,6 @@ struct WalletView: View {
     @Bindable var planViewModel: SpendingPlanViewModel
     @State private var showingStatementUpload = false
     @State private var showCategoryEditor = false
-    @State private var showVoiceRecording = false
-    @State private var voiceViewModel = VoiceTransactionViewModel()
 
     private var greeting: String {
         if let name = AuthManager.shared.userName, !name.isEmpty {
@@ -72,9 +70,6 @@ struct WalletView: View {
                             hasData: walletViewModel.hasData
                         )
                     }
-
-                    // MARK: - Voice Transaction
-                    VoiceTransactionTile { showVoiceRecording = true }
 
                     // MARK: - Top Expenses
                     TopExpensesCard(
@@ -145,17 +140,6 @@ struct WalletView: View {
                 allowsMultipleSelection: false
             ) { result in
                 handleFileSelection(result)
-            }
-            .sheet(isPresented: $showVoiceRecording) {
-                VoiceTransactionFlowView(viewModel: voiceViewModel) {
-                    showVoiceRecording = false
-                    Task { await walletViewModel.refresh() }
-                }
-            }
-            .onChange(of: voiceViewModel.state) { _, newState in
-                if newState == .success {
-                    Task { await walletViewModel.refresh() }
-                }
             }
         }
     }
