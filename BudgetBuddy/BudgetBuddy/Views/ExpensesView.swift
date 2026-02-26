@@ -11,6 +11,8 @@ struct ExpensesView: View {
     @Bindable var viewModel: ExpensesViewModel
     @State private var showVoiceRecording = false
     @State private var voiceViewModel = VoiceTransactionViewModel()
+    @State private var showReceiptScan = false
+    @State private var receiptViewModel = ReceiptScanViewModel()
 
     var body: some View {
         NavigationStack {
@@ -165,6 +167,13 @@ struct ExpensesView: View {
                     Task { await viewModel.refresh() }
                 }
             }
+            .sheet(isPresented: $showReceiptScan) {
+                ReceiptScanView(viewModel: receiptViewModel) {
+                    showReceiptScan = false
+                    receiptViewModel.reset()
+                    Task { await viewModel.refresh() }
+                }
+            }
             .onChange(of: voiceViewModel.state) { _, newState in
                 if newState == .success {
                     Task { await viewModel.refresh() }
@@ -173,23 +182,44 @@ struct ExpensesView: View {
         }
     }
 
-    // MARK: - Voice Log Button
+    // MARK: - Bottom Action Buttons (Voice + Receipt)
 
     private var voiceLogButton: some View {
-        Button {
-            voiceViewModel.reset()
-            showVoiceRecording = true
-        } label: {
-            HStack(spacing: 8) {
-                Image(systemName: "mic.fill")
-                Text("Log Expense by Voice")
-                    .font(.roundedHeadline)
+        HStack(spacing: 12) {
+            // Voice log button
+            Button {
+                voiceViewModel.reset()
+                showVoiceRecording = true
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "mic.fill")
+                    Text("Voice")
+                        .font(.roundedHeadline)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
+                .background(Color.accent)
+                .foregroundStyle(Color.appBackground)
+                .clipShape(Capsule())
             }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 14)
-            .background(Color.accent)
-            .foregroundStyle(Color.appBackground)
-            .clipShape(Capsule())
+
+            // Scan receipt button
+            Button {
+                receiptViewModel.reset()
+                showReceiptScan = true
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "receipt")
+                    Text("Scan Receipt")
+                        .font(.roundedHeadline)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
+                .background(Color.surface)
+                .foregroundStyle(Color.accent)
+                .clipShape(Capsule())
+                .overlay(Capsule().stroke(Color.accent, lineWidth: 1))
+            }
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
@@ -620,6 +650,9 @@ struct TransactionClassificationSheet: View {
 
     @State private var selectedCategory: String
     @State private var essentialRatio: Double
+    @State private var isSaving = false
+    @State private var showChallenge = false
+    @State private var challengeReason = ""
     @Environment(\.dismiss) private var dismiss
 
     init(transaction: ExpenseTransaction, viewModel: ExpensesViewModel) {
@@ -719,19 +752,46 @@ struct TransactionClassificationSheet: View {
                         .foregroundStyle(Color.textSecondary)
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
+                    Button(isSaving ? "Saving..." : "Save") {
                         let ratio: Double? = selectedCategory == "mixed" ? essentialRatio : nil
+                        isSaving = true
                         Task {
-                            await viewModel.classifyTransaction(
-                                transactionId: transaction.id,
-                                subCategory: selectedCategory,
-                                essentialRatio: ratio
-                            )
+                            do {
+                                let response = try await viewModel.classifyTransactionForSheet(
+                                    transactionId: transaction.id,
+                                    subCategory: selectedCategory,
+                                    essentialRatio: ratio
+                                )
+                                if let challenge = response.challenge, challenge.show, let reason = challenge.reason {
+                                    challengeReason = reason
+                                    showChallenge = true
+                                } else {
+                                    dismiss()
+                                }
+                            } catch {
+                                print("Failed to classify: \(error)")
+                            }
+                            isSaving = false
                         }
-                        dismiss()
                     }
+                    .disabled(isSaving)
                     .foregroundStyle(Color.accent)
                 }
+            }
+            .alert("Are you sure?", isPresented: $showChallenge) {
+                Button("Yes, it's Essential") { dismiss() }
+                Button("Change to Discretionary") {
+                    Task {
+                        _ = try? await viewModel.classifyTransactionForSheet(
+                            transactionId: transaction.id,
+                            subCategory: "discretionary",
+                            essentialRatio: 0.0
+                        )
+                        dismiss()
+                    }
+                }
+            } message: {
+                Text(challengeReason)
             }
         }
     }

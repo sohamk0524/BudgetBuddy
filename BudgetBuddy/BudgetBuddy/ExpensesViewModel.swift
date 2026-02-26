@@ -173,38 +173,43 @@ class ExpensesViewModel {
 
     func classifyTransaction(transactionId: Int, subCategory: String, essentialRatio: Double? = nil) async {
         do {
-            let response = try await apiService.classifyTransaction(
-                transactionId: transactionId,
-                subCategory: subCategory,
-                essentialRatio: essentialRatio
-            )
-            // Update local state
-            if let idx = transactions.firstIndex(where: { $0.id == transactionId }) {
-                let old = transactions[idx]
-                transactions[idx] = ExpenseTransaction(
-                    id: old.id,
-                    transactionId: old.transactionId,
-                    accountId: old.accountId,
-                    amount: old.amount,
-                    date: old.date,
-                    authorizedDate: old.authorizedDate,
-                    name: old.name,
-                    merchantName: old.merchantName,
-                    categoryPrimary: old.categoryPrimary,
-                    categoryDetailed: old.categoryDetailed,
-                    pending: old.pending,
-                    paymentChannel: old.paymentChannel,
-                    subCategory: response.transaction.subCategory,
-                    essentialAmount: response.transaction.essentialAmount,
-                    discretionaryAmount: response.transaction.discretionaryAmount
-                )
-            }
+            _ = try await classifyTransactionForSheet(transactionId: transactionId, subCategory: subCategory, essentialRatio: essentialRatio)
             showClassificationSheet = false
-            // Refresh summary
-            await fetchExpenses()
         } catch {
             print("Failed to classify transaction: \(error)")
         }
+    }
+
+    /// Classifies a transaction and returns the response. Does NOT dismiss the sheet — caller handles dismissal.
+    func classifyTransactionForSheet(transactionId: Int, subCategory: String, essentialRatio: Double? = nil) async throws -> ClassifyTransactionResponse {
+        let response = try await apiService.classifyTransaction(
+            transactionId: transactionId,
+            subCategory: subCategory,
+            essentialRatio: essentialRatio
+        )
+        // Update local state
+        if let idx = transactions.firstIndex(where: { $0.id == transactionId }) {
+            let old = transactions[idx]
+            transactions[idx] = ExpenseTransaction(
+                id: old.id,
+                transactionId: old.transactionId,
+                accountId: old.accountId,
+                amount: old.amount,
+                date: old.date,
+                authorizedDate: old.authorizedDate,
+                name: old.name,
+                merchantName: old.merchantName,
+                categoryPrimary: old.categoryPrimary,
+                categoryDetailed: old.categoryDetailed,
+                pending: old.pending,
+                paymentChannel: old.paymentChannel,
+                subCategory: response.transaction.subCategory,
+                essentialAmount: response.transaction.essentialAmount,
+                discretionaryAmount: response.transaction.discretionaryAmount
+            )
+        }
+        await fetchExpenses()
+        return response
     }
 
     func autoClassifyWithAI() async {

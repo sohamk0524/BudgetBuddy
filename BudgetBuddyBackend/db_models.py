@@ -7,7 +7,8 @@ Integer IDs are assigned automatically by Datastore and accessible via entity.ke
 """
 
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
+from difflib import SequenceMatcher
 from typing import Optional, List
 
 from google.cloud import datastore
@@ -563,5 +564,150 @@ def upsert_cached_recommendations(user_id: int, **kwargs) -> datastore.Entity:
         entity['created_at'] = datetime.utcnow()
     entity.update(kwargs)
     entity['updated_at'] = datetime.utcnow()
+    client.put(entity)
+    return entity
+
+
+# ---------------------------------------------------------------------------
+# Receipt helpers
+# ---------------------------------------------------------------------------
+
+def find_matching_transaction(
+    user_id: int,
+    amount: float,
+    date_str: str,
+    merchant: str,
+) -> Optional[datastore.Entity]:
+    """
+    Find an existing Plaid Transaction that matches a receipt by amount (±$2),
+    date (±2 days), and merchant name similarity (≥ 0.7).
+    Returns the best match or None.
+    """
+    try:
+        receipt_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+    except (ValueError, TypeError):
+        return None
+
+    account_ids = []
+    for item in get_plaid_items(user_id):
+        for account in get_accounts_for_item(item.key.id):
+            account_ids.append(account.key.id)
+
+    if not account_ids:
+        return None
+
+    date_min = (receipt_date - timedelta(days=2)).isoformat()
+    date_max = (receipt_date + timedelta(days=2)).isoformat()
+
+    client = get_client()
+    best_match = None
+    best_score = 0.0
+
+    for account_id in account_ids:
+        query = client.query(kind='Transaction')
+        query.add_filter(filter=PropertyFilter('plaid_account_id', '=', account_id))
+        for txn in query.fetch():
+            txn_date = txn.get('date') or ''
+            if not (date_min <= txn_date <= date_max):
+                continue
+            txn_amount = abs(txn.get('amount') or 0.0)
+            if abs(txn_amount - abs(amount)) > 2.0:
+                continue
+            txn_merchant = (txn.get('merchant_name') or txn.get('name') or '').lower().strip()
+            merchant_norm = (merchant or '').lower().strip()
+            if txn_merchant and merchant_norm:
+                score = SequenceMatcher(None, txn_merchant, merchant_norm).ratio()
+                if score >= 0.7 and score > best_score:
+                    best_score = score
+                    best_match = txn
+
+    return best_match
+
+
+def update_transaction_receipt(
+    txn_id: int,
+    receipt_items_json: str,
+    essential_amount: float,
+    discretionary_amount: float,
+    sub_category: str,
+    image_url: Optional[str] = None,
+) -> Optional[datastore.Entity]:
+    """Enrich an existing Plaid Transaction with receipt data."""
+    client = get_client()
+    entity = client.get(client.key('Transaction', txn_id))
+    if not entity:
+        return None
+    entity['receipt_items'] = receipt_items_json
+    entity['essential_amount'] = essential_amount
+    entity['discretionary_amount'] = discretionary_amount
+    entity['sub_category'] = sub_category
+    if image_url:
+        entity['receipt_image_url'] = image_url
+    client.put(entity)
+    return entity
+
+
+def find_pending_receipt_transaction(
+    user_id: int,
+    amount: float,
+    date_str: str,
+    merchant: str,
+) -> Optional[datastore.Entity]:
+    """
+    Find a ManualTransaction with pending_plaid_reconcile=True that matches
+    the given Plaid transaction (amount ±$2, date ±2 days, merchant similarity ≥ 0.7).
+    """
+    try:
+        plaid_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+    except (ValueError, TypeError):
+        return None
+
+    client = get_client()
+    query = client.query(kind='ManualTransaction')
+    query.add_filter(filter=PropertyFilter('user_id', '=', user_id))
+    query.add_filter(filter=PropertyFilter('pending_plaid_reconcile', '=', True))
+
+    date_min = (plaid_date - timedelta(days=2)).isoformat()
+    date_max = (plaid_date + timedelta(days=2)).isoformat()
+    merchant_norm = (merchant or '').lower().strip()
+
+    best_match = None
+    best_score = 0.0
+
+    for mt in query.fetch():
+        mt_date = mt.get('date') or ''
+        if not (date_min <= mt_date <= date_max):
+            continue
+        mt_amount = abs(mt.get('amount') or 0.0)
+        if abs(mt_amount - abs(amount)) > 2.0:
+            continue
+        mt_merchant = (mt.get('store') or mt.get('notes') or '').lower().strip()
+        if merchant_norm and mt_merchant:
+            score = SequenceMatcher(None, mt_merchant, merchant_norm).ratio()
+            if score >= 0.7 and score > best_score:
+                best_score = score
+                best_match = mt
+        elif abs(mt_amount - abs(amount)) <= 2.0:
+            # No merchant name to compare — match on amount+date alone
+            if best_score == 0.0:
+                best_match = mt
+
+    return best_match
+
+
+def reconcile_manual_with_plaid(manual_id: int, plaid_data: dict) -> Optional[datastore.Entity]:
+    """
+    Copy Plaid metadata into a ManualTransaction and clear the pending reconcile flag.
+    """
+    client = get_client()
+    entity = client.get(client.key('ManualTransaction', manual_id))
+    if not entity:
+        return None
+    entity['plaid_transaction_id'] = plaid_data.get('transaction_id')
+    entity['merchant_name'] = plaid_data.get('merchant_name')
+    entity['category_primary'] = plaid_data.get('category')
+    entity['category_detailed'] = plaid_data.get('category_detailed')
+    entity['payment_channel'] = plaid_data.get('payment_channel')
+    entity['pending_plaid_reconcile'] = False
     client.put(entity)
     return entity

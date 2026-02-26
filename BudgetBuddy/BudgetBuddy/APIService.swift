@@ -564,6 +564,68 @@ actor APIService {
         return try JSONDecoder().decode(AutoClassifyResponse.self, from: data)
     }
 
+    // MARK: - Receipt API
+
+    /// Uploads a receipt image for Claude Vision analysis
+    func analyzeReceipt(imageData: Data, userId: Int) async throws -> ReceiptAnalysisResult {
+        let url = baseURL.appendingPathComponent("receipt/analyze")
+
+        let boundary = UUID().uuidString
+        var body = Data()
+
+        // Add image file
+        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"file\"; filename=\"receipt.jpg\"\r\n".data(using: .utf8)!)
+        body.append("Content-Type: image/jpeg\r\n\r\n".data(using: .utf8)!)
+        body.append(imageData)
+        body.append("\r\n".data(using: .utf8)!)
+
+        // Add userId
+        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"userId\"\r\n\r\n".data(using: .utf8)!)
+        body.append("\(userId)\r\n".data(using: .utf8)!)
+
+        body.append("--\(boundary)--\r\n".data(using: .utf8)!)
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        request.httpBody = body
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            throw APIError.invalidResponse
+        }
+        return try JSONDecoder().decode(ReceiptAnalysisResult.self, from: data)
+    }
+
+    /// Attaches an analyzed receipt to an existing transaction or creates a new one
+    func attachReceipt(userId: Int, result: ReceiptAnalysisResult, date: String) async throws -> ReceiptAttachResponse {
+        let url = baseURL.appendingPathComponent("receipt/attach")
+
+        let requestBody = ReceiptAttachRequest(
+            userId: userId,
+            merchant: result.merchant,
+            total: result.total,
+            items: result.items,
+            essentialTotal: result.essentialTotal,
+            discretionaryTotal: result.discretionaryTotal,
+            date: date
+        )
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONEncoder().encode(requestBody)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse,
+              httpResponse.statusCode == 200 || httpResponse.statusCode == 201 else {
+            throw APIError.invalidResponse
+        }
+        return try JSONDecoder().decode(ReceiptAttachResponse.self, from: data)
+    }
+
     /// Gets smart nudges
     func getNudges(userId: Int) async throws -> NudgesResponse {
         let url = baseURL.appendingPathComponent("user/nudges/\(userId)")

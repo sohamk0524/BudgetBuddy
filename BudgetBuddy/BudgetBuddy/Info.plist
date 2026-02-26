@@ -11,9 +11,24 @@
 	<string>BudgetBuddy uses speech recognition to transcribe your voice into transaction details.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>BudgetBuddy needs microphone access to record your voice for transaction logging.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>BudgetBuddy needs camera access to scan receipts.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>BudgetBuddy needs photo library access to select receipt images.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>remote-notification</string>
+	</array>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>budgetbuddy</string>
+			</array>
+			<key>CFBundleURLName</key>
+			<string>com.budgetbuddy.receipt</string>
+		</dict>
 	</array>
 </dict>
 </plist>

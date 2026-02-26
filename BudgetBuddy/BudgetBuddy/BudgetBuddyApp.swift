@@ -6,16 +6,52 @@
 //
 
 import SwiftUI
+import UIKit
 import UserNotifications
 
 @main
 struct BudgetBuddyApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+    @State private var pendingReceiptImage: UIImage?
+    @State private var showReceiptFromExtension = false
+    @State private var extensionReceiptViewModel = ReceiptScanViewModel()
+
+    private let appGroupID = "group.sample.BudgetBuddy"
+    private let sharedImageFilename = "receipt_pending.jpg"
 
     var body: some Scene {
         WindowGroup {
             ContentView()
                 .preferredColorScheme(.dark)
+                .onOpenURL { url in
+                    guard url.scheme == "budgetbuddy", url.host == "receipt" else { return }
+                    loadSharedReceiptImage()
+                }
+                .sheet(isPresented: $showReceiptFromExtension) {
+                    ReceiptScanView(viewModel: extensionReceiptViewModel) {
+                        showReceiptFromExtension = false
+                        extensionReceiptViewModel.reset()
+                    }
+                }
+        }
+    }
+
+    private func loadSharedReceiptImage() {
+        guard let container = FileManager.default.containerURL(
+            forSecurityApplicationGroupIdentifier: appGroupID
+        ) else { return }
+
+        let imageURL = container.appendingPathComponent(sharedImageFilename)
+        guard let data = try? Data(contentsOf: imageURL),
+              let image = UIImage(data: data) else { return }
+
+        // Clean up shared file
+        try? FileManager.default.removeItem(at: imageURL)
+
+        extensionReceiptViewModel.reset()
+        showReceiptFromExtension = true
+        Task {
+            await extensionReceiptViewModel.analyzeImage(image)
         }
     }
 }

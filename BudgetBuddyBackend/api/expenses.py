@@ -24,9 +24,33 @@ from services.classification_service import (
     normalize_merchant_name,
     llm_classify_merchants_batch,
     CONFIDENCE_THRESHOLD,
+    OBVIOUSLY_DISCRETIONARY_CATEGORIES,
 )
 
 expenses_bp = Blueprint('expenses', __name__)
+
+_CHALLENGE_REASONS = {
+    "FOOD_AND_DRINK_COFFEE": "Coffee shops are almost always discretionary spending. Are you sure this is essential?",
+    "FOOD_AND_DRINK_BEER_WINE_AND_LIQUOR": "Alcohol is typically discretionary. Are you sure this is essential?",
+    "FOOD_AND_DRINK_FAST_FOOD": "Fast food is usually discretionary spending. Are you sure this is essential?",
+    "ENTERTAINMENT_MOVIES_AND_MUSIC": "Movie and music purchases are discretionary. Are you sure this is essential?",
+    "ENTERTAINMENT_CONCERTS_AND_EVENTS": "Concert and event tickets are discretionary. Are you sure this is essential?",
+    "ENTERTAINMENT_TV_AND_MOVIES": "Streaming and TV subscriptions are discretionary. Are you sure this is essential?",
+    "ENTERTAINMENT_VIDEO_GAMES": "Video games are discretionary spending. Are you sure this is essential?",
+    "ENTERTAINMENT_CASINOS_AND_GAMBLING": "Gambling is discretionary. Are you sure this is essential?",
+    "ENTERTAINMENT_SPORTING_EVENTS": "Sporting event tickets are discretionary. Are you sure this is essential?",
+}
+
+
+def _build_challenge(sub_category: str, category_detailed: str | None) -> dict:
+    """Return a challenge dict if sub_category is essential and category is obviously discretionary."""
+    if sub_category == 'essential' and category_detailed in OBVIOUSLY_DISCRETIONARY_CATEGORIES:
+        reason = _CHALLENGE_REASONS.get(
+            category_detailed,
+            "This category is typically discretionary. Are you sure this is essential?"
+        )
+        return {"show": True, "reason": reason}
+    return {"show": False, "reason": None}
 
 
 def _get_account_ids_and_map(user_id):
@@ -301,6 +325,7 @@ def classify_single_transaction(transaction_id):
 
     # Manual transactions: just save classification, no merchant-level propagation
     if is_manual:
+        challenge = _build_challenge(sub_category, txn.get('category_detailed'))
         return jsonify({
             "success": True,
             "transaction": {
@@ -311,6 +336,7 @@ def classify_single_transaction(transaction_id):
             },
             "updatedMerchantRatio": essential_ratio,
             "autoApplied": 0,
+            "challenge": challenge,
         })
 
     # Update merchant running average and check auto-apply threshold
@@ -369,6 +395,7 @@ def classify_single_transaction(transaction_id):
                 txn['discretionary_amount'] = round(amount * (1.0 - essential_ratio), 2)
                 client.put(txn)
 
+    challenge = _build_challenge(sub_category, txn.get('category_detailed'))
     return jsonify({
         "success": True,
         "transaction": {
@@ -379,6 +406,7 @@ def classify_single_transaction(transaction_id):
         },
         "updatedMerchantRatio": updated_merchant_ratio,
         "autoApplied": auto_applied,
+        "challenge": challenge,
     })
 
 
