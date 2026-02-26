@@ -65,6 +65,7 @@ def classify_transaction(transaction, user_id: int, use_llm: bool = False) -> No
     Classify a single Datastore transaction entity in-place and persist.
     Priority: user MerchantClassification → pre-seeded by detailed → pre-seeded by primary → LLM → unclassified.
     Skips income transactions (amount <= 0).
+    Uses merchant_name if available, falls back to name field for merchant identity.
     """
     amount = transaction.get('amount')
     if amount is not None and amount <= 0:
@@ -72,7 +73,10 @@ def classify_transaction(transaction, user_id: int, use_llm: bool = False) -> No
 
     from db_models import get_merchant_classification
 
-    merchant = normalize_merchant_name(transaction.get('merchant_name'))
+    # Use merchant_name if set, fall back to transaction name for classification identity
+    merchant = normalize_merchant_name(
+        transaction.get('merchant_name') or transaction.get('name')
+    )
 
     # 1. Check user's merchant classification
     if merchant:
@@ -108,11 +112,11 @@ def classify_transaction(transaction, user_id: int, use_llm: bool = False) -> No
             _store_inferred_classification(user_id, merchant, detailed, classification, ratio)
             return
 
-    # 5. Default to unclassified
-    transaction['sub_category'] = 'unclassified'
+    # 5. Default to unclassified — do not persist, leave sub_category as-is
+    # (avoids overwriting auto-classify results due to Datastore eventual consistency)
+    transaction['sub_category'] = transaction.get('sub_category') or 'unclassified'
     transaction['essential_amount'] = None
     transaction['discretionary_amount'] = None
-    _save_transaction(transaction)
 
 
 def _save_transaction(transaction) -> None:
@@ -135,6 +139,7 @@ def retroactively_reclassify(user_id: int, merchant_name: str, classification: s
     Returns the count of reclassified transactions.
     """
     from db_models import get_plaid_items, get_accounts_for_item, get_client
+    from google.cloud.datastore.query import PropertyFilter
 
     normalized = normalize_merchant_name(merchant_name)
     if not normalized:
@@ -152,9 +157,13 @@ def retroactively_reclassify(user_id: int, merchant_name: str, classification: s
     count = 0
     for account_id in account_ids:
         query = client.query(kind='Transaction')
-        query.add_filter('plaid_account_id', '=', account_id)
+        query.add_filter(filter=PropertyFilter('plaid_account_id', '=', account_id))
         for txn in query.fetch():
-            if normalize_merchant_name(txn.get('merchant_name')) == normalized:
+            # Match on merchant_name first, fall back to name field (same as classify_transaction)
+            effective = normalize_merchant_name(
+                txn.get('merchant_name') or txn.get('name')
+            )
+            if effective == normalized:
                 _apply_classification(txn, classification, essential_ratio)
                 client.put(txn)
                 count += 1
@@ -229,7 +238,7 @@ def llm_classify_merchant(
         agent = Agent(
             name="MerchantClassifier",
             instructions=system_prompt,
-            model="claude-sonnet-4-5-20250929",
+            model="claude-haiku-4-5-20251001",
         )
 
         msg_parts = [f"Merchant: {merchant_name}"]
@@ -317,7 +326,7 @@ Respond with ONLY a JSON array:
         agent = Agent(
             name="BatchMerchantClassifier",
             instructions=system_prompt,
-            model="claude-sonnet-4-5-20250929",
+            model="claude-haiku-4-5-20251001",
         )
 
         lines = []

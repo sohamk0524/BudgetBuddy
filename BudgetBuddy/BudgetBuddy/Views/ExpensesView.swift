@@ -117,7 +117,7 @@ struct ExpensesView: View {
             }
             .background(Color.appBackground)
             .navigationTitle("Expenses")
-            .toolbarColorScheme(.dark, for: .navigationBar)
+            .navigationBarTitleDisplayMode(.large)
             .refreshable {
                 await viewModel.refresh()
             }

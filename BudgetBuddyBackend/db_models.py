@@ -11,6 +11,7 @@ from datetime import datetime
 from typing import Optional, List
 
 from google.cloud import datastore
+from google.cloud.datastore.query import PropertyFilter
 
 
 def get_client() -> datastore.Client:
@@ -31,7 +32,7 @@ def get_user(user_id: int) -> Optional[datastore.Entity]:
 def get_user_by_phone(phone: str) -> Optional[datastore.Entity]:
     client = get_client()
     query = client.query(kind='User')
-    query.add_filter('phone_number', '=', phone)
+    query.add_filter(filter=PropertyFilter('phone_number', '=', phone))
     results = list(query.fetch(limit=1))
     return results[0] if results else None
 
@@ -83,7 +84,7 @@ def delete_user_cascade(user_id: int):
 
 def _delete_kind_for_user(client: datastore.Client, kind: str, user_id: int):
     query = client.query(kind=kind)
-    query.add_filter('user_id', '=', user_id)
+    query.add_filter(filter=PropertyFilter('user_id', '=', user_id))
     keys = [e.key for e in query.fetch()]
     if keys:
         client.delete_multi(keys)
@@ -111,8 +112,8 @@ def create_otp(phone: str, code: str, expires_at: datetime) -> datastore.Entity:
 def get_pending_otp(phone: str) -> Optional[datastore.Entity]:
     client = get_client()
     query = client.query(kind='OTPCode')
-    query.add_filter('phone_number', '=', phone)
-    query.add_filter('verified', '=', False)
+    query.add_filter(filter=PropertyFilter('phone_number', '=', phone))
+    query.add_filter(filter=PropertyFilter('verified', '=', False))
     results = list(query.fetch())
     if not results:
         return None
@@ -131,7 +132,7 @@ def mark_otp_verified(otp_key):
 def delete_otps_for_phone(phone: str):
     client = get_client()
     query = client.query(kind='OTPCode')
-    query.add_filter('phone_number', '=', phone)
+    query.add_filter(filter=PropertyFilter('phone_number', '=', phone))
     keys = [e.key for e in query.fetch()]
     if keys:
         client.delete_multi(keys)
@@ -144,7 +145,7 @@ def delete_otps_for_phone(phone: str):
 def get_profile(user_id: int) -> Optional[datastore.Entity]:
     client = get_client()
     query = client.query(kind='FinancialProfile')
-    query.add_filter('user_id', '=', user_id)
+    query.add_filter(filter=PropertyFilter('user_id', '=', user_id))
     results = list(query.fetch(limit=1))
     return results[0] if results else None
 
@@ -171,7 +172,7 @@ def upsert_profile(user_id: int, **kwargs) -> datastore.Entity:
 def get_latest_plan(user_id: int) -> Optional[datastore.Entity]:
     client = get_client()
     query = client.query(kind='BudgetPlan')
-    query.add_filter('user_id', '=', user_id)
+    query.add_filter(filter=PropertyFilter('user_id', '=', user_id))
     results = list(query.fetch())
     if not results:
         return None
@@ -200,7 +201,7 @@ def create_plan(user_id: int, plan_json: str, month_year: str) -> datastore.Enti
 def get_statement(user_id: int) -> Optional[datastore.Entity]:
     client = get_client()
     query = client.query(kind='SavedStatement')
-    query.add_filter('user_id', '=', user_id)
+    query.add_filter(filter=PropertyFilter('user_id', '=', user_id))
     results = list(query.fetch(limit=1))
     return results[0] if results else None
 
@@ -223,7 +224,7 @@ def upsert_statement(user_id: int, **kwargs) -> datastore.Entity:
 def delete_statement_for_user(user_id: int):
     client = get_client()
     query = client.query(kind='SavedStatement')
-    query.add_filter('user_id', '=', user_id)
+    query.add_filter(filter=PropertyFilter('user_id', '=', user_id))
     keys = [e.key for e in query.fetch()]
     if keys:
         client.delete_multi(keys)
@@ -236,15 +237,15 @@ def delete_statement_for_user(user_id: int):
 def get_plaid_items(user_id: int) -> List[datastore.Entity]:
     client = get_client()
     query = client.query(kind='PlaidItem')
-    query.add_filter('user_id', '=', user_id)
+    query.add_filter(filter=PropertyFilter('user_id', '=', user_id))
     return list(query.fetch())
 
 
 def get_active_plaid_items(user_id: int) -> List[datastore.Entity]:
     client = get_client()
     query = client.query(kind='PlaidItem')
-    query.add_filter('user_id', '=', user_id)
-    query.add_filter('status', '=', 'active')
+    query.add_filter(filter=PropertyFilter('user_id', '=', user_id))
+    query.add_filter(filter=PropertyFilter('status', '=', 'active'))
     return list(query.fetch())
 
 
@@ -262,7 +263,7 @@ def create_plaid_item(user_id: int, **kwargs) -> datastore.Entity:
 def get_plaid_item_by_item_id(item_id: str) -> Optional[datastore.Entity]:
     client = get_client()
     query = client.query(kind='PlaidItem')
-    query.add_filter('item_id', '=', item_id)
+    query.add_filter(filter=PropertyFilter('item_id', '=', item_id))
     results = list(query.fetch(limit=1))
     return results[0] if results else None
 
@@ -281,7 +282,7 @@ def delete_plaid_item_cascade(item_key):
     plaid_item_id = item_key.id
     for account in get_accounts_for_item(plaid_item_id):
         txn_query = client.query(kind='Transaction')
-        txn_query.add_filter('plaid_account_id', '=', account.key.id)
+        txn_query.add_filter(filter=PropertyFilter('plaid_account_id', '=', account.key.id))
         txn_keys = [e.key for e in txn_query.fetch()]
         if txn_keys:
             client.delete_multi(txn_keys)
@@ -296,7 +297,7 @@ def delete_plaid_item_cascade(item_key):
 def get_accounts_for_item(plaid_item_id: int) -> List[datastore.Entity]:
     client = get_client()
     query = client.query(kind='PlaidAccount')
-    query.add_filter('plaid_item_id', '=', plaid_item_id)
+    query.add_filter(filter=PropertyFilter('plaid_item_id', '=', plaid_item_id))
     return list(query.fetch())
 
 
@@ -314,7 +315,7 @@ def create_plaid_account(plaid_item_id: int, **kwargs) -> datastore.Entity:
 def get_account_by_account_id(account_id: str) -> Optional[datastore.Entity]:
     client = get_client()
     query = client.query(kind='PlaidAccount')
-    query.add_filter('account_id', '=', account_id)
+    query.add_filter(filter=PropertyFilter('account_id', '=', account_id))
     results = list(query.fetch(limit=1))
     return results[0] if results else None
 
@@ -337,7 +338,7 @@ def create_transaction(plaid_account_id: int, **kwargs) -> datastore.Entity:
 def get_transaction_by_transaction_id(txn_id: str) -> Optional[datastore.Entity]:
     client = get_client()
     query = client.query(kind='Transaction')
-    query.add_filter('transaction_id', '=', txn_id)
+    query.add_filter(filter=PropertyFilter('transaction_id', '=', txn_id))
     results = list(query.fetch(limit=1))
     return results[0] if results else None
 
@@ -357,7 +358,7 @@ def get_transactions_for_accounts(
     all_txns = []
     for account_id in account_ids:
         query = client.query(kind='Transaction')
-        query.add_filter('plaid_account_id', '=', account_id)
+        query.add_filter(filter=PropertyFilter('plaid_account_id', '=', account_id))
         all_txns.extend(list(query.fetch()))
 
     if start_date:
@@ -378,7 +379,7 @@ def get_transactions_since(account_ids: List[int], since_date) -> List[datastore
     all_txns = []
     for account_id in account_ids:
         query = client.query(kind='Transaction')
-        query.add_filter('plaid_account_id', '=', account_id)
+        query.add_filter(filter=PropertyFilter('plaid_account_id', '=', account_id))
         all_txns.extend(list(query.fetch()))
 
     since_str = since_date if isinstance(since_date, str) else since_date.isoformat()
@@ -406,7 +407,7 @@ def delete_transaction_by_id(txn_id: str):
 def get_category_prefs(user_id: int) -> List[datastore.Entity]:
     client = get_client()
     query = client.query(kind='UserCategoryPreference')
-    query.add_filter('user_id', '=', user_id)
+    query.add_filter(filter=PropertyFilter('user_id', '=', user_id))
     results = list(query.fetch())
     results.sort(key=lambda e: e.get('display_order', 0))
     return results
@@ -415,7 +416,7 @@ def get_category_prefs(user_id: int) -> List[datastore.Entity]:
 def set_category_prefs(user_id: int, categories: List[str]):
     client = get_client()
     query = client.query(kind='UserCategoryPreference')
-    query.add_filter('user_id', '=', user_id)
+    query.add_filter(filter=PropertyFilter('user_id', '=', user_id))
     keys = [e.key for e in query.fetch()]
     if keys:
         client.delete_multi(keys)
@@ -449,7 +450,7 @@ def create_manual_transaction(user_id: int, **kwargs) -> datastore.Entity:
 def get_manual_transactions(user_id: int, limit: int = 50) -> List[datastore.Entity]:
     client = get_client()
     query = client.query(kind='ManualTransaction')
-    query.add_filter('user_id', '=', user_id)
+    query.add_filter(filter=PropertyFilter('user_id', '=', user_id))
     results = list(query.fetch())
     results.sort(key=lambda e: e.get('created_at', datetime.min), reverse=True)
     return results[:limit]
@@ -462,8 +463,8 @@ def get_manual_transactions(user_id: int, limit: int = 50) -> List[datastore.Ent
 def get_merchant_classification(user_id: int, merchant_name: str) -> Optional[datastore.Entity]:
     client = get_client()
     query = client.query(kind='MerchantClassification')
-    query.add_filter('user_id', '=', user_id)
-    query.add_filter('merchant_name', '=', merchant_name)
+    query.add_filter(filter=PropertyFilter('user_id', '=', user_id))
+    query.add_filter(filter=PropertyFilter('merchant_name', '=', merchant_name))
     results = list(query.fetch(limit=1))
     return results[0] if results else None
 
@@ -471,7 +472,7 @@ def get_merchant_classification(user_id: int, merchant_name: str) -> Optional[da
 def get_merchant_classifications_for_user(user_id: int) -> List[datastore.Entity]:
     client = get_client()
     query = client.query(kind='MerchantClassification')
-    query.add_filter('user_id', '=', user_id)
+    query.add_filter(filter=PropertyFilter('user_id', '=', user_id))
     return list(query.fetch())
 
 
@@ -498,16 +499,16 @@ def upsert_merchant_classification(user_id: int, merchant_name: str, **kwargs) -
 def get_active_device_tokens(user_id: int) -> List[datastore.Entity]:
     client = get_client()
     query = client.query(kind='DeviceToken')
-    query.add_filter('user_id', '=', user_id)
-    query.add_filter('is_active', '=', True)
+    query.add_filter(filter=PropertyFilter('user_id', '=', user_id))
+    query.add_filter(filter=PropertyFilter('is_active', '=', True))
     return list(query.fetch())
 
 
 def get_device_token(user_id: int, token: str) -> Optional[datastore.Entity]:
     client = get_client()
     query = client.query(kind='DeviceToken')
-    query.add_filter('user_id', '=', user_id)
-    query.add_filter('token', '=', token)
+    query.add_filter(filter=PropertyFilter('user_id', '=', user_id))
+    query.add_filter(filter=PropertyFilter('token', '=', token))
     results = list(query.fetch(limit=1))
     return results[0] if results else None
 
@@ -535,7 +536,7 @@ def upsert_device_token(user_id: int, token: str, **kwargs) -> datastore.Entity:
 def get_cached_recommendations(user_id: int) -> Optional[datastore.Entity]:
     client = get_client()
     query = client.query(kind='CachedRecommendations')
-    query.add_filter('user_id', '=', user_id)
+    query.add_filter(filter=PropertyFilter('user_id', '=', user_id))
     results = list(query.fetch(limit=1))
     return results[0] if results else None
 

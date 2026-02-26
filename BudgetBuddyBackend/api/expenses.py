@@ -483,16 +483,18 @@ def auto_classify_with_llm(user_id):
         t for t in all_txns
         if (t.get('amount') or 0) > 0 and
         t.get('sub_category') in (None, 'unclassified') and
-        t.get('merchant_name')
+        (t.get('merchant_name') or t.get('name'))
     ]
 
     merchant_info = {}
     for txn in unclassified:
-        name = normalize_merchant_name(txn.get('merchant_name'))
+        # Use merchant_name if available, fall back to transaction name
+        effective_name = txn.get('merchant_name') or txn.get('name')
+        name = normalize_merchant_name(effective_name)
         if not name or name in merchant_info:
             continue
         merchant_info[name] = {
-            "name": txn.get('merchant_name'),
+            "name": effective_name,
             "category_primary": txn.get('category_primary'),
             "category_detailed": txn.get('category_detailed'),
         }
