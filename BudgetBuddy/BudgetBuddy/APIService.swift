@@ -577,6 +577,43 @@ actor APIService {
 
         return try JSONDecoder().decode(NudgesResponse.self, from: data)
     }
+
+    /// Gets cached or fresh recommendations
+    func getRecommendations(userId: Int) async throws -> RecommendationsResponse {
+        let url = baseURL.appendingPathComponent("recommendations/\(userId)")
+
+        let (data, response) = try await URLSession.shared.data(from: url)
+
+        guard let httpResponse = response as? HTTPURLResponse,
+              httpResponse.statusCode == 200 else {
+            throw APIError.invalidResponse
+        }
+
+        return try JSONDecoder().decode(RecommendationsResponse.self, from: data)
+    }
+
+    /// Force-generates fresh recommendations
+    func generateRecommendations(userId: Int, action: String = "general") async throws -> RecommendationsResponse {
+        let url = baseURL.appendingPathComponent("recommendations/generate")
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        let body: [String: Any] = [
+            "userId": userId,
+            "action": action
+        ]
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse,
+              httpResponse.statusCode == 200 else {
+            throw APIError.invalidResponse
+        }
+
+        return try JSONDecoder().decode(RecommendationsResponse.self, from: data)
+    }
 }
 
 // MARK: - Errors

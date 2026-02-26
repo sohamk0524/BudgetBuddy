@@ -526,3 +526,31 @@ def upsert_device_token(user_id: int, token: str, **kwargs) -> datastore.Entity:
     entity.update(kwargs)
     client.put(entity)
     return entity
+
+
+# ---------------------------------------------------------------------------
+# CachedRecommendations
+# ---------------------------------------------------------------------------
+
+def get_cached_recommendations(user_id: int) -> Optional[datastore.Entity]:
+    client = get_client()
+    query = client.query(kind='CachedRecommendations')
+    query.add_filter('user_id', '=', user_id)
+    results = list(query.fetch(limit=1))
+    return results[0] if results else None
+
+
+def upsert_cached_recommendations(user_id: int, **kwargs) -> datastore.Entity:
+    client = get_client()
+    existing = get_cached_recommendations(user_id)
+    if existing:
+        entity = existing
+    else:
+        key = client.key('CachedRecommendations')
+        entity = datastore.Entity(key=key, exclude_from_indexes=['recommendations_json'])
+        entity['user_id'] = user_id
+        entity['created_at'] = datetime.utcnow()
+    entity.update(kwargs)
+    entity['updated_at'] = datetime.utcnow()
+    client.put(entity)
+    return entity
