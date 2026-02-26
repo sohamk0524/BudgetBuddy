@@ -104,7 +104,6 @@ struct RecommendationsView: View {
 
     private var actionButtons: some View {
         VStack(spacing: 10) {
-            // Primary: Generate Recommendations
             Button {
                 Task { await viewModel.generateRecommendations() }
             } label: {
@@ -126,33 +125,6 @@ struct RecommendationsView: View {
                 .clipShape(Capsule())
             }
             .disabled(viewModel.isGenerating)
-
-            // Secondary row
-            HStack(spacing: 10) {
-                Button {
-                    Task { await viewModel.generateRecommendations(action: "budget_balance") }
-                } label: {
-                    Text("Check Budget")
-                        .font(.roundedCaption)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 10)
-                        .foregroundStyle(Color.accent)
-                        .overlay(Capsule().strokeBorder(Color.accent, lineWidth: 1))
-                }
-                .disabled(viewModel.isGenerating)
-
-                Button {
-                    Task { await viewModel.generateRecommendations(action: "spending_habits") }
-                } label: {
-                    Text("Analyze Spending")
-                        .font(.roundedCaption)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 10)
-                        .foregroundStyle(Color.accent)
-                        .overlay(Capsule().strokeBorder(Color.accent, lineWidth: 1))
-                }
-                .disabled(viewModel.isGenerating)
-            }
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)

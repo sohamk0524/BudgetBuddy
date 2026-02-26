@@ -11,6 +11,11 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+if os.environ.get("USE_LOCAL_DB", "").lower() in ("1", "true", "yes"):
+    print("[DB] Using LOCAL Datastore emulator (localhost:8081)")
+else:
+    print("[DB] Using CLOUD Datastore")
+
 from api.auth import auth_bp
 from api.onboarding import onboarding_bp
 from api.budget import budget_bp

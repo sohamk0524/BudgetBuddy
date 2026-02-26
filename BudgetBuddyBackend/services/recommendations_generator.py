@@ -146,11 +146,12 @@ def _build_user_context(user_id: int) -> str:
 def _fallback_recommendations(user_id: int) -> Dict[str, Any]:
     """Fall back to the rules-based nudge generator when LLM is unavailable."""
     from services.nudge_generator import generate_nudges
+    from services.recommendation_templates import run_all_templates
 
     nudges = generate_nudges(user_id)
-    recommendations = []
+    nudge_recs = []
     for nudge in nudges:
-        recommendations.append({
+        nudge_recs.append({
             "category": _nudge_type_to_category(nudge.get("type", "")),
             "title": nudge.get("title", "Financial Tip"),
             "description": nudge.get("message", ""),
@@ -158,6 +159,10 @@ def _fallback_recommendations(user_id: int) -> Dict[str, Any]:
             "priority": 3,
             "icon": "lightbulb",
         })
+
+    # Templates first, then nudges, max 5 total
+    template_recs = run_all_templates(user_id)
+    recommendations = (template_recs + nudge_recs)[:5]
 
     # Get safe-to-spend from financial summary
     summary_data = _get_user_financial_summary(user_id)
@@ -198,34 +203,6 @@ def generate_recommendations(user_id: int, action: str = "general") -> Dict[str,
         f"[USER CONTEXT:\n{context}]"
     )
 
-    # For spending_habits, pre-fetch school-specific advice if the user is a student
-    if action == "spending_habits":
-        try:
-            from db_models import get_profile
-            from services.school_rag import get_school_advice
-
-            profile = get_profile(user_id)
-            if profile and profile.get("is_student") and profile.get("school"):
-                # Extract top spending categories from Plaid transactions
-                txn_data = _get_plaid_transactions(user_id, days=30)
-                top_categories = []
-                if txn_data.get("has_transactions"):
-                    spending_by_cat = txn_data.get("spending_by_category", [])
-                    top_categories = [c.get("category", "") for c in spending_by_cat[:3]]
-
-                category_str = ", ".join(top_categories) if top_categories else "food, transportation, entertainment"
-                school_slug = profile.get("school")
-                query = f"student discounts and savings tips for {category_str} near {school_slug}"
-
-                school_result = get_school_advice(query, school_slug)
-                if school_result.get("answer"):
-                    user_message += (
-                        f"\n\n[SCHOOL-SPECIFIC CONTEXT: {school_result['answer']}]"
-                    )
-        except Exception as e:
-            # Don't let school advice failure block recommendations
-            print(f"School advice pre-fetch failed (non-fatal): {e}")
-
     try:
         agent = Agent(
             name="RecommendationsEngine",
@@ -264,8 +241,15 @@ def generate_recommendations(user_id: int, action: str = "general") -> Dict[str,
             status_data = _get_user_spending_status(user_id)
             status = status_data.get("status", "unknown")
 
+        # Merge template-based recommendations (first) with LLM recommendations
+        from services.recommendation_templates import run_all_templates
+
+        template_recs = run_all_templates(user_id)
+        llm_recs = parsed.get("recommendations", [])
+        combined = (template_recs + llm_recs)[:5]
+
         output = {
-            "recommendations": parsed.get("recommendations", []),
+            "recommendations": combined,
             "safeToSpend": safe_to_spend,
             "status": status,
             "summary": parsed.get("summary", ""),
