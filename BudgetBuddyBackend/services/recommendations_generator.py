@@ -10,7 +10,6 @@ from typing import Dict, Any, List, Optional
 
 from services.llm_service import Agent
 from services.tools import (
-    _get_user_budget_plan,
     _get_plaid_transactions,
     _get_user_financial_summary,
     _get_user_spending_status,
@@ -36,7 +35,7 @@ You will receive the user's financial context (budget plan, transactions, financ
 }
 
 RULES:
-- Return 3-5 recommendations sorted by priority
+- Return 3 recommendations sorted by priority
 - Use REAL numbers from the provided data — never make up amounts
 - Each recommendation must be specific and actionable
 - potentialSavings should be 0 if not applicable
@@ -47,19 +46,11 @@ RULES:
 ACTION_PROMPTS = {
     "general": "Analyze all the user's financial data and provide general recommendations.",
     "budget_balance": "Focus on how the user's budget allocations compare to actual spending. Highlight categories that are over or under budget.",
-    "spending_habits": "Focus on the user's spending patterns and habits. Identify trends, recurring expenses, and areas where small changes could save money.",
+    "spending_habits": "Focus on the user's spending patterns and habits. Identify trends, recurring expenses, and areas where small changes could save money. If school-specific context is provided, incorporate local student deals and resources into your recommendations.",
 }
 
 # Tool definitions for the recommendations agent (subset — no render_visual)
 _RECO_TOOLS = [
-    {
-        "type": "function",
-        "function": {
-            "name": "get_budget_plan",
-            "description": "Get the user's budget plan with category allocations.",
-            "parameters": {"type": "object", "properties": {}, "required": []},
-        },
-    },
     {
         "type": "function",
         "function": {
@@ -90,16 +81,35 @@ _RECO_TOOLS = [
             "parameters": {"type": "object", "properties": {}, "required": []},
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_school_advice",
+            "description": "Search the web for school-specific financial advice (student discounts, cheap food, campus resources). Use when the user is a student and recommendations could benefit from school-specific context.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "The question to search for (e.g., 'student discounts', 'cheap food near campus')"
+                    }
+                },
+                "required": ["query"],
+            },
+        },
+    },
 ]
 
 
 def _tool_executor(user_id: int):
     """Return a tool executor bound to the given user_id."""
+    from services.tools import _get_school_advice
+
     executors = {
-        "get_budget_plan": lambda _: _get_user_budget_plan(user_id),
         "get_plaid_transactions": lambda args: _get_plaid_transactions(user_id, args.get("days", 30) if args else 30),
         "get_financial_summary": lambda _: _get_user_financial_summary(user_id),
         "get_spending_status": lambda _: _get_user_spending_status(user_id),
+        "get_school_advice": lambda args: _get_school_advice(user_id, args.get("query", "") if args else ""),
     }
 
     def execute(tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
@@ -136,11 +146,12 @@ def _build_user_context(user_id: int) -> str:
 def _fallback_recommendations(user_id: int) -> Dict[str, Any]:
     """Fall back to the rules-based nudge generator when LLM is unavailable."""
     from services.nudge_generator import generate_nudges
+    from services.recommendation_templates import run_all_templates
 
     nudges = generate_nudges(user_id)
-    recommendations = []
+    nudge_recs = []
     for nudge in nudges:
-        recommendations.append({
+        nudge_recs.append({
             "category": _nudge_type_to_category(nudge.get("type", "")),
             "title": nudge.get("title", "Financial Tip"),
             "description": nudge.get("message", ""),
@@ -148,6 +159,10 @@ def _fallback_recommendations(user_id: int) -> Dict[str, Any]:
             "priority": 3,
             "icon": "lightbulb",
         })
+
+    # Templates first, then nudges, max 5 total
+    template_recs = run_all_templates(user_id)
+    recommendations = (template_recs + nudge_recs)[:5]
 
     # Get safe-to-spend from financial summary
     summary_data = _get_user_financial_summary(user_id)
@@ -226,8 +241,15 @@ def generate_recommendations(user_id: int, action: str = "general") -> Dict[str,
             status_data = _get_user_spending_status(user_id)
             status = status_data.get("status", "unknown")
 
+        # Merge template-based recommendations (first) with LLM recommendations
+        from services.recommendation_templates import run_all_templates
+
+        template_recs = run_all_templates(user_id)
+        llm_recs = parsed.get("recommendations", [])
+        combined = (template_recs + llm_recs)[:5]
+
         output = {
-            "recommendations": parsed.get("recommendations", []),
+            "recommendations": combined,
             "safeToSpend": safe_to_spend,
             "status": status,
             "summary": parsed.get("summary", ""),

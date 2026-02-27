@@ -7,7 +7,7 @@ from typing import Optional, Dict, Any
 from models import AssistantResponse, VisualPayload, SankeyNode
 from services.llm_service import Agent
 from services.tools import get_tools, execute_tool, set_tool_context
-from services.data_mock import get_budget_overview_data, get_spending_status_data
+from services.data_mock import get_spending_status_data
 
 
 def get_user_profile(user_id):
@@ -45,30 +45,21 @@ CONVERSATION GUIDELINES:
 
 AVAILABLE TOOLS AND WHEN TO USE THEM:
 
-1. get_budget_plan - Use when user asks about:
-   - Their budget plan or spending plan
-   - How to reduce spending or save money
-   - What they should spend on different categories
-   - Budget recommendations or advice
-   - Their financial plan
+1. get_plaid_transactions - Use when user asks about:
+   - Their recent spending, transactions, or purchases
+   - Where their money is going
+   - Spending patterns or habits
 
-2. get_spending_analysis - Use when user asks about:
-   - Their actual spending habits
-   - Where their money is going (from bank statement)
-   - Top spending categories
-   - Comparing actual vs planned spending
-
-3. get_financial_summary - Use when user asks about:
+2. get_financial_summary - Use when user asks about:
    - Their balance or net worth
    - How much money they have
    - Safe-to-spend amount
    - Overall financial health
 
-4. get_budget_overview - Use for quick budget overviews
-5. get_spending_status - Use for budget tracking status
-6. get_savings_progress - Use for savings goal progress
+3. get_spending_status - Use for budget tracking status
+4. get_savings_progress - Use for savings goal progress
 
-7. render_visual - Render a chart or diagram for the user
+5. render_visual - Render a chart or diagram for the user
    - ONLY call this when you have REAL data that would benefit from visualization
    - Do NOT render visuals for greetings, errors, or when the user has no data
    - Types: "spending_plan" (budget categories), "burndown_chart" (spending pace), "sankey_flow" (money flow)
@@ -77,10 +68,9 @@ AVAILABLE TOOLS AND WHEN TO USE THEM:
    - For sankey_flow, pass: {"nodes": [{"id": "...", "name": "...", "value": <number>}]}
 
 IMPORTANT GUIDANCE:
-- When user asks for help reducing spending or financial advice, FIRST fetch their plan with get_budget_plan
-- If they ask about actual spending, use get_spending_analysis
+- When user asks for help reducing spending or financial advice, fetch their transactions with get_plaid_transactions
 - You can call multiple tools if needed to give comprehensive advice
-- If a tool returns "has_plan: false" or "has_statement: false", let the user know they need to set that up first
+- If a tool returns "has_plaid: false", let the user know they need to link their bank account first
 - Only call render_visual when you have real data to show — never for missing data or error states
 
 DO NOT USE TOOLS FOR:
@@ -300,14 +290,6 @@ def _fallback_response(text: str, error_message: str = None) -> AssistantRespons
         return AssistantResponse(
             text_message="Hey there! I'm BudgetBuddy. I'm having some technical difficulties, but I'm here to help with your finances!",
             visual_payload=None
-        )
-
-    if any(keyword in text_lower for keyword in ["budget", "overview", "spending breakdown"]):
-        data = get_budget_overview_data()
-        nodes = [SankeyNode(**node) for node in data["nodes"]]
-        return AssistantResponse(
-            text_message="Here's your budget overview. (Note: AI is temporarily unavailable)",
-            visual_payload=VisualPayload.sankey_flow(nodes)
         )
 
     if any(keyword in text_lower for keyword in ["afford", "status", "overspending"]):
