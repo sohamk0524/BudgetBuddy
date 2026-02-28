@@ -2,7 +2,7 @@
 //  TransactionConfirmationView.swift
 //  BudgetBuddy
 //
-//  Editable form for confirming parsed transaction details
+//  Editable form for logging a transaction manually or by voice
 //
 
 import SwiftUI
@@ -14,10 +14,10 @@ struct TransactionConfirmationView: View {
     // Local editable state
     @State private var amountText: String = ""
     @State private var selectedCategory: String = ""
-    @State private var customCategory: String = ""
     @State private var store: String = ""
     @State private var date: Date = Date()
-    @State private var notes: String = ""
+    @State private var subCategory: String = "essential"
+    @State private var essentialRatio: Double = 1.0
 
     private let categories = ["Coffee", "Food", "Groceries", "Transport", "Entertainment", "Shopping", "Gas", "Other"]
 
@@ -25,7 +25,7 @@ struct TransactionConfirmationView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 24) {
-                    // Transcription context
+                    // Transcription context (shown after voice input)
                     if !viewModel.transcribedText.isEmpty {
                         HStack {
                             Image(systemName: "quote.opening")
@@ -41,6 +41,25 @@ struct TransactionConfirmationView: View {
                         .background(Color.surface)
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                     }
+
+                    // MARK: - Voice Input Hero Card
+                    voiceHeroCard
+
+                    // MARK: - "or enter manually" divider
+                    HStack(spacing: 12) {
+                        Rectangle()
+                            .fill(Color.textSecondary.opacity(0.3))
+                            .frame(height: 1)
+                        Text("or enter manually")
+                            .font(.roundedCaption)
+                            .foregroundStyle(Color.textSecondary)
+                            .layoutPriority(1)
+                        Rectangle()
+                            .fill(Color.textSecondary.opacity(0.3))
+                            .frame(height: 1)
+                    }
+
+                    // MARK: - Manual Form
 
                     // Amount
                     VStack(alignment: .leading, spacing: 8) {
@@ -72,7 +91,6 @@ struct TransactionConfirmationView: View {
                                 ForEach(categories, id: \.self) { category in
                                     Button {
                                         selectedCategory = category
-                                        customCategory = ""
                                     } label: {
                                         Text(category)
                                             .font(.roundedCaption)
@@ -85,18 +103,6 @@ struct TransactionConfirmationView: View {
                                 }
                             }
                         }
-
-                        TextField("Or enter custom category...", text: $customCategory)
-                            .font(.roundedBody)
-                            .foregroundStyle(Color.textPrimary)
-                            .padding(12)
-                            .background(Color.surface)
-                            .clipShape(RoundedRectangle(cornerRadius: 10))
-                            .onChange(of: customCategory) { _, newValue in
-                                if !newValue.isEmpty {
-                                    selectedCategory = ""
-                                }
-                            }
                     }
 
                     // Store
@@ -112,6 +118,62 @@ struct TransactionConfirmationView: View {
                             .clipShape(RoundedRectangle(cornerRadius: 10))
                     }
 
+                    // Classification — Essential | Fun Money | Split
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Classification")
+                            .font(.roundedCaption)
+                            .foregroundStyle(Color.textSecondary)
+
+                        Picker("Classification", selection: $subCategory) {
+                            Text("Essential").tag("essential")
+                            Text("Fun Money").tag("discretionary")
+                            Text("Split").tag("mixed")
+                        }
+                        .pickerStyle(.segmented)
+                        .onChange(of: subCategory) {
+                            switch subCategory {
+                            case "essential": essentialRatio = 1.0
+                            case "discretionary": essentialRatio = 0.0
+                            default: break
+                            }
+                        }
+
+                        if subCategory == "mixed" {
+                            VStack(spacing: 8) {
+                                HStack {
+                                    Text("Essential")
+                                        .font(.roundedCaption)
+                                        .foregroundStyle(.green)
+                                    Spacer()
+                                    Text("\(Int(essentialRatio * 100))%")
+                                        .font(.roundedBody)
+                                        .fontWeight(.medium)
+                                        .foregroundStyle(Color.textPrimary)
+                                        .monospacedDigit()
+                                    Spacer()
+                                    Text("Fun Money")
+                                        .font(.roundedCaption)
+                                        .foregroundStyle(Color.danger)
+                                }
+
+                                Slider(value: $essentialRatio, in: 0...1, step: 0.05)
+                                    .tint(Color.accent)
+
+                                if let amount = Double(amountText), amount > 0 {
+                                    HStack {
+                                        Text("$\(amount * essentialRatio, specifier: "%.2f") essential")
+                                            .font(.roundedCaption)
+                                            .foregroundStyle(.green)
+                                        Spacer()
+                                        Text("$\(amount * (1 - essentialRatio), specifier: "%.2f") fun money")
+                                            .font(.roundedCaption)
+                                            .foregroundStyle(Color.danger)
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                     // Date
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Date")
@@ -121,19 +183,6 @@ struct TransactionConfirmationView: View {
                             .datePickerStyle(.compact)
                             .labelsHidden()
                             .tint(Color.accent)
-                    }
-
-                    // Notes
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Notes")
-                            .font(.roundedCaption)
-                            .foregroundStyle(Color.textSecondary)
-                        TextField("Optional notes", text: $notes)
-                            .font(.roundedBody)
-                            .foregroundStyle(Color.textPrimary)
-                            .padding(12)
-                            .background(Color.surface)
-                            .clipShape(RoundedRectangle(cornerRadius: 10))
                     }
 
                     // Confirm button
@@ -166,16 +215,6 @@ struct TransactionConfirmationView: View {
             .toolbarBackground(Color.appBackground, for: .navigationBar)
             .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button {
-                        saveLocalStateToViewModel()
-                        viewModel.startRecording()
-                    } label: {
-                        Image(systemName: "mic.fill")
-                            .foregroundStyle(Color.accent)
-                            .font(.system(size: 18))
-                    }
-                }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
                         viewModel.reset()
@@ -193,6 +232,35 @@ struct TransactionConfirmationView: View {
         }
     }
 
+    // MARK: - Voice Hero Card
+
+    private var voiceHeroCard: some View {
+        Button {
+            saveLocalStateToViewModel()
+            viewModel.startRecording()
+        } label: {
+            VStack(spacing: 10) {
+                Circle()
+                    .fill(Color.accent)
+                    .frame(width: 40, height: 40)
+                    .overlay(
+                        Image(systemName: "mic.fill")
+                            .font(.system(size: 18))
+                            .foregroundStyle(Color.appBackground)
+                    )
+
+                Text("Log using voice")
+                    .font(.roundedHeadline)
+                    .foregroundStyle(Color.textPrimary)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 16)
+            .background(Color.surface)
+            .clipShape(RoundedRectangle(cornerRadius: 16))
+        }
+        .buttonStyle(.plain)
+    }
+
     // MARK: - Helpers
 
     private var isAmountValid: Bool {
@@ -200,34 +268,26 @@ struct TransactionConfirmationView: View {
         return true
     }
 
-    private var effectiveCategory: String {
-        if !customCategory.isEmpty { return customCategory }
-        if !selectedCategory.isEmpty { return selectedCategory }
-        return "Other"
-    }
-
     private func populateFromViewModel() {
         if let amount = viewModel.transaction.amount {
             amountText = String(format: "%.2f", amount)
         }
-        if let category = viewModel.transaction.category {
-            if categories.contains(category) {
-                selectedCategory = category
-            } else {
-                customCategory = category
-            }
+        if let category = viewModel.transaction.category, categories.contains(category) {
+            selectedCategory = category
         }
         store = viewModel.transaction.store ?? ""
         date = viewModel.transaction.date
-        notes = viewModel.transaction.notes ?? ""
+        subCategory = viewModel.transaction.subCategory
+        essentialRatio = viewModel.transaction.essentialRatio
     }
 
     private func saveLocalStateToViewModel() {
         viewModel.transaction.amount = Double(amountText)
-        viewModel.transaction.category = effectiveCategory
+        viewModel.transaction.category = selectedCategory.isEmpty ? "Other" : selectedCategory
         viewModel.transaction.store = store.isEmpty ? nil : store
         viewModel.transaction.date = date
-        viewModel.transaction.notes = notes.isEmpty ? nil : notes
+        viewModel.transaction.subCategory = subCategory
+        viewModel.transaction.essentialRatio = essentialRatio
     }
 
     private func confirmTransaction() {
