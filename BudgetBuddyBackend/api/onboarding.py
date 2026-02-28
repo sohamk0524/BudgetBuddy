@@ -18,7 +18,11 @@ def onboarding():
     user_id = data.get("userId")
     name = data.get("name", "").strip() or None
     is_student = data.get("isStudent", False)
-    budgeting_goal = data.get("budgetingGoal", "stability")
+    weekly_spending_limit = data.get("weeklySpendingLimit", 0)
+    try:
+        weekly_spending_limit = float(weekly_spending_limit)
+    except (TypeError, ValueError):
+        weekly_spending_limit = 0
     strictness_level = data.get("strictnessLevel", "moderate")
 
     if not user_id:
@@ -34,7 +38,7 @@ def onboarding():
     upsert_profile(
         int(user_id),
         is_student=is_student,
-        budgeting_goal=budgeting_goal,
+        weekly_spending_limit=weekly_spending_limit,
         strictness_level=strictness_level,
     )
 

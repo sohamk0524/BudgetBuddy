@@ -68,7 +68,9 @@ struct ContentView: View {
                 .tag(1)
 
             // Tab 3: Profile
-            ProfileView()
+            NavigationStack {
+                ProfileView()
+            }
                 .tabItem {
                     Label("Profile", systemImage: "person.circle")
                 }
