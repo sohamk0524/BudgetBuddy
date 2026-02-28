@@ -147,6 +147,14 @@ class VoiceTransactionViewModel {
         }
     }
 
+    // MARK: - Manual Entry
+
+    func startManualEntry() {
+        transaction = VoiceTransaction()
+        transcribedText = ""
+        state = .confirming
+    }
+
     // MARK: - Reset
 
     func reset() {

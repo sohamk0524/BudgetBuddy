@@ -9,6 +9,7 @@ import SwiftUI
 
 struct TransactionConfirmationView: View {
     @Bindable var viewModel: VoiceTransactionViewModel
+    @Environment(\.dismiss) private var dismiss
 
     // Local editable state
     @State private var amountText: String = ""
@@ -160,10 +161,32 @@ struct TransactionConfirmationView: View {
                 .padding()
             }
             .background(Color.appBackground)
-            .navigationTitle("Confirm Transaction")
+            .navigationTitle("Log Transaction")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(Color.appBackground, for: .navigationBar)
             .toolbarColorScheme(.dark, for: .navigationBar)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button {
+                        saveLocalStateToViewModel()
+                        viewModel.startRecording()
+                    } label: {
+                        Image(systemName: "mic.fill")
+                            .foregroundStyle(Color.accent)
+                            .font(.system(size: 18))
+                    }
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        viewModel.reset()
+                        dismiss()
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(Color.textSecondary)
+                            .font(.system(size: 20))
+                    }
+                }
+            }
         }
         .onAppear {
             populateFromViewModel()
@@ -199,12 +222,16 @@ struct TransactionConfirmationView: View {
         notes = viewModel.transaction.notes ?? ""
     }
 
-    private func confirmTransaction() {
+    private func saveLocalStateToViewModel() {
         viewModel.transaction.amount = Double(amountText)
         viewModel.transaction.category = effectiveCategory
         viewModel.transaction.store = store.isEmpty ? nil : store
         viewModel.transaction.date = date
         viewModel.transaction.notes = notes.isEmpty ? nil : notes
+    }
+
+    private func confirmTransaction() {
+        saveLocalStateToViewModel()
 
         Task {
             await viewModel.saveTransaction()
