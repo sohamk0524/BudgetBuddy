@@ -131,6 +131,75 @@ _RECO_TOOLS = [
 ]
 
 
+def _compute_safe_to_spend(user_id: int) -> Dict[str, Any]:
+    """Compute safe-to-spend as Weekly Limit minus this week's transactions."""
+    from db_models import (
+        get_profile,
+        get_active_plaid_items,
+        get_accounts_for_item,
+        get_transactions_for_accounts,
+        get_manual_transactions,
+    )
+
+    profile = get_profile(user_id)
+    weekly_limit = float(profile.get('weekly_spending_limit', 0)) if profile else 0
+
+    if weekly_limit <= 0:
+        return {"safe_to_spend": 0, "status": "unknown", "weekly_limit": 0, "spent": 0}
+
+    # Monday of the current week
+    today = datetime.utcnow().date()
+    monday = today - timedelta(days=today.weekday())
+    start_date = monday.isoformat()
+
+    total_spent = 0.0
+
+    # Plaid transactions for this week
+    plaid_items = get_active_plaid_items(user_id)
+    account_ids = []
+    for item in plaid_items:
+        for acc in get_accounts_for_item(item.key.id):
+            account_ids.append(acc.key.id)
+    if account_ids:
+        txns, _ = get_transactions_for_accounts(account_ids, start_date=start_date, limit=10000)
+        for txn in txns:
+            amt = txn.get('amount') or 0
+            if amt > 0:
+                total_spent += amt
+
+    # Manual transactions for this week
+    manual_txns = get_manual_transactions(user_id, limit=500)
+    for txn in manual_txns:
+        txn_date = txn.get('date')
+        if txn_date:
+            if isinstance(txn_date, str):
+                try:
+                    txn_date = datetime.fromisoformat(txn_date).date()
+                except ValueError:
+                    continue
+            elif hasattr(txn_date, 'date'):
+                txn_date = txn_date.date()
+            if txn_date >= monday:
+                total_spent += float(txn.get('amount') or 0)
+
+    safe_to_spend = round(weekly_limit - total_spent, 2)
+    pct_remaining = safe_to_spend / weekly_limit if weekly_limit > 0 else 0
+
+    if pct_remaining >= 0.2:
+        status = "on_track"
+    elif pct_remaining > 0:
+        status = "caution"
+    else:
+        status = "over_budget"
+
+    return {
+        "safe_to_spend": safe_to_spend,
+        "status": status,
+        "weekly_limit": weekly_limit,
+        "spent": round(total_spent, 2),
+    }
+
+
 def _tool_executor(user_id: int):
     """Return a tool executor bound to the given user_id."""
     from services.tools import _get_school_advice
@@ -194,13 +263,10 @@ def _fallback_recommendations(user_id: int) -> Dict[str, Any]:
     template_recs = run_all_templates(user_id)
     recommendations = (template_recs + nudge_recs)[:5]
 
-    # Get safe-to-spend from financial summary
-    summary_data = _get_user_financial_summary(user_id)
-    safe_to_spend = summary_data.get("safe_to_spend", 0)
-
-    # Get spending status
-    status_data = _get_user_spending_status(user_id)
-    status = status_data.get("status", "unknown")
+    # Compute safe-to-spend from weekly spending limit
+    sts = _compute_safe_to_spend(user_id)
+    safe_to_spend = sts["safe_to_spend"]
+    status = sts["status"]
 
     return {
         "recommendations": recommendations,
@@ -253,23 +319,10 @@ def generate_recommendations(user_id: int, action: str = "general") -> Dict[str,
         if not parsed:
             return _cache_and_return(user_id, _fallback_recommendations(user_id))
 
-        # Enrich with safe-to-spend and status from tool results
-        tool_results = result.get("tool_results", [])
-        safe_to_spend = 0
-        status = "unknown"
-        for tr in tool_results:
-            if tr.get("tool") == "get_financial_summary":
-                safe_to_spend = tr["result"].get("safe_to_spend", 0)
-            if tr.get("tool") == "get_spending_status":
-                status = tr["result"].get("status", "unknown")
-
-        # If agent didn't call the tools, fetch directly
-        if safe_to_spend == 0:
-            summary_data = _get_user_financial_summary(user_id)
-            safe_to_spend = summary_data.get("safe_to_spend", 0)
-        if status == "unknown":
-            status_data = _get_user_spending_status(user_id)
-            status = status_data.get("status", "unknown")
+        # Compute safe-to-spend from weekly spending limit
+        sts = _compute_safe_to_spend(user_id)
+        safe_to_spend = sts["safe_to_spend"]
+        status = sts["status"]
 
         # Merge template-based recommendations (first) with LLM recommendations
         from services.recommendation_templates import run_all_templates
@@ -310,5 +363,34 @@ def _cache_and_return(user_id: int, data: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def get_cached_or_generate(user_id: int) -> Dict[str, Any]:
-    """Always generate fresh recommendations based on current transaction data."""
+    """
+    Return cached recommendations if fresh (<24h), otherwise generate new ones.
+    """
+    from db_models import get_cached_recommendations
+
+    cached = get_cached_recommendations(user_id)
+    if cached:
+        updated_at = cached.get("updated_at")
+        if updated_at:
+            # Strip tzinfo for comparison (Datastore returns tz-aware datetimes)
+            if hasattr(updated_at, "replace"):
+                updated_at = updated_at.replace(tzinfo=None)
+            if datetime.utcnow() - updated_at < timedelta(hours=24):
+                try:
+                    recommendations = json.loads(cached.get("recommendations_json", "[]"))
+                except (json.JSONDecodeError, TypeError):
+                    recommendations = []
+
+                # Always recompute safe-to-spend from weekly limit
+                sts = _compute_safe_to_spend(user_id)
+
+                return {
+                    "recommendations": recommendations,
+                    "safeToSpend": sts["safe_to_spend"],
+                    "status": sts["status"],
+                    "summary": cached.get("summary", ""),
+                    "cached": True,
+                    "generatedAt": updated_at.isoformat() if updated_at else None,
+                }
+
     return generate_recommendations(user_id)

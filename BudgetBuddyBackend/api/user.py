@@ -229,7 +229,7 @@ def get_user_profile(user_id):
     if profile:
         profile_data = {
             "isStudent": profile.get('is_student'),
-            "budgetingGoal": profile.get('budgeting_goal'),
+            "weeklySpendingLimit": profile.get('weekly_spending_limit'),
             "strictnessLevel": profile.get('strictness_level'),
         }
 
@@ -279,8 +279,11 @@ def update_user_profile(user_id):
         profile_updates = {}
         if "isStudent" in data:
             profile_updates['is_student'] = data["isStudent"]
-        if "budgetingGoal" in data:
-            profile_updates['budgeting_goal'] = data["budgetingGoal"]
+        if "weeklySpendingLimit" in data:
+            try:
+                profile_updates['weekly_spending_limit'] = float(data["weeklySpendingLimit"])
+            except (TypeError, ValueError):
+                pass
         if "strictnessLevel" in data:
             profile_updates['strictness_level'] = data["strictnessLevel"]
         if profile_updates:
