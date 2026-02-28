@@ -136,7 +136,7 @@ def get_expenses(user_id):
             "discretionaryAmount": txn.get('discretionary_amount'),
         })
 
-    # Merge in manual (voice-logged) transactions
+    # Merge in manual/voice-logged transactions
     manual_txns = get_manual_transactions(user_id)
     for mt in manual_txns:
         mt_date = mt.get('date') or ''
@@ -150,9 +150,33 @@ def get_expenses(user_id):
             continue
 
         mt_amount = mt.get('amount') or 0
-        total += 1
-        total_unclassified += mt_amount
+        mt_sub = mt.get('sub_category') or 'unclassified'
+        mt_essential = mt.get('essential_amount')
+        mt_discretionary = mt.get('discretionary_amount')
 
+        # Apply sub_category filter if set
+        if sub_category:
+            if sub_category == 'essential' and mt_sub not in ('essential', 'mixed'):
+                continue
+            elif sub_category == 'discretionary' and mt_sub not in ('discretionary', 'mixed'):
+                continue
+            elif sub_category not in ('essential', 'discretionary') and mt_sub != sub_category:
+                continue
+
+        total += 1
+
+        # Accumulate into summary totals
+        if mt_sub == 'essential':
+            total_essential += mt_essential or mt_amount
+        elif mt_sub == 'discretionary':
+            total_discretionary += mt_discretionary or mt_amount
+        elif mt_sub == 'mixed':
+            total_essential += mt_essential or 0
+            total_discretionary += mt_discretionary or 0
+        else:
+            total_unclassified += mt_amount
+
+        mt_source = mt.get('source') or 'manual'
         result.append({
             "id": mt.key.id,
             "transactionId": f"manual-{mt.key.id}",
@@ -160,16 +184,16 @@ def get_expenses(user_id):
             "amount": mt_amount,
             "date": mt_date,
             "authorizedDate": mt_date,
-            "name": mt.get('notes') or mt.get('category') or 'Voice Transaction',
+            "name": mt.get('store') or mt.get('category') or 'Manual Transaction',
             "merchantName": mt.get('store'),
             "categoryPrimary": mt.get('category'),
             "categoryDetailed": mt.get('category'),
             "pending": False,
-            "paymentChannel": "voice",
-            "subCategory": "unclassified",
-            "essentialAmount": None,
-            "discretionaryAmount": None,
-            "source": "voice",
+            "paymentChannel": mt_source,
+            "subCategory": mt_sub,
+            "essentialAmount": mt_essential,
+            "discretionaryAmount": mt_discretionary,
+            "source": mt_source,
         })
 
     # Sort all results by date descending

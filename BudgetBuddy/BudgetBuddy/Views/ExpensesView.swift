@@ -109,7 +109,7 @@ struct ExpensesView: View {
                                 Text("No expenses found")
                                     .font(.roundedHeadline)
                                     .foregroundStyle(Color.textSecondary)
-                                Text("Link a bank account or log an expense by voice")
+                                Text("Link a bank account or log a transaction")
                                     .font(.roundedCaption)
                                     .foregroundStyle(Color.textSecondary)
                             }
@@ -119,8 +119,8 @@ struct ExpensesView: View {
                     .padding(.vertical)
                 }
 
-                // Voice logging button pinned to bottom
-                voiceLogButton
+                // Log transaction button pinned to bottom
+                logTransactionButton
             }
             .background(Color.appBackground)
             .navigationTitle("Expenses")
@@ -173,16 +173,16 @@ struct ExpensesView: View {
         }
     }
 
-    // MARK: - Voice Log Button
+    // MARK: - Log Transaction Button
 
-    private var voiceLogButton: some View {
+    private var logTransactionButton: some View {
         Button {
-            voiceViewModel.reset()
+            voiceViewModel.startManualEntry()
             showVoiceRecording = true
         } label: {
             HStack(spacing: 8) {
-                Image(systemName: "mic.fill")
-                Text("Log Expense by Voice")
+                Image(systemName: "plus.circle.fill")
+                Text("Log Transaction")
                     .font(.roundedHeadline)
             }
             .frame(maxWidth: .infinity)
