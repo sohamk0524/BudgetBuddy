@@ -19,6 +19,7 @@ struct ReceiptScanView: View {
     var body: some View {
         NavigationStack {
             content
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(Color.appBackground)
                 .navigationTitle("Scan Receipt")
                 .navigationBarTitleDisplayMode(.inline)
@@ -57,9 +58,16 @@ struct ReceiptScanView: View {
             analyzingView
         case .reviewed:
             if let result = viewModel.analysisResult {
-                ReceiptLineItemsView(result: result) {
+                ReceiptLineItemsView(result: result) { essentialTotal, discretionaryTotal in
                     let today = DateFormatter.isoDate.string(from: Date())
-                    Task { await viewModel.confirmAndAttach(date: today) }
+                    let date = result.date ?? today
+                    Task {
+                        await viewModel.confirmAndAttach(
+                            date: date,
+                            essentialTotal: essentialTotal,
+                            discretionaryTotal: discretionaryTotal
+                        )
+                    }
                 }
             }
         case .attaching:

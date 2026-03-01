@@ -2,32 +2,55 @@
 //  ReceiptLineItemsView.swift
 //  BudgetBuddy
 //
-//  Shows Claude Vision receipt analysis: merchant, total, line items with color-coded bars.
+//  Shows Claude Vision receipt analysis: merchant, total, and tappable line items.
+//  Users can tap any item to toggle it between Essential and Fun Money.
 //
 
 import SwiftUI
 
 struct ReceiptLineItemsView: View {
     let result: ReceiptAnalysisResult
-    let onConfirm: () -> Void
+    /// Called on confirm with the user-edited essential and discretionary totals.
+    let onConfirm: (_ essentialTotal: Double, _ discretionaryTotal: Double) -> Void
+
+    /// Per-item classification overrides (index → "essential" | "discretionary")
+    @State private var classifications: [String]
+
+    init(result: ReceiptAnalysisResult, onConfirm: @escaping (_ essentialTotal: Double, _ discretionaryTotal: Double) -> Void) {
+        self.result = result
+        self.onConfirm = onConfirm
+        _classifications = State(initialValue: result.items.map(\.classification))
+    }
+
+    // MARK: - Derived totals
+
+    private var currentEssentialTotal: Double {
+        zip(result.items, classifications).reduce(0) { sum, pair in
+            sum + (pair.1 == "essential" ? pair.0.price : 0)
+        }
+    }
+
+    private var currentDiscretionaryTotal: Double {
+        zip(result.items, classifications).reduce(0) { sum, pair in
+            sum + (pair.1 == "discretionary" ? pair.0.price : 0)
+        }
+    }
 
     private var essentialFraction: Double {
         guard result.total > 0 else { return 0.5 }
-        return result.essentialTotal / result.total
+        return currentEssentialTotal / result.total
     }
+
+    // MARK: - Body
 
     var body: some View {
         VStack(spacing: 0) {
             // Header card
             VStack(alignment: .leading, spacing: 12) {
-                Text(result.merchant)
-                    .font(.roundedHeadline)
-                    .foregroundStyle(Color.textPrimary)
-
                 HStack {
-                    Text("Total")
-                        .font(.roundedCaption)
-                        .foregroundStyle(Color.textSecondary)
+                    Text(result.merchant)
+                        .font(.roundedHeadline)
+                        .foregroundStyle(Color.textPrimary)
                     Spacer()
                     Text("$\(result.total, specifier: "%.2f")")
                         .font(.rounded(.title2, weight: .bold))
@@ -35,7 +58,7 @@ struct ReceiptLineItemsView: View {
                         .monospacedDigit()
                 }
 
-                // Essential / Discretionary split bar
+                // Split bar — updates live as user toggles items
                 if result.total > 0 {
                     GeometryReader { geo in
                         HStack(spacing: 2) {
@@ -47,21 +70,24 @@ struct ReceiptLineItemsView: View {
                     }
                     .frame(height: 10)
                     .clipShape(Capsule())
+                    .animation(.easeInOut(duration: 0.25), value: essentialFraction)
                 }
 
                 HStack {
                     HStack(spacing: 6) {
                         Circle().fill(Color.accent).frame(width: 8, height: 8)
-                        Text("Essential $\(result.essentialTotal, specifier: "%.2f")")
+                        Text("Essential $\(currentEssentialTotal, specifier: "%.2f")")
                             .font(.roundedCaption)
                             .foregroundStyle(Color.textSecondary)
+                            .monospacedDigit()
                     }
                     Spacer()
                     HStack(spacing: 6) {
                         Circle().fill(Color.danger).frame(width: 8, height: 8)
-                        Text("Fun Money $\(result.discretionaryTotal, specifier: "%.2f")")
+                        Text("Fun Money $\(currentDiscretionaryTotal, specifier: "%.2f")")
                             .font(.roundedCaption)
                             .foregroundStyle(Color.textSecondary)
+                            .monospacedDigit()
                     }
                 }
             }
@@ -71,44 +97,75 @@ struct ReceiptLineItemsView: View {
             .padding(.horizontal)
             .padding(.top, 12)
 
-            // Line items
+            // Hint pill — outside the card, consistent 12pt spacing above and below
+            HStack(spacing: 5) {
+                Image(systemName: "hand.tap")
+                    .font(.system(size: 12))
+                Text("Tap items to change their category")
+                    .font(.roundedCaption)
+            }
+            .foregroundStyle(Color.textSecondary)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
+            .background(Color.appBackground)
+            .clipShape(Capsule())
+            .overlay(Capsule().stroke(Color.textSecondary.opacity(0.18), lineWidth: 1))
+            .padding(.vertical, 12)
+
+            // Line items — tappable
             ScrollView {
                 LazyVStack(spacing: 8) {
-                    ForEach(result.items) { item in
-                        HStack(spacing: 12) {
-                            // Color bar
-                            RoundedRectangle(cornerRadius: 3)
-                                .fill(item.isEssential ? Color.accent : Color.danger)
-                                .frame(width: 4)
-                                .padding(.vertical, 2)
+                    ForEach(Array(result.items.enumerated()), id: \.offset) { index, item in
+                        let cls = index < classifications.count ? classifications[index] : item.classification
+                        let isEssential = cls == "essential"
 
-                            Text(item.name)
-                                .font(.roundedBody)
-                                .foregroundStyle(Color.textPrimary)
-                                .lineLimit(1)
+                        Button {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                classifications[index] = isEssential ? "discretionary" : "essential"
+                            }
+                        } label: {
+                            HStack(spacing: 12) {
+                                // Color bar
+                                RoundedRectangle(cornerRadius: 3)
+                                    .fill(isEssential ? Color.accent : Color.danger)
+                                    .frame(width: 4)
+                                    .padding(.vertical, 2)
 
-                            Spacer()
+                                Text(item.name)
+                                    .font(.roundedBody)
+                                    .foregroundStyle(Color.textPrimary)
+                                    .lineLimit(2)
+                                    .multilineTextAlignment(.leading)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
 
-                            Text("$\(item.price, specifier: "%.2f")")
-                                .font(.roundedBody)
-                                .fontWeight(.medium)
-                                .foregroundStyle(Color.textPrimary)
-                                .monospacedDigit()
+                                VStack(alignment: .trailing, spacing: 2) {
+                                    Text("$\(item.price, specifier: "%.2f")")
+                                        .font(.roundedBody)
+                                        .fontWeight(.medium)
+                                        .foregroundStyle(Color.textPrimary)
+                                        .monospacedDigit()
+
+                                    Text(isEssential ? "Essential" : "Fun Money")
+                                        .font(.system(size: 10, weight: .semibold, design: .rounded))
+                                        .foregroundStyle(isEssential ? Color.accent : Color.danger)
+                                }
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 10)
+                            .background(Color.surface)
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
                         }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 10)
-                        .background(Color.surface)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .buttonStyle(.plain)
                         .padding(.horizontal)
                     }
                 }
-                .padding(.vertical, 12)
+                .padding(.bottom, 12)
             }
 
-            Spacer(minLength: 0)
-
             // Confirm button
-            Button(action: onConfirm) {
+            Button {
+                onConfirm(currentEssentialTotal, currentDiscretionaryTotal)
+            } label: {
                 Text("Confirm & Save")
                     .font(.roundedHeadline)
                     .fontWeight(.semibold)
@@ -122,6 +179,7 @@ struct ReceiptLineItemsView: View {
             .padding(.vertical, 12)
             .background(Color.surface)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.appBackground)
     }
 }

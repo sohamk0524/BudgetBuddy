@@ -437,6 +437,9 @@ struct ExpenseTransaction: Codable, Identifiable {
     let subCategory: String
     let essentialAmount: Double?
     let discretionaryAmount: Double?
+    let source: String?
+    let notes: String?
+    let receiptItems: [ReceiptLineItem]?
 }
 
 struct ExpensesSummary: Codable {
@@ -556,6 +559,7 @@ struct ReceiptLineItem: Codable, Identifiable {
 
 struct ReceiptAnalysisResult: Codable {
     let merchant: String
+    let date: String?
     let total: Double
     let items: [ReceiptLineItem]
     let essentialTotal: Double

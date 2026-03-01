@@ -119,9 +119,9 @@ def attach_receipt():
     else:
         essential_ratio = 0.5
 
-    if essential_ratio >= 0.9:
+    if discretionary_total < 0.01:
         sub_category = 'essential'
-    elif essential_ratio <= 0.1:
+    elif essential_total < 0.01:
         sub_category = 'discretionary'
     else:
         sub_category = 'mixed'

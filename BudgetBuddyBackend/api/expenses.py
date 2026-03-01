@@ -2,6 +2,8 @@
 Expenses Blueprint — classification, merchant preferences, device tokens.
 """
 
+import json
+
 from flask import Blueprint, jsonify, request
 
 from db_models import (
@@ -53,6 +55,17 @@ def _build_challenge(sub_category: str, category_detailed: str | None) -> dict:
     return {"show": False, "reason": None}
 
 
+def _parse_receipt_items(raw):
+    """Parse a JSON-encoded receipt_items string into a list, or return None."""
+    if not raw:
+        return None
+    try:
+        items = json.loads(raw)
+        return items if items else None
+    except (ValueError, TypeError):
+        return None
+
+
 def _get_account_ids_and_map(user_id):
     """Return (account_ids list, account_id_map {internal_key_id: plaid_account_id_str})."""
     account_ids = []
@@ -94,13 +107,17 @@ def get_expenses(user_id):
             t for t in all_txns
             if (t.get('amount') or 0) > 0 and t.get('sub_category') in (None, 'unclassified')
         ]
-        for txn in unclassified:
-            classify_transaction(txn, user_id)
+        if unclassified:
+            for txn in unclassified:
+                classify_transaction(txn, user_id)
+            # Re-fetch only when entities were actually updated
+            all_txns, _ = get_transactions_for_accounts(account_ids, limit=10000)
 
-        # Re-fetch to get updated classification values
-        all_txns, _ = get_transactions_for_accounts(
-            account_ids, start_date=start_date, end_date=end_date, limit=10000
-        )
+        # Apply date filter in-memory (avoids a second Datastore round-trip)
+        if start_date:
+            all_txns = [t for t in all_txns if (t.get('date') or '') >= start_date]
+        if end_date:
+            all_txns = [t for t in all_txns if (t.get('date') or '') <= end_date]
 
     # Filter: expenses only (positive amount = money out)
     filtered = [t for t in all_txns if (t.get('amount') or 0) > 0]
@@ -159,6 +176,7 @@ def get_expenses(user_id):
             "subCategory": txn.get('sub_category') or 'unclassified',
             "essentialAmount": txn.get('essential_amount'),
             "discretionaryAmount": txn.get('discretionary_amount'),
+            "receiptItems": _parse_receipt_items(txn.get('receipt_items')),
         })
 
     # Merge in manual (voice-logged) transactions
@@ -198,16 +216,18 @@ def get_expenses(user_id):
             "amount": mt_amount,
             "date": mt_date,
             "authorizedDate": mt_date,
-            "name": mt.get('notes') or mt.get('category') or 'Voice Transaction',
+            "name": mt.get('notes') or mt.get('store') or mt.get('category') or 'Transaction',
             "merchantName": mt.get('store'),
             "categoryPrimary": mt.get('category'),
             "categoryDetailed": mt.get('category'),
             "pending": False,
-            "paymentChannel": "voice",
+            "paymentChannel": mt.get('source') or 'voice',
             "subCategory": mt_sub_category,
             "essentialAmount": mt.get('essential_amount'),
             "discretionaryAmount": mt.get('discretionary_amount'),
-            "source": "voice",
+            "source": mt.get('source') or 'voice',
+            "notes": mt.get('notes'),
+            "receiptItems": _parse_receipt_items(mt.get('receipt_items')),
         })
 
     # Sort all results by date descending

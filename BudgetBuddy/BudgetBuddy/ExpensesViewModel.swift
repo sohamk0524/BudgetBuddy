@@ -23,14 +23,40 @@ class ExpensesViewModel {
     var isLoading = false
     var errorMessage: String?
 
-    var transactions: [ExpenseTransaction] = []
-    var summary = ExpensesSummary(totalEssential: 0, totalDiscretionary: 0, totalFunMoney: 0, totalMixed: 0, totalUnclassified: 0)
-    var total = 0
-    var hasMore = false
+    /// Full unfiltered transaction list — source of truth for all derived state.
+    private var allTransactions: [ExpenseTransaction] = []
+
+    /// Filtered view used by the UI. Computed locally — no API call on filter change.
+    var transactions: [ExpenseTransaction] {
+        switch selectedFilter {
+        case .all:          return allTransactions
+        case .essential:    return allTransactions.filter { ($0.essentialAmount ?? 0) > 0.01 }
+        case .discretionary: return allTransactions.filter { ($0.discretionaryAmount ?? 0) > 0.01 }
+        case .unclassified: return allTransactions.filter { $0.subCategory == "unclassified" }
+        }
+    }
+
+    /// Summary computed locally from the full list — always reflects the whole picture.
+    var summary: ExpensesSummary {
+        let essential = allTransactions.reduce(0.0) { $0 + ($1.essentialAmount ?? 0) }
+        let discretionary = allTransactions.reduce(0.0) { $0 + ($1.discretionaryAmount ?? 0) }
+        let unclassified = allTransactions
+            .filter { $0.subCategory == "unclassified" }
+            .reduce(0.0) { $0 + $1.amount }
+        return ExpensesSummary(
+            totalEssential: essential,
+            totalDiscretionary: discretionary,
+            totalFunMoney: discretionary,
+            totalMixed: 0,
+            totalUnclassified: unclassified
+        )
+    }
+
+    /// Number of weeks of history currently loaded (default = 2).
+    private(set) var weeksBack: Int = 2
+    var isLoadingMore = false
 
     var selectedFilter: ExpenseFilter = .all
-    var startDate: String?
-    var endDate: String?
 
     // Swipe classification state
     var unclassifiedTransactions: [UnclassifiedTransactionItem] = []
@@ -46,8 +72,77 @@ class ExpensesViewModel {
     // MARK: - Dependencies
 
     private let apiService = APIService.shared
-    private var currentOffset = 0
-    private let pageSize = 50
+
+    // MARK: - Week-based date helpers
+
+    private var fetchStartDate: String {
+        let start = Calendar.current.date(byAdding: .day, value: -(weeksBack * 7), to: Date()) ?? Date()
+        return Self.isoDateFormatter.string(from: start)
+    }
+
+    private var fetchEndDate: String {
+        Self.isoDateFormatter.string(from: Date())
+    }
+
+    private static let isoDateFormatter: DateFormatter = {
+        let df = DateFormatter()
+        df.dateFormat = "yyyy-MM-dd"
+        return df
+    }()
+
+    private static func parseDate(_ s: String) -> Date? {
+        isoDateFormatter.date(from: s)
+    }
+
+    private static func weekStart(for date: Date, cal: Calendar) -> Date {
+        let weekday = cal.component(.weekday, from: date)
+        let daysSinceMonday = (weekday - cal.firstWeekday + 7) % 7
+        return cal.startOfDay(for: cal.date(byAdding: .day, value: -daysSinceMonday, to: date)!)
+    }
+
+    /// Human-readable date range for the current fetch window.
+    var rangeLabel: String {
+        guard let start = Self.isoDateFormatter.date(from: fetchStartDate) else { return "" }
+        let df = DateFormatter()
+        df.dateFormat = "MMM d"
+        return "\(df.string(from: start)) – Today"
+    }
+
+    /// Filtered transactions grouped by calendar week (Mon–Sun), most-recent week first.
+    var transactionsByWeek: [(label: String, items: [ExpenseTransaction])] {
+        var cal = Calendar(identifier: .gregorian)
+        cal.firstWeekday = 2   // Monday
+        let today = Date()
+        let thisWeekStart = Self.weekStart(for: today, cal: cal)
+        let lastWeekStart = cal.date(byAdding: .day, value: -7, to: thisWeekStart)!
+
+        var groups: [Date: [ExpenseTransaction]] = [:]
+        for txn in transactions {
+            guard let dateStr = txn.date, let date = Self.parseDate(dateStr) else { continue }
+            let ws = Self.weekStart(for: date, cal: cal)
+            groups[ws, default: []].append(txn)
+        }
+
+        let labelFmt = DateFormatter()
+        labelFmt.dateFormat = "MMM d"
+
+        return groups.keys.sorted(by: >).map { weekStart in
+            let label: String
+            if weekStart == thisWeekStart {
+                label = "This Week"
+            } else if weekStart == lastWeekStart {
+                label = "Last Week"
+            } else {
+                let weekEnd = cal.date(byAdding: .day, value: 6, to: weekStart) ?? weekStart
+                label = "\(labelFmt.string(from: weekStart)) – \(labelFmt.string(from: weekEnd))"
+            }
+            let items = groups[weekStart]!.sorted {
+                (Self.parseDate($0.date ?? "") ?? .distantPast) >
+                (Self.parseDate($1.date ?? "") ?? .distantPast)
+            }
+            return (label: label, items: items)
+        }
+    }
 
     // MARK: - Public Methods
 
@@ -56,29 +151,17 @@ class ExpensesViewModel {
 
         isLoading = true
         errorMessage = nil
-        currentOffset = 0
-
-        let subCategory: String? = switch selectedFilter {
-        case .all: nil
-        case .essential: "essential"
-        case .discretionary: "discretionary"
-        case .unclassified: "unclassified"
-        }
 
         do {
             let response = try await apiService.getExpenses(
                 userId: userId,
-                startDate: startDate,
-                endDate: endDate,
-                subCategory: subCategory,
-                limit: pageSize,
+                startDate: fetchStartDate,
+                endDate: fetchEndDate,
+                subCategory: nil,
+                limit: 500,
                 offset: 0
             )
-            transactions = response.transactions
-            summary = response.summary
-            total = response.total
-            hasMore = response.hasMore
-            currentOffset = pageSize
+            allTransactions = response.transactions
         } catch {
             print("Failed to fetch expenses: \(error)")
             errorMessage = "Unable to load expenses"
@@ -87,31 +170,28 @@ class ExpensesViewModel {
         isLoading = false
     }
 
-    func loadMore() async {
-        guard hasMore, let userId = AuthManager.shared.authToken else { return }
+    func loadPreviousWeek() async {
+        guard let userId = AuthManager.shared.authToken else { return }
 
-        let subCategory: String? = switch selectedFilter {
-        case .all: nil
-        case .essential: "essential"
-        case .discretionary: "discretionary"
-        case .unclassified: "unclassified"
-        }
+        isLoadingMore = true
+        weeksBack += 1
 
         do {
             let response = try await apiService.getExpenses(
                 userId: userId,
-                startDate: startDate,
-                endDate: endDate,
-                subCategory: subCategory,
-                limit: pageSize,
-                offset: currentOffset
+                startDate: fetchStartDate,
+                endDate: fetchEndDate,
+                subCategory: nil,
+                limit: 500,
+                offset: 0
             )
-            transactions.append(contentsOf: response.transactions)
-            hasMore = response.hasMore
-            currentOffset += pageSize
+            allTransactions = response.transactions
         } catch {
-            print("Failed to load more expenses: \(error)")
+            print("Failed to load previous week: \(error)")
+            weeksBack -= 1
         }
+
+        isLoadingMore = false
     }
 
     func fetchUnclassifiedTransactions() async {
@@ -138,15 +218,24 @@ class ExpensesViewModel {
             // Advance to next card
             currentClassifyIndex += 1
 
-            // If auto-applied, reduce the unclassified count
             let autoApplied = response.autoApplied ?? 0
             totalUnclassifiedCount -= (1 + autoApplied)
             if totalUnclassifiedCount < 0 { totalUnclassifiedCount = 0 }
 
-            // Refresh summary to reflect the new classification
-            await fetchExpenses()
+            // Update local record immediately
+            applyClassificationLocally(
+                transactionId: transactionId,
+                subCategory: response.transaction.subCategory,
+                essentialAmount: response.transaction.essentialAmount,
+                discretionaryAmount: response.transaction.discretionaryAmount
+            )
 
-            // If we've gone through all loaded cards, fetch more
+            // If bulk auto-apply happened, refresh to capture all changed records
+            if autoApplied > 0 {
+                await fetchExpenses()
+            }
+
+            // Load next batch of cards if needed
             if currentClassifyIndex >= unclassifiedTransactions.count {
                 await fetchUnclassifiedTransactions()
             }
@@ -187,28 +276,20 @@ class ExpensesViewModel {
             subCategory: subCategory,
             essentialRatio: essentialRatio
         )
-        // Update local state
-        if let idx = transactions.firstIndex(where: { $0.id == transactionId }) {
-            let old = transactions[idx]
-            transactions[idx] = ExpenseTransaction(
-                id: old.id,
-                transactionId: old.transactionId,
-                accountId: old.accountId,
-                amount: old.amount,
-                date: old.date,
-                authorizedDate: old.authorizedDate,
-                name: old.name,
-                merchantName: old.merchantName,
-                categoryPrimary: old.categoryPrimary,
-                categoryDetailed: old.categoryDetailed,
-                pending: old.pending,
-                paymentChannel: old.paymentChannel,
-                subCategory: response.transaction.subCategory,
-                essentialAmount: response.transaction.essentialAmount,
-                discretionaryAmount: response.transaction.discretionaryAmount
-            )
+
+        // Update local record immediately — no refetch needed for single classification
+        applyClassificationLocally(
+            transactionId: transactionId,
+            subCategory: response.transaction.subCategory,
+            essentialAmount: response.transaction.essentialAmount,
+            discretionaryAmount: response.transaction.discretionaryAmount
+        )
+
+        // If the backend bulk-applied to other transactions, refresh in the background
+        if (response.autoApplied ?? 0) > 0 {
+            Task { await fetchExpenses() }
         }
-        await fetchExpenses()
+
         return response
     }
 
@@ -229,5 +310,37 @@ class ExpensesViewModel {
         async let expenses: () = fetchExpenses()
         async let unclassified: () = fetchUnclassifiedTransactions()
         _ = await (expenses, unclassified)
+    }
+
+    // MARK: - Private Helpers
+
+    private func applyClassificationLocally(
+        transactionId: Int,
+        subCategory: String,
+        essentialAmount: Double?,
+        discretionaryAmount: Double?
+    ) {
+        guard let idx = allTransactions.firstIndex(where: { $0.id == transactionId }) else { return }
+        let old = allTransactions[idx]
+        allTransactions[idx] = ExpenseTransaction(
+            id: old.id,
+            transactionId: old.transactionId,
+            accountId: old.accountId,
+            amount: old.amount,
+            date: old.date,
+            authorizedDate: old.authorizedDate,
+            name: old.name,
+            merchantName: old.merchantName,
+            categoryPrimary: old.categoryPrimary,
+            categoryDetailed: old.categoryDetailed,
+            pending: old.pending,
+            paymentChannel: old.paymentChannel,
+            subCategory: subCategory,
+            essentialAmount: essentialAmount,
+            discretionaryAmount: discretionaryAmount,
+            source: old.source,
+            notes: old.notes,
+            receiptItems: old.receiptItems
+        )
     }
 }
