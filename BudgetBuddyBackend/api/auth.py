@@ -20,14 +20,31 @@ from db_models import (
     delete_user_cascade,
 )
 
+import os
+from twilio.rest import Client
+
 auth_bp = Blueprint('auth', __name__)
 
+    
+TWILIO_ACCOUNT_SID = os.environ.get('TWILIO_ACCOUNT_SID')
+TWILIO_AUTH_TOKEN = os.environ.get('TWILIO_AUTH_TOKEN')
+TWILIO_PHONE_NUMBER = os.environ.get('TWILIO_PHONE_NUMBER')
+VIRTUAL_TEST_NUMBER = os.environ.get('VIRTUAL_TEST_NUMBER')
 
 def send_via_twilio(phone_number: str, code: str):
-    """Placeholder for Twilio SMS. Prints to console in development."""
-    print(f"\n{'='*50}")
-    print(f"SMS to {phone_number}: Your BudgetBuddy code is {code}")
-    print(f"{'='*50}\n")
+    """Sends SMS using the Twilio API."""
+    try:
+        client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
+
+        message = client.messages.create(
+            body=f"Your BudgetBuddy code is {code}",
+            from_=TWILIO_PHONE_NUMBER,
+            to=VIRTUAL_TEST_NUMBER
+            #to=phone_number
+        )
+        print(f"Message sent! SID: {message.sid}")
+    except Exception as e:
+        print(f"Error sending SMS: {e}")
 
 
 @auth_bp.route("/v1/send_sms_code", methods=["POST"])
