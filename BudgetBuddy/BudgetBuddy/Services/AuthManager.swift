@@ -298,7 +298,7 @@ class AuthManager {
     func completeOnboarding(
         name: String = "",
         isStudent: Bool = false,
-        userBudgetingGoal: String = "stability",
+        weeklySpendingLimit: Double = 0,
         strictnessLevel: String = "moderate",
         school: String = ""
     ) async {
@@ -318,7 +318,7 @@ class AuthManager {
             var body: [String: Any] = [
                 "userId": userId,
                 "isStudent": isStudent,
-                "budgetingGoal": userBudgetingGoal,
+                "weeklySpendingLimit": weeklySpendingLimit,
                 "strictnessLevel": strictnessLevel
             ]
             if !name.isEmpty {

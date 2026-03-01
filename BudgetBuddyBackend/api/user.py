@@ -229,7 +229,7 @@ def get_user_profile(user_id):
     if profile:
         profile_data = {
             "isStudent": profile.get('is_student'),
-            "budgetingGoal": profile.get('budgeting_goal'),
+            "weeklySpendingLimit": profile.get('weekly_spending_limit'),
             "strictnessLevel": profile.get('strictness_level'),
         }
 
@@ -279,8 +279,11 @@ def update_user_profile(user_id):
         profile_updates = {}
         if "isStudent" in data:
             profile_updates['is_student'] = data["isStudent"]
-        if "budgetingGoal" in data:
-            profile_updates['budgeting_goal'] = data["budgetingGoal"]
+        if "weeklySpendingLimit" in data:
+            try:
+                profile_updates['weekly_spending_limit'] = float(data["weeklySpendingLimit"])
+            except (TypeError, ValueError):
+                pass
         if "strictnessLevel" in data:
             profile_updates['strictness_level'] = data["strictnessLevel"]
         if profile_updates:
@@ -479,14 +482,35 @@ def save_manual_transaction():
     if not amount or float(amount) <= 0:
         return jsonify({"error": "amount must be greater than 0"}), 400
 
+    # Determine classification
+    sub_category = data.get("subCategory", "unclassified")
+    if sub_category not in ("essential", "discretionary", "mixed", "unclassified"):
+        sub_category = "unclassified"
+
+    essential_ratio = data.get("essentialRatio")
+    amt = float(amount)
+    if essential_ratio is None:
+        if sub_category == "essential":
+            essential_ratio = 1.0
+        elif sub_category == "discretionary":
+            essential_ratio = 0.0
+        else:
+            essential_ratio = 0.5
+
+    essential_amount = round(amt * essential_ratio, 2) if sub_category != "unclassified" else None
+    discretionary_amount = round(amt * (1.0 - essential_ratio), 2) if sub_category != "unclassified" else None
+
     entity = create_manual_transaction(
         user_id,
-        amount=float(amount),
+        amount=amt,
         category=data.get("category", "Other"),
         store=data.get("store"),
         date=data.get("date"),
         notes=data.get("notes"),
-        source="voice",
+        source=data.get("source", "manual"),
+        sub_category=sub_category,
+        essential_amount=essential_amount,
+        discretionary_amount=discretionary_amount,
     )
 
     return jsonify({

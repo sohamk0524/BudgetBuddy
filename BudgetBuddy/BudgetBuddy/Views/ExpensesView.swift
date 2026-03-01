@@ -144,7 +144,7 @@ struct ExpensesView: View {
                                 Text("No expenses found")
                                     .font(.roundedHeadline)
                                     .foregroundStyle(Color.textSecondary)
-                                Text("Link a bank account or log an expense by voice")
+                                Text("Link a bank account or log a transaction")
                                     .font(.roundedCaption)
                                     .foregroundStyle(Color.textSecondary)
                             }
@@ -154,8 +154,8 @@ struct ExpensesView: View {
                     .padding(.vertical)
                 }
 
-                // Voice logging button pinned to bottom
-                voiceLogButton
+                // Log transaction button pinned to bottom
+                logTransactionButton
             }
             .background(Color.appBackground)
             .navigationTitle("Expenses")
@@ -216,10 +216,28 @@ struct ExpensesView: View {
         }
     }
 
-    // MARK: - Bottom Action Buttons (Voice + Receipt)
+    // MARK: - Log Transaction Button
 
-    private var voiceLogButton: some View {
-        HStack(spacing: 12) {
+    private var logTransactionButton: some View {
+        HStack(spacing: 8) {
+            // Scan receipt button
+            Button {
+                receiptViewModel.reset()
+                showReceiptScan = true
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "receipt")
+                    Text("Scan")
+                        .font(.roundedHeadline)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
+                .background(Color.surface)
+                .foregroundStyle(Color.accent)
+                .clipShape(Capsule())
+                .overlay(Capsule().stroke(Color.accent, lineWidth: 1))
+            }
+
             // Voice log button
             Button {
                 voiceViewModel.reset()
@@ -237,14 +255,14 @@ struct ExpensesView: View {
                 .clipShape(Capsule())
             }
 
-            // Scan receipt button
+            // Manual entry button
             Button {
-                receiptViewModel.reset()
-                showReceiptScan = true
+                voiceViewModel.startManualEntry()
+                showVoiceRecording = true
             } label: {
                 HStack(spacing: 6) {
-                    Image(systemName: "receipt")
-                    Text("Scan Receipt")
+                    Image(systemName: "square.and.pencil")
+                    Text("Manual")
                         .font(.roundedHeadline)
                 }
                 .frame(maxWidth: .infinity)

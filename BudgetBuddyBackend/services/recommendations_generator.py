@@ -10,56 +10,77 @@ from typing import Dict, Any, List, Optional
 
 from services.llm_service import Agent
 from services.tools import (
-    _get_user_budget_plan,
     _get_plaid_transactions,
     _get_user_financial_summary,
     _get_user_spending_status,
 )
 
 
-RECOMMENDATIONS_SYSTEM_PROMPT = """You are BudgetBuddy's recommendation engine. Your job is to analyze a user's financial data and return structured, actionable recommendations.
+RECOMMENDATIONS_SYSTEM_PROMPT = """You are BudgetBuddy's recommendation engine for college students. Your job is to analyze a user's actual financial data and return 3 highly specific, actionable recommendations they can act on THIS WEEK.
 
-You will receive the user's financial context (budget plan, transactions, financial summary, spending status) as pre-fetched data. Analyze it and return ONLY a JSON object with this exact schema:
+WHAT MAKES A GOOD RECOMMENDATION:
+- References specific merchants, amounts, and patterns from the user's real data (e.g., "You spent $47 at Starbucks this month — brewing at home 3x/week saves ~$30/month")
+- Targets the highest-impact area first: where is the most money being lost relative to what the user could reasonably change?
+- Gives a concrete next step, not vague advice. "Reduce spending" is bad. "Switch your 4 weekly Uber Eats orders to pickup and save ~$15/month in fees" is good.
+- Connects to patterns: recurring subscriptions, frequency of small purchases adding up, weekend vs weekday spending spikes
 
+WHAT TO AVOID:
+- Generic advice that doesn't reference the user's actual numbers ("consider tracking your spending", "look for ways to save")
+- Recommending app features, budgeting tools, or creating plans — this app doesn't have those
+- Recommendations that require major lifestyle changes (e.g., "move to a cheaper apartment")
+- Repeating what the user already knows (e.g., "you spent $X on food" without a specific alternative)
+
+OUTPUT FORMAT — return ONLY a JSON object, no markdown fences:
 {
   "recommendations": [
     {
       "category": "spending" | "saving" | "budgeting" | "income" | "habits",
       "title": "Short actionable title (max 60 chars)",
-      "description": "1-2 sentence explanation with specific numbers from the data",
+      "description": "1-2 sentences with specific numbers and a concrete next step",
       "potentialSavings": 0.00,
       "priority": 1-5 (1=highest),
       "icon": "SF Symbol name"
     }
   ],
-  "summary": "One sentence overall financial health summary"
+  "summary": "One sentence overall financial health summary referencing a key number"
 }
 
 RULES:
-- Return 3-5 recommendations sorted by priority
+- Return exactly 3 recommendations sorted by priority (highest impact first)
 - Use REAL numbers from the provided data — never make up amounts
-- Each recommendation must be specific and actionable
-- potentialSavings should be 0 if not applicable
-- Use these SF Symbol icon names: "dollarsign.arrow.circlepath" (spending), "banknote" (saving), "chart.pie" (budgeting), "arrow.up.right" (income), "lightbulb" (habits), "exclamationmark.triangle" (warning)
+- potentialSavings should be a realistic monthly estimate (0 if not applicable)
+- Icon names: "dollarsign.arrow.circlepath" (spending), "banknote" (saving), "chart.pie" (budgeting), "arrow.up.right" (income), "lightbulb" (habits), "exclamationmark.triangle" (warning)
 - Return ONLY valid JSON, no markdown fences, no explanation text
 """
 
 ACTION_PROMPTS = {
-    "general": "Analyze all the user's financial data and provide general recommendations.",
-    "budget_balance": "Focus on how the user's budget allocations compare to actual spending. Highlight categories that are over or under budget.",
-    "spending_habits": "Focus on the user's spending patterns and habits. Identify trends, recurring expenses, and areas where small changes could save money.",
+    "general": (
+        "Analyze the user's transactions and financial summary below. "
+        "Identify the TOP spending categories by dollar amount, look for recurring charges "
+        "(subscriptions, repeated merchants), and flag any unusual spikes. "
+        "Prioritize recommendations by potential monthly savings — put the biggest wins first. "
+        "If the user is a student, use the get_school_advice tool to find campus-specific deals "
+        "or cheaper alternatives near their school."
+    ),
+    "budget_balance": (
+        "Compare the user's budget allocations to their actual spending in each category. "
+        "For categories where they're overspending, calculate by how much and suggest a specific "
+        "swap or cutback. For categories where they're under budget, acknowledge it briefly. "
+        "Focus on the 1-2 categories with the largest overspend gap."
+    ),
+    "spending_habits": (
+        "Look at the user's transaction history for behavioral patterns: "
+        "Which merchants appear most often? Are there small frequent purchases adding up "
+        "(e.g., daily coffee, delivery fees)? Is spending higher on weekends? "
+        "Any subscriptions they might have forgotten? "
+        "Give concrete alternatives with estimated savings. "
+        "If the user is a student, call get_school_advice to find student discounts or "
+        "cheaper local options for their most-visited merchants."
+    ),
 }
 
 # Tool definitions for the recommendations agent (subset — no render_visual)
 _RECO_TOOLS = [
-    {
-        "type": "function",
-        "function": {
-            "name": "get_budget_plan",
-            "description": "Get the user's budget plan with category allocations.",
-            "parameters": {"type": "object", "properties": {}, "required": []},
-        },
-    },
     {
         "type": "function",
         "function": {
@@ -90,16 +111,104 @@ _RECO_TOOLS = [
             "parameters": {"type": "object", "properties": {}, "required": []},
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_school_advice",
+            "description": "Search the web for school-specific financial advice (student discounts, cheap food, campus resources). Use when the user is a student and recommendations could benefit from school-specific context.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "The question to search for (e.g., 'student discounts', 'cheap food near campus')"
+                    }
+                },
+                "required": ["query"],
+            },
+        },
+    },
 ]
+
+
+def _compute_safe_to_spend(user_id: int) -> Dict[str, Any]:
+    """Compute safe-to-spend as Weekly Limit minus this week's transactions."""
+    from db_models import (
+        get_profile,
+        get_active_plaid_items,
+        get_accounts_for_item,
+        get_transactions_for_accounts,
+        get_manual_transactions,
+    )
+
+    profile = get_profile(user_id)
+    weekly_limit = float(profile.get('weekly_spending_limit', 0)) if profile else 0
+
+    if weekly_limit <= 0:
+        return {"safe_to_spend": 0, "status": "unknown", "weekly_limit": 0, "spent": 0}
+
+    # Monday of the current week
+    today = datetime.utcnow().date()
+    monday = today - timedelta(days=today.weekday())
+    start_date = monday.isoformat()
+
+    total_spent = 0.0
+
+    # Plaid transactions for this week
+    plaid_items = get_active_plaid_items(user_id)
+    account_ids = []
+    for item in plaid_items:
+        for acc in get_accounts_for_item(item.key.id):
+            account_ids.append(acc.key.id)
+    if account_ids:
+        txns, _ = get_transactions_for_accounts(account_ids, start_date=start_date, limit=10000)
+        for txn in txns:
+            amt = txn.get('amount') or 0
+            if amt > 0:
+                total_spent += amt
+
+    # Manual transactions for this week
+    manual_txns = get_manual_transactions(user_id, limit=500)
+    for txn in manual_txns:
+        txn_date = txn.get('date')
+        if txn_date:
+            if isinstance(txn_date, str):
+                try:
+                    txn_date = datetime.fromisoformat(txn_date).date()
+                except ValueError:
+                    continue
+            elif hasattr(txn_date, 'date'):
+                txn_date = txn_date.date()
+            if txn_date >= monday:
+                total_spent += float(txn.get('amount') or 0)
+
+    safe_to_spend = round(weekly_limit - total_spent, 2)
+    pct_remaining = safe_to_spend / weekly_limit if weekly_limit > 0 else 0
+
+    if pct_remaining >= 0.2:
+        status = "on_track"
+    elif pct_remaining > 0:
+        status = "caution"
+    else:
+        status = "over_budget"
+
+    return {
+        "safe_to_spend": safe_to_spend,
+        "status": status,
+        "weekly_limit": weekly_limit,
+        "spent": round(total_spent, 2),
+    }
 
 
 def _tool_executor(user_id: int):
     """Return a tool executor bound to the given user_id."""
+    from services.tools import _get_school_advice
+
     executors = {
-        "get_budget_plan": lambda _: _get_user_budget_plan(user_id),
         "get_plaid_transactions": lambda args: _get_plaid_transactions(user_id, args.get("days", 30) if args else 30),
         "get_financial_summary": lambda _: _get_user_financial_summary(user_id),
         "get_spending_status": lambda _: _get_user_spending_status(user_id),
+        "get_school_advice": lambda args: _get_school_advice(user_id, args.get("query", "") if args else ""),
     }
 
     def execute(tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
@@ -136,11 +245,12 @@ def _build_user_context(user_id: int) -> str:
 def _fallback_recommendations(user_id: int) -> Dict[str, Any]:
     """Fall back to the rules-based nudge generator when LLM is unavailable."""
     from services.nudge_generator import generate_nudges
+    from services.recommendation_templates import run_all_templates
 
     nudges = generate_nudges(user_id)
-    recommendations = []
+    nudge_recs = []
     for nudge in nudges:
-        recommendations.append({
+        nudge_recs.append({
             "category": _nudge_type_to_category(nudge.get("type", "")),
             "title": nudge.get("title", "Financial Tip"),
             "description": nudge.get("message", ""),
@@ -149,13 +259,14 @@ def _fallback_recommendations(user_id: int) -> Dict[str, Any]:
             "icon": "lightbulb",
         })
 
-    # Get safe-to-spend from financial summary
-    summary_data = _get_user_financial_summary(user_id)
-    safe_to_spend = summary_data.get("safe_to_spend", 0)
+    # Templates first, then nudges, max 5 total
+    template_recs = run_all_templates(user_id)
+    recommendations = (template_recs + nudge_recs)[:5]
 
-    # Get spending status
-    status_data = _get_user_spending_status(user_id)
-    status = status_data.get("status", "unknown")
+    # Compute safe-to-spend from weekly spending limit
+    sts = _compute_safe_to_spend(user_id)
+    safe_to_spend = sts["safe_to_spend"]
+    status = sts["status"]
 
     return {
         "recommendations": recommendations,
@@ -208,26 +319,20 @@ def generate_recommendations(user_id: int, action: str = "general") -> Dict[str,
         if not parsed:
             return _cache_and_return(user_id, _fallback_recommendations(user_id))
 
-        # Enrich with safe-to-spend and status from tool results
-        tool_results = result.get("tool_results", [])
-        safe_to_spend = 0
-        status = "unknown"
-        for tr in tool_results:
-            if tr.get("tool") == "get_financial_summary":
-                safe_to_spend = tr["result"].get("safe_to_spend", 0)
-            if tr.get("tool") == "get_spending_status":
-                status = tr["result"].get("status", "unknown")
+        # Compute safe-to-spend from weekly spending limit
+        sts = _compute_safe_to_spend(user_id)
+        safe_to_spend = sts["safe_to_spend"]
+        status = sts["status"]
 
-        # If agent didn't call the tools, fetch directly
-        if safe_to_spend == 0:
-            summary_data = _get_user_financial_summary(user_id)
-            safe_to_spend = summary_data.get("safe_to_spend", 0)
-        if status == "unknown":
-            status_data = _get_user_spending_status(user_id)
-            status = status_data.get("status", "unknown")
+        # Merge template-based recommendations (first) with LLM recommendations
+        from services.recommendation_templates import run_all_templates
+
+        template_recs = run_all_templates(user_id)
+        llm_recs = parsed.get("recommendations", [])
+        combined = (template_recs + llm_recs)[:5]
 
         output = {
-            "recommendations": parsed.get("recommendations", []),
+            "recommendations": combined,
             "safeToSpend": safe_to_spend,
             "status": status,
             "summary": parsed.get("summary", ""),
@@ -276,10 +381,13 @@ def get_cached_or_generate(user_id: int) -> Dict[str, Any]:
                 except (json.JSONDecodeError, TypeError):
                     recommendations = []
 
+                # Always recompute safe-to-spend from weekly limit
+                sts = _compute_safe_to_spend(user_id)
+
                 return {
                     "recommendations": recommendations,
-                    "safeToSpend": cached.get("safe_to_spend", 0),
-                    "status": cached.get("status", "unknown"),
+                    "safeToSpend": sts["safe_to_spend"],
+                    "status": sts["status"],
                     "summary": cached.get("summary", ""),
                     "cached": True,
                     "generatedAt": updated_at.isoformat() if updated_at else None,

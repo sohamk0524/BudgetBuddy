@@ -126,13 +126,18 @@ class VoiceTransactionViewModel {
         state = .saving
 
         let formatter = ISO8601DateFormatter()
+        let source = transcribedText.isEmpty ? "manual" : "voice"
+
         let request = SaveTransactionRequest(
             userId: userId,
             amount: amount,
             category: transaction.category ?? "Other",
             store: transaction.store,
             date: formatter.string(from: transaction.date),
-            notes: transaction.notes
+            notes: transaction.notes,
+            subCategory: transaction.subCategory,
+            essentialRatio: transaction.essentialRatio,
+            source: source
         )
 
         do {
@@ -145,6 +150,14 @@ class VoiceTransactionViewModel {
         } catch {
             state = .error("Failed to save: \(error.localizedDescription)")
         }
+    }
+
+    // MARK: - Manual Entry
+
+    func startManualEntry() {
+        transaction = VoiceTransaction()
+        transcribedText = ""
+        state = .confirming
     }
 
     // MARK: - Reset

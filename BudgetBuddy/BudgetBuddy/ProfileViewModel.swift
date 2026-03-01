@@ -17,7 +17,7 @@ class ProfileViewModel {
     var name: String = ""
     var phoneNumber: String = ""
     var isStudent: Bool = false
-    var budgetingGoal: String = ""
+    var weeklySpendingLimit: Double = 0
     var strictnessLevel: String = ""
 
     var plaidItems: [PlaidItemInfo] = []
@@ -44,7 +44,7 @@ class ProfileViewModel {
             name = profile.name ?? ""
             phoneNumber = profile.phoneNumber ?? ""
             isStudent = profile.profile?.isStudent ?? false
-            budgetingGoal = profile.profile?.budgetingGoal ?? ""
+            weeklySpendingLimit = profile.profile?.weeklySpendingLimit ?? 0
             strictnessLevel = profile.profile?.strictnessLevel ?? ""
             plaidItems = profile.plaidItems
         } catch {
@@ -65,7 +65,7 @@ class ProfileViewModel {
             let update = UserProfileUpdateRequest(
                 name: name.isEmpty ? nil : name,
                 isStudent: isStudent,
-                budgetingGoal: budgetingGoal.isEmpty ? nil : budgetingGoal,
+                weeklySpendingLimit: weeklySpendingLimit,
                 strictnessLevel: strictnessLevel.isEmpty ? nil : strictnessLevel
             )
             try await apiService.updateUserProfile(userId: userId, update: update)

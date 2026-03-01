@@ -30,44 +30,8 @@ TOOL_DEFINITIONS: List[Dict[str, Any]] = [
     {
         "type": "function",
         "function": {
-            "name": "get_budget_plan",
-            "description": "Get the user's personalized budget plan including category allocations, recommendations, and spending limits. Use this when the user asks about their budget, spending plan, how to reduce spending, what they should spend on different categories, or wants advice on their finances.",
-            "parameters": {
-                "type": "object",
-                "properties": {},
-                "required": []
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "get_spending_analysis",
-            "description": "Get analysis of the user's actual spending from their bank statement, including spending by category and top expenses. Use this when the user asks about their actual spending habits, where their money is going, what they spent on, or wants to compare actual vs. planned spending.",
-            "parameters": {
-                "type": "object",
-                "properties": {},
-                "required": []
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
             "name": "get_financial_summary",
             "description": "Get the user's overall financial summary including net worth, safe-to-spend amount, and account balances. Use this when the user asks about their balance, how much money they have, their financial health, or safe spending amount.",
-            "parameters": {
-                "type": "object",
-                "properties": {},
-                "required": []
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "get_budget_overview",
-            "description": "Get a high-level budget breakdown showing income and expense categories. Use this when the user asks for a quick overview of their budget or where their money goes. Do NOT use for greetings.",
             "parameters": {
                 "type": "object",
                 "properties": {},
@@ -100,6 +64,23 @@ TOOL_DEFINITIONS: List[Dict[str, Any]] = [
         }
     }
     ,
+    {
+        "type": "function",
+        "function": {
+            "name": "get_school_advice",
+            "description": "Search the web for school-specific financial advice using the student's university context. Use this when the user asks about student discounts, cheap food near campus, campus resources, scholarships, or any question that benefits from knowing their school. Requires a query describing what the user wants to know.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "The user's question to search for school-specific advice (e.g., 'cheap coffee near campus', 'student discounts')"
+                    }
+                },
+                "required": ["query"]
+            }
+        }
+    },
     {
         "type": "function",
         "function": {
@@ -222,102 +203,6 @@ def _get_plaid_transactions(user_id: Optional[int], days: int = 30) -> Dict[str,
         return {"error": f"Failed to fetch Plaid transactions: {str(e)}", "has_plaid": False}
 
 
-def _get_user_budget_plan(user_id: Optional[int]) -> Dict[str, Any]:
-    """
-    Fetch the user's most recent budget plan from the database.
-    Returns the plan with all category allocations and recommendations.
-    """
-    if not user_id:
-        return {"error": "No user ID provided", "has_plan": False}
-
-    try:
-        from db_models import get_user, get_latest_plan
-
-        user = get_user(user_id)
-        if not user:
-            return {"error": "User not found", "has_plan": False}
-
-        plan_record = get_latest_plan(user_id)
-        if not plan_record:
-            return {
-                "has_plan": False,
-                "message": "No budget plan found. The user should create a plan first.",
-            }
-
-        plan_data = json.loads(plan_record['plan_json'])
-        categories = plan_data.get("categories", [])
-        recommendations = plan_data.get("recommendations", [])
-        warnings = plan_data.get("warnings", [])
-        safe_to_spend = plan_data.get("safeToSpend", 0)
-        created_at = plan_record.get('created_at')
-
-        return {
-            "has_plan": True,
-            "created_at": created_at.isoformat() if created_at else None,
-            "month_year": plan_record.get('month_year'),
-            "safe_to_spend": safe_to_spend,
-            "categories": categories,
-            "recommendations": recommendations,
-            "warnings": warnings,
-            "summary": f"User has a budget plan with {len(categories)} categories and ${safe_to_spend:.2f} safe to spend.",
-        }
-
-    except Exception as e:
-        return {"error": f"Failed to fetch plan: {str(e)}", "has_plan": False}
-
-
-def _get_user_spending_analysis(user_id: Optional[int]) -> Dict[str, Any]:
-    """
-    Fetch the user's spending analysis from their uploaded bank statement.
-    Returns categorized spending and top expenses.
-    """
-    if not user_id:
-        return {"error": "No user ID provided", "has_statement": False}
-
-    try:
-        from db_models import get_user, get_statement
-
-        user = get_user(user_id)
-        if not user:
-            return {"error": "User not found", "has_statement": False}
-
-        statement = get_statement(user_id)
-        if not statement:
-            return {
-                "has_statement": False,
-                "message": "No bank statement uploaded. The user should upload a statement for spending analysis.",
-            }
-
-        analysis = {}
-        if statement.get('llm_analysis'):
-            try:
-                analysis = json.loads(statement['llm_analysis'])
-            except json.JSONDecodeError:
-                pass
-
-        top_categories = analysis.get("top_categories", [])
-        transactions = analysis.get("transactions", [])
-        total_income = statement.get('total_income') or 0
-        total_expenses = statement.get('total_expenses') or 0
-        ending_balance = statement.get('ending_balance') or 0
-
-        return {
-            "has_statement": True,
-            "total_income": total_income,
-            "total_expenses": total_expenses,
-            "ending_balance": ending_balance,
-            "statement_period": {
-                "start": statement.get('statement_start_date'),
-                "end": statement.get('statement_end_date'),
-            },
-            "spending_by_category": top_categories,
-            "transaction_count": len(transactions),
-            "summary": f"From statement: ${total_income:.2f} income, ${total_expenses:.2f} expenses, ${ending_balance:.2f} ending balance.",
-        }
-
-    except Exception as e:
-        return {"error": f"Failed to fetch spending analysis: {str(e)}", "has_statement": False}
-
 
 def _get_user_financial_summary(user_id: Optional[int]) -> Dict[str, Any]:
     """
@@ -363,32 +248,6 @@ def _get_user_financial_summary(user_id: Optional[int]) -> Dict[str, Any]:
     except Exception as e:
         return {"error": f"Failed to fetch financial summary: {str(e)}"}
 
-
-def _get_user_budget_overview(user_id: Optional[int]) -> Dict[str, Any]:
-    """
-    Get budget overview - uses real plan data if available.
-    """
-    if not user_id:
-        return {"has_overview": False, "message": "No user ID provided."}
-
-    plan_data = _get_user_budget_plan(user_id)
-    if plan_data.get("has_plan"):
-        categories = plan_data.get("categories", [])
-        total_budget = sum(cat.get("amount", 0) for cat in categories)
-
-        return {
-            "has_overview": True,
-            "source": "user_plan",
-            "total_budget": total_budget,
-            "safe_to_spend": plan_data.get("safe_to_spend", 0),
-            "categories": categories,
-            "recommendations": plan_data.get("recommendations", [])
-        }
-
-    return {
-        "has_overview": False,
-        "message": "No budget plan found. The user should create a plan first."
-    }
 
 
 def _get_user_spending_status(user_id: Optional[int]) -> Dict[str, Any]:
@@ -509,6 +368,35 @@ def _get_user_savings_progress(user_id: Optional[int]) -> Dict[str, Any]:
         return {"has_savings_data": False, "message": f"Error fetching savings progress: {str(e)}"}
 
 
+def _get_school_advice(user_id: Optional[int], query: str) -> Dict[str, Any]:
+    """
+    Get school-specific financial advice via web search (Tavily RAG).
+    Looks up the user's school from their profile and searches for relevant info.
+    """
+    if not user_id:
+        return {"error": "No user ID provided"}
+    if not query:
+        return {"error": "No query provided"}
+
+    try:
+        from db_models import get_profile
+        from services.school_rag import get_school_advice
+
+        profile = get_profile(user_id)
+        school_slug = profile.get("school") if profile else None
+
+        if not school_slug:
+            return {
+                "error": "No school found in user profile. The user should complete onboarding with their school."
+            }
+
+        result = get_school_advice(query, school_slug)
+        return result
+
+    except Exception as e:
+        return {"error": f"Failed to get school advice: {str(e)}"}
+
+
 def _render_visual(visual_type: str, data: Dict[str, Any]) -> Dict[str, Any]:
     """
     Package visual data for the frontend.
@@ -543,13 +431,11 @@ def get_tool_context() -> Optional[int]:
 # Tool executor registry - now uses user context
 TOOL_EXECUTORS: Dict[str, Callable] = {
     "get_plaid_transactions": lambda args: _get_plaid_transactions(get_tool_context(), args.get("days", 30) if args else 30),
-    "get_budget_plan": lambda _: _get_user_budget_plan(get_tool_context()),
-    "get_spending_analysis": lambda _: _get_user_spending_analysis(get_tool_context()),
     "get_financial_summary": lambda _: _get_user_financial_summary(get_tool_context()),
-    "get_budget_overview": lambda _: _get_user_budget_overview(get_tool_context()),
     "get_spending_status": lambda _: _get_user_spending_status(get_tool_context()),
     "get_savings_progress": lambda _: _get_user_savings_progress(get_tool_context()),
     "render_visual": lambda args: _render_visual(args.get("visual_type"), args.get("data", {})),
+    "get_school_advice": lambda args: _get_school_advice(get_tool_context(), args.get("query", "")),
 }
 
 
@@ -588,12 +474,10 @@ def get_tools() -> List[Dict[str, Any]]:
 # Mapping from tool names to visual payload types
 TOOL_TO_VISUAL_TYPE: Dict[str, Optional[str]] = {
     "get_plaid_transactions": "burndownChart",
-    "get_budget_plan": "spendingPlan",
-    "get_spending_analysis": "burndownChart",
     "get_financial_summary": "burndownChart",
-    "get_budget_overview": "spendingPlan",  # or "sankeyFlow" for mock data
     "get_spending_status": "burndownChart",
     "get_savings_progress": None,
+    "get_school_advice": None,
 }
 
 

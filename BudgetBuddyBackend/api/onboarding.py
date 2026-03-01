@@ -18,8 +18,13 @@ def onboarding():
     user_id = data.get("userId")
     name = data.get("name", "").strip() or None
     is_student = data.get("isStudent", False)
-    budgeting_goal = data.get("budgetingGoal", "stability")
+    weekly_spending_limit = data.get("weeklySpendingLimit", 0)
+    try:
+        weekly_spending_limit = float(weekly_spending_limit)
+    except (TypeError, ValueError):
+        weekly_spending_limit = 0
     strictness_level = data.get("strictnessLevel", "moderate")
+    school = data.get("school", "").strip() or None
 
     if not user_id:
         return jsonify({"error": "userId is required"}), 400
@@ -31,11 +36,14 @@ def onboarding():
     if name:
         update_user(int(user_id), name=name)
 
-    upsert_profile(
-        int(user_id),
+    profile_kwargs = dict(
         is_student=is_student,
-        budgeting_goal=budgeting_goal,
+        weekly_spending_limit=weekly_spending_limit,
         strictness_level=strictness_level,
     )
+    if school:
+        profile_kwargs["school"] = school
+
+    upsert_profile(int(user_id), **profile_kwargs)
 
     return jsonify({"status": "success"})

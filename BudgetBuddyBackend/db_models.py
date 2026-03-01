@@ -16,7 +16,15 @@ from google.cloud.datastore.query import PropertyFilter
 
 
 def get_client() -> datastore.Client:
-    """Return a Datastore client (uses ADC or GOOGLE_APPLICATION_CREDENTIALS)."""
+    """Return a Datastore client.
+
+    When USE_LOCAL_DB is set to a truthy value, routes requests to the
+    local Datastore emulator (localhost:8081) and skips authentication.
+    Otherwise uses ADC / GOOGLE_APPLICATION_CREDENTIALS for production.
+    """
+    if os.environ.get("USE_LOCAL_DB", "").lower() in ("1", "true", "yes"):
+        os.environ.setdefault("DATASTORE_EMULATOR_HOST", "localhost:8081")
+        return datastore.Client(project="budgetbuddy-local")
     return datastore.Client()
 
 

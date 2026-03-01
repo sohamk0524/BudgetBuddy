@@ -154,15 +154,12 @@ struct ProfileView: View {
                         .labelsHidden()
                 }
 
-                profileRow(label: "Budgeting Goal", value: formatGoal(viewModel.budgetingGoal)) {
-                    Picker("Goal", selection: $viewModel.budgetingGoal) {
-                        Text("Emergency Fund").tag("emergency_fund")
-                        Text("Pay Off Debt").tag("pay_debt")
-                        Text("Save for Purchase").tag("save_purchase")
-                        Text("General Stability").tag("stability")
-                    }
-                    .pickerStyle(.menu)
-                    .tint(Color.accent)
+                profileRow(label: "Weekly Limit", value: String(format: "$%.0f", viewModel.weeklySpendingLimit)) {
+                    TextField("Amount", value: $viewModel.weeklySpendingLimit, format: .number)
+                        .keyboardType(.decimalPad)
+                        .multilineTextAlignment(.trailing)
+                        .font(.roundedBody)
+                        .foregroundStyle(Color.accent)
                 }
 
                 profileRow(label: "Strictness", value: formatStrictness(viewModel.strictnessLevel)) {
@@ -285,16 +282,6 @@ struct ProfileView: View {
     }
 
     // MARK: - Formatters
-
-    private func formatGoal(_ value: String) -> String {
-        switch value {
-        case "emergency_fund": return "Emergency Fund"
-        case "pay_debt": return "Pay Off Debt"
-        case "save_purchase": return "Save for Purchase"
-        case "stability": return "General Stability"
-        default: return "--"
-        }
-    }
 
     private func formatStrictness(_ value: String) -> String {
         switch value {

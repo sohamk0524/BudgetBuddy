@@ -593,14 +593,14 @@ struct UserProfile: Codable {
 
 struct FinancialProfileInfo: Codable {
     let isStudent: Bool?
-    let budgetingGoal: String?
+    let weeklySpendingLimit: Double?
     let strictnessLevel: String?
 }
 
 struct UserProfileUpdateRequest: Codable {
     var name: String?
     var isStudent: Bool?
-    var budgetingGoal: String?
+    var weeklySpendingLimit: Double?
     var strictnessLevel: String?
 }
 
@@ -677,11 +677,15 @@ struct VoiceTransaction: Codable, Identifiable {
     var store: String?
     var date: Date
     var notes: String?
+    var subCategory: String       // "essential", "discretionary", or "mixed"
+    var essentialRatio: Double     // 0.0 to 1.0
 
     init(id: UUID = UUID(), amount: Double? = nil, category: String? = nil,
-         store: String? = nil, date: Date = Date(), notes: String? = nil) {
+         store: String? = nil, date: Date = Date(), notes: String? = nil,
+         subCategory: String = "essential", essentialRatio: Double = 1.0) {
         self.id = id; self.amount = amount; self.category = category
         self.store = store; self.date = date; self.notes = notes
+        self.subCategory = subCategory; self.essentialRatio = essentialRatio
     }
 }
 
@@ -700,6 +704,9 @@ struct SaveTransactionRequest: Codable {
     let store: String?
     let date: String   // ISO 8601
     let notes: String?
+    let subCategory: String        // essential, discretionary, unclassified
+    let essentialRatio: Double?
+    let source: String?            // "manual" or "voice"
 }
 
 struct SaveTransactionResponse: Codable {

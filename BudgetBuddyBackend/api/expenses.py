@@ -179,7 +179,7 @@ def get_expenses(user_id):
             "receiptItems": _parse_receipt_items(txn.get('receipt_items')),
         })
 
-    # Merge in manual (voice-logged) transactions
+    # Merge in manual/voice-logged transactions
     manual_txns = get_manual_transactions(user_id)
     for mt in manual_txns:
         mt_date = mt.get('date') or ''
@@ -193,22 +193,33 @@ def get_expenses(user_id):
             continue
 
         mt_amount = mt.get('amount') or 0
-        mt_sub_category = mt.get('sub_category') or 'unclassified'
+        mt_sub = mt.get('sub_category') or 'unclassified'
+        mt_essential = mt.get('essential_amount')
+        mt_discretionary = mt.get('discretionary_amount')
 
         # Apply sub_category filter if set
-        if sub_category and mt_sub_category != sub_category:
-            continue
+        if sub_category:
+            if sub_category == 'essential' and mt_sub not in ('essential', 'mixed'):
+                continue
+            elif sub_category == 'discretionary' and mt_sub not in ('discretionary', 'mixed'):
+                continue
+            elif sub_category not in ('essential', 'discretionary') and mt_sub != sub_category:
+                continue
 
         total += 1
 
-        # Update summary based on actual classification
-        if mt_sub_category in ('essential', 'mixed'):
-            total_essential += mt.get('essential_amount') or mt_amount
-        if mt_sub_category in ('discretionary', 'mixed'):
-            total_discretionary += mt.get('discretionary_amount') or 0
-        if mt_sub_category == 'unclassified':
+        # Accumulate into summary totals
+        if mt_sub == 'essential':
+            total_essential += mt_essential or mt_amount
+        elif mt_sub == 'discretionary':
+            total_discretionary += mt_discretionary or mt_amount
+        elif mt_sub == 'mixed':
+            total_essential += mt_essential or 0
+            total_discretionary += mt_discretionary or 0
+        else:
             total_unclassified += mt_amount
 
+        mt_source = mt.get('source') or 'manual'
         result.append({
             "id": mt.key.id,
             "transactionId": f"manual-{mt.key.id}",
@@ -221,11 +232,11 @@ def get_expenses(user_id):
             "categoryPrimary": mt.get('category'),
             "categoryDetailed": mt.get('category'),
             "pending": False,
-            "paymentChannel": mt.get('source') or 'voice',
-            "subCategory": mt_sub_category,
-            "essentialAmount": mt.get('essential_amount'),
-            "discretionaryAmount": mt.get('discretionary_amount'),
-            "source": mt.get('source') or 'voice',
+            "paymentChannel": mt_source,
+            "subCategory": mt_sub,
+            "essentialAmount": mt_essential,
+            "discretionaryAmount": mt_discretionary,
+            "source": mt_source,
             "notes": mt.get('notes'),
             "receiptItems": _parse_receipt_items(mt.get('receipt_items')),
         })
