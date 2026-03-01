@@ -8,6 +8,7 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
+@MainActor
 struct ChatView: View {
     @State private var viewModel = ChatViewModel()
     @FocusState private var isInputFocused: Bool

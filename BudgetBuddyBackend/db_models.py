@@ -14,7 +14,15 @@ from google.cloud import datastore
 
 
 def get_client() -> datastore.Client:
-    """Return a Datastore client (uses ADC or GOOGLE_APPLICATION_CREDENTIALS)."""
+    """Return a Datastore client.
+
+    When USE_LOCAL_DB is set to a truthy value, routes requests to the
+    local Datastore emulator (localhost:8081) and skips authentication.
+    Otherwise uses ADC / GOOGLE_APPLICATION_CREDENTIALS for production.
+    """
+    if os.environ.get("USE_LOCAL_DB", "").lower() in ("1", "true", "yes"):
+        os.environ.setdefault("DATASTORE_EMULATOR_HOST", "localhost:8081")
+        return datastore.Client(project="budgetbuddy-local")
     return datastore.Client()
 
 
@@ -429,3 +437,128 @@ def set_category_prefs(user_id: int, categories: List[str]):
             'created_at': datetime.utcnow(),
         })
         client.put(entity)
+
+
+# ---------------------------------------------------------------------------
+# ManualTransaction (voice-logged)
+# ---------------------------------------------------------------------------
+
+def create_manual_transaction(user_id: int, **kwargs) -> datastore.Entity:
+    client = get_client()
+    key = client.key('ManualTransaction')
+    entity = datastore.Entity(key=key)
+    entity['user_id'] = user_id
+    entity['created_at'] = datetime.utcnow()
+    entity.update(kwargs)
+    client.put(entity)
+    return entity
+
+
+def get_manual_transactions(user_id: int, limit: int = 50) -> List[datastore.Entity]:
+    client = get_client()
+    query = client.query(kind='ManualTransaction')
+    query.add_filter('user_id', '=', user_id)
+    results = list(query.fetch())
+    results.sort(key=lambda e: e.get('created_at', datetime.min), reverse=True)
+    return results[:limit]
+
+
+# ---------------------------------------------------------------------------
+# MerchantClassification
+# ---------------------------------------------------------------------------
+
+def get_merchant_classification(user_id: int, merchant_name: str) -> Optional[datastore.Entity]:
+    client = get_client()
+    query = client.query(kind='MerchantClassification')
+    query.add_filter('user_id', '=', user_id)
+    query.add_filter('merchant_name', '=', merchant_name)
+    results = list(query.fetch(limit=1))
+    return results[0] if results else None
+
+
+def get_merchant_classifications_for_user(user_id: int) -> List[datastore.Entity]:
+    client = get_client()
+    query = client.query(kind='MerchantClassification')
+    query.add_filter('user_id', '=', user_id)
+    return list(query.fetch())
+
+
+def upsert_merchant_classification(user_id: int, merchant_name: str, **kwargs) -> datastore.Entity:
+    client = get_client()
+    existing = get_merchant_classification(user_id, merchant_name)
+    if existing:
+        entity = existing
+    else:
+        key = client.key('MerchantClassification')
+        entity = datastore.Entity(key=key)
+        entity['user_id'] = user_id
+        entity['merchant_name'] = merchant_name
+        entity['created_at'] = datetime.utcnow()
+    entity.update(kwargs)
+    client.put(entity)
+    return entity
+
+
+# ---------------------------------------------------------------------------
+# DeviceToken
+# ---------------------------------------------------------------------------
+
+def get_active_device_tokens(user_id: int) -> List[datastore.Entity]:
+    client = get_client()
+    query = client.query(kind='DeviceToken')
+    query.add_filter('user_id', '=', user_id)
+    query.add_filter('is_active', '=', True)
+    return list(query.fetch())
+
+
+def get_device_token(user_id: int, token: str) -> Optional[datastore.Entity]:
+    client = get_client()
+    query = client.query(kind='DeviceToken')
+    query.add_filter('user_id', '=', user_id)
+    query.add_filter('token', '=', token)
+    results = list(query.fetch(limit=1))
+    return results[0] if results else None
+
+
+def upsert_device_token(user_id: int, token: str, **kwargs) -> datastore.Entity:
+    client = get_client()
+    existing = get_device_token(user_id, token)
+    if existing:
+        entity = existing
+    else:
+        key = client.key('DeviceToken')
+        entity = datastore.Entity(key=key)
+        entity['user_id'] = user_id
+        entity['token'] = token
+        entity['created_at'] = datetime.utcnow()
+    entity.update(kwargs)
+    client.put(entity)
+    return entity
+
+
+# ---------------------------------------------------------------------------
+# CachedRecommendations
+# ---------------------------------------------------------------------------
+
+def get_cached_recommendations(user_id: int) -> Optional[datastore.Entity]:
+    client = get_client()
+    query = client.query(kind='CachedRecommendations')
+    query.add_filter('user_id', '=', user_id)
+    results = list(query.fetch(limit=1))
+    return results[0] if results else None
+
+
+def upsert_cached_recommendations(user_id: int, **kwargs) -> datastore.Entity:
+    client = get_client()
+    existing = get_cached_recommendations(user_id)
+    if existing:
+        entity = existing
+    else:
+        key = client.key('CachedRecommendations')
+        entity = datastore.Entity(key=key, exclude_from_indexes=['recommendations_json'])
+        entity['user_id'] = user_id
+        entity['created_at'] = datetime.utcnow()
+    entity.update(kwargs)
+    entity['updated_at'] = datetime.utcnow()
+    client.put(entity)
+    return entity

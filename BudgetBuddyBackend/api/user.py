@@ -21,6 +21,7 @@ from db_models import (
     get_latest_plan,
     get_category_prefs,
     set_category_prefs,
+    create_manual_transaction,
 )
 
 user_bp = Blueprint('user', __name__)
@@ -228,7 +229,7 @@ def get_user_profile(user_id):
     if profile:
         profile_data = {
             "isStudent": profile.get('is_student'),
-            "budgetingGoal": profile.get('budgeting_goal'),
+            "weeklySpendingLimit": profile.get('weekly_spending_limit'),
             "strictnessLevel": profile.get('strictness_level'),
         }
 
@@ -278,8 +279,11 @@ def update_user_profile(user_id):
         profile_updates = {}
         if "isStudent" in data:
             profile_updates['is_student'] = data["isStudent"]
-        if "budgetingGoal" in data:
-            profile_updates['budgeting_goal'] = data["budgetingGoal"]
+        if "weeklySpendingLimit" in data:
+            try:
+                profile_updates['weekly_spending_limit'] = float(data["weeklySpendingLimit"])
+            except (TypeError, ValueError):
+                pass
         if "strictnessLevel" in data:
             profile_updates['strictness_level'] = data["strictnessLevel"]
         if profile_updates:
@@ -407,3 +411,109 @@ def get_nudges(user_id):
     from services.nudge_generator import generate_nudges
     nudges = generate_nudges(user_id)
     return jsonify({"nudges": nudges})
+
+
+@user_bp.route("/user/parse-transaction", methods=["POST"])
+def parse_transaction():
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "Request body must be JSON"}), 400
+
+    statement = data.get("statement", "").strip()
+    if not statement:
+        return jsonify({"error": "statement is required"}), 400
+
+    from services.llm_service import Agent
+
+    parse_agent = Agent(
+        name="TransactionParser",
+        instructions=(
+            "You are a transaction parser. Extract transaction details from the user's spoken statement.\n"
+            "Return ONLY a JSON object with these fields:\n"
+            '  {"amount": <number or null>, "category": <string or null>, "store": <string or null>, "date": <ISO 8601 string or null>, "notes": <string or null>}\n'
+            "Rules:\n"
+            '- amount: the dollar amount spent, as a number (e.g. 10.50). Convert words like "ten" to 10.\n'
+            "- category: one of Coffee, Food, Groceries, Transport, Entertainment, Shopping, Gas, or Other.\n"
+            "- store: the merchant/store name if mentioned.\n"
+            '- date: if a date is mentioned, use ISO 8601. If "today" or not mentioned, use null.\n'
+            "- notes: any extra detail not captured above, or null.\n"
+            "Return ONLY the JSON object. No markdown, no explanation, no extra text."
+        ),
+        tools=None,
+    )
+
+    try:
+        result = parse_agent.run(statement)
+        raw = result.get("content", "")
+
+        # Extract JSON from response (find first { to last })
+        start = raw.find("{")
+        end = raw.rfind("}")
+        if start != -1 and end != -1:
+            parsed = json.loads(raw[start:end + 1])
+            return jsonify(parsed)
+
+        return jsonify({"amount": None, "category": None, "store": None, "date": None, "notes": None})
+
+    except Exception as e:
+        print(f"Parse transaction error: {e}")
+        return jsonify({"amount": None, "category": None, "store": None, "date": None, "notes": None})
+
+
+@user_bp.route("/user/transactions", methods=["POST"])
+def save_manual_transaction():
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "Request body must be JSON"}), 400
+
+    user_id = data.get("userId")
+    if not user_id:
+        return jsonify({"error": "userId is required"}), 400
+    try:
+        user_id = int(user_id)
+    except (ValueError, TypeError):
+        return jsonify({"error": "Invalid userId"}), 400
+
+    user = get_user(user_id)
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
+    amount = data.get("amount")
+    if not amount or float(amount) <= 0:
+        return jsonify({"error": "amount must be greater than 0"}), 400
+
+    # Determine classification
+    sub_category = data.get("subCategory", "unclassified")
+    if sub_category not in ("essential", "discretionary", "mixed", "unclassified"):
+        sub_category = "unclassified"
+
+    essential_ratio = data.get("essentialRatio")
+    amt = float(amount)
+    if essential_ratio is None:
+        if sub_category == "essential":
+            essential_ratio = 1.0
+        elif sub_category == "discretionary":
+            essential_ratio = 0.0
+        else:
+            essential_ratio = 0.5
+
+    essential_amount = round(amt * essential_ratio, 2) if sub_category != "unclassified" else None
+    discretionary_amount = round(amt * (1.0 - essential_ratio), 2) if sub_category != "unclassified" else None
+
+    entity = create_manual_transaction(
+        user_id,
+        amount=amt,
+        category=data.get("category", "Other"),
+        store=data.get("store"),
+        date=data.get("date"),
+        notes=data.get("notes"),
+        source=data.get("source", "manual"),
+        sub_category=sub_category,
+        essential_amount=essential_amount,
+        discretionary_amount=discretionary_amount,
+    )
+
+    return jsonify({
+        "success": True,
+        "transactionId": str(entity.key.id),
+    }), 201

@@ -55,8 +55,7 @@ class AuthManager {
         }
     }
 
-    /// For physical devices, change to your Mac's IP address (run: ipconfig getifaddr en0)
-    private let baseURL = URL(string: "http://localhost:5000")!
+    private let baseURL = AppConfig.baseURL
 
     /// Ephemeral session to avoid caching issues
     @ObservationIgnored
@@ -299,8 +298,9 @@ class AuthManager {
     func completeOnboarding(
         name: String = "",
         isStudent: Bool = false,
-        userBudgetingGoal: String = "stability",
-        strictnessLevel: String = "moderate"
+        weeklySpendingLimit: Double = 0,
+        strictnessLevel: String = "moderate",
+        school: String = ""
     ) async {
         guard let userId = authToken else { return }
 
@@ -318,11 +318,14 @@ class AuthManager {
             var body: [String: Any] = [
                 "userId": userId,
                 "isStudent": isStudent,
-                "budgetingGoal": userBudgetingGoal,
+                "weeklySpendingLimit": weeklySpendingLimit,
                 "strictnessLevel": strictnessLevel
             ]
             if !name.isEmpty {
                 body["name"] = name
+            }
+            if !school.isEmpty {
+                body["school"] = school
             }
             request.httpBody = try JSONSerialization.data(withJSONObject: body)
 

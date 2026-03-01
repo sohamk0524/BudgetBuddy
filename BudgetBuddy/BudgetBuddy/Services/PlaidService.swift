@@ -36,7 +36,7 @@ actor PlaidService {
     static let shared = PlaidService()
 
     /// For physical devices, change to your Mac's IP address
-    private let baseURL = URL(string: "http://localhost:5000")!
+    private let baseURL = AppConfig.baseURL
 
     private init() {}
 

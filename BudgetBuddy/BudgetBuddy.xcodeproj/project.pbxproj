@@ -7,263 +7,309 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		E196E8582F4E32B200818774 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = E196E8572F4E32B200818774 /* Assets.xcassets */; };
-		E196E85B2F4E32B200818774 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = E196E85A2F4E32B200818774 /* Preview Assets.xcassets */; };
-		E19895732F4E3341002D6720 /* APIService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E19895722F4E3341002D6720 /* APIService.swift */; };
-		E19895A02F4E3371002D6720 /* ChatViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = E19895742F4E3370002D6720 /* ChatViewModel.swift */; };
-		E19895A12F4E3371002D6720 /* ProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E19895762F4E3370002D6720 /* ProfileView.swift */; };
-		E19895A22F4E3371002D6720 /* PlanQuestionFlowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E19895782F4E3370002D6720 /* PlanQuestionFlowView.swift */; };
-		E19895A32F4E3371002D6720 /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E198957A2F4E3370002D6720 /* LoginView.swift */; };
-		E19895A42F4E3371002D6720 /* OTPView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E198957B2F4E3370002D6720 /* OTPView.swift */; };
-		E19895A52F4E3371002D6720 /* EnterPhoneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E198957C2F4E3370002D6720 /* EnterPhoneView.swift */; };
-		E19895A62F4E3371002D6720 /* PlanView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E198957D2F4E3370002D6720 /* PlanView.swift */; };
-		E19895A72F4E3371002D6720 /* QuickActionModalView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E198957F2F4E3370002D6720 /* QuickActionModalView.swift */; };
-		E19895A82F4E3371002D6720 /* GenerativeWidgetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E19895802F4E3370002D6720 /* GenerativeWidgetView.swift */; };
-		E19895A92F4E3371002D6720 /* BurndownWidgetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E19895812F4E3370002D6720 /* BurndownWidgetView.swift */; };
-		E19895AA2F4E3371002D6720 /* PulseHeaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E19895822F4E3370002D6720 /* PulseHeaderView.swift */; };
-		E19895AB2F4E3371002D6720 /* PlanDashboardCards.swift in Sources */ = {isa = PBXBuildFile; fileRef = E19895842F4E3370002D6720 /* PlanDashboardCards.swift */; };
-		E19895AC2F4E3371002D6720 /* SmartNudgesCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = E19895852F4E3370002D6720 /* SmartNudgesCard.swift */; };
-		E19895AD2F4E3371002D6720 /* GoalProgressSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = E19895862F4E3370002D6720 /* GoalProgressSection.swift */; };
-		E19895AE2F4E3371002D6720 /* TopExpensesCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = E19895872F4E3370002D6720 /* TopExpensesCard.swift */; };
-		E19895AF2F4E3371002D6720 /* PlaidLinkView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E19895892F4E3370002D6720 /* PlaidLinkView.swift */; };
-		E19895B02F4E3371002D6720 /* ChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E198958A2F4E3370002D6720 /* ChatView.swift */; };
-		E19895B12F4E3371002D6720 /* WalletView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E198958B2F4E3370002D6720 /* WalletView.swift */; };
-		E19895B22F4E3371002D6720 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E198958C2F4E3370002D6720 /* ContentView.swift */; };
-		E19895B32F4E3371002D6720 /* OnboardingWizardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E198958E2F4E3370002D6720 /* OnboardingWizardView.swift */; };
-		E19895B42F4E3371002D6720 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = E198958F2F4E3370002D6720 /* Models.swift */; };
-		E19895B52F4E3371002D6720 /* PlaidService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E19895912F4E3370002D6720 /* PlaidService.swift */; };
-		E19895B62F4E3371002D6720 /* AuthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = E19895922F4E3370002D6720 /* AuthManager.swift */; };
-		E19895B72F4E3371002D6720 /* PlaidLinkManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = E19895932F4E3370002D6720 /* PlaidLinkManager.swift */; };
-		E19895B82F4E3371002D6720 /* ProfileViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = E19895942F4E3370002D6720 /* ProfileViewModel.swift */; };
-		E19895B92F4E3371002D6720 /* MockService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E19895952F4E3370002D6720 /* MockService.swift */; };
-		E19895BA2F4E3371002D6720 /* ChatBubbleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E19895972F4E3370002D6720 /* ChatBubbleView.swift */; };
-		E19895BB2F4E3371002D6720 /* BurndownChartView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E19895982F4E3370002D6720 /* BurndownChartView.swift */; };
-		E19895BC2F4E3371002D6720 /* BudgetBuddyApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = E19895992F4E3370002D6720 /* BudgetBuddyApp.swift */; };
-		E19895BE2F4E3371002D6720 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = E198959D2F4E3371002D6720 /* Theme.swift */; };
-		E19895BF2F4E3371002D6720 /* SpendingPlanViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = E198959E2F4E3371002D6720 /* SpendingPlanViewModel.swift */; };
-		E19895C02F4E3371002D6720 /* WalletViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = E198959F2F4E3371002D6720 /* WalletViewModel.swift */; };
-		E19895CA2F4E3846002D6720 /* PhoneNumberKit in Frameworks */ = {isa = PBXBuildFile; productRef = E19895C92F4E3846002D6720 /* PhoneNumberKit */; };
-		E19895CC2F4E3846002D6720 /* PhoneNumberKit-Dynamic in Frameworks */ = {isa = PBXBuildFile; productRef = E19895CB2F4E3846002D6720 /* PhoneNumberKit-Dynamic */; };
-		E19895CE2F4E3846002D6720 /* PhoneNumberKit-Static in Frameworks */ = {isa = PBXBuildFile; productRef = E19895CD2F4E3846002D6720 /* PhoneNumberKit-Static */; };
-		E19895D12F4E390B002D6720 /* LinkKit in Frameworks */ = {isa = PBXBuildFile; productRef = E19895D02F4E390B002D6720 /* LinkKit */; };
+		E18C83742F54305B00E66577 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = E18C83732F54305B00E66577 /* Assets.xcassets */; };
+		E18C83772F54305B00E66577 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = E18C83762F54305B00E66577 /* Preview Assets.xcassets */; };
+		E18C83B82F54330900E66577 /* RecommendationsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C837D2F5432FF00E66577 /* RecommendationsViewModel.swift */; };
+		E18C83B92F54330900E66577 /* ChatBubbleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C837F2F54330000E66577 /* ChatBubbleView.swift */; };
+		E18C83BA2F54330900E66577 /* BurndownChartView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C83802F54330000E66577 /* BurndownChartView.swift */; };
+		E18C83BB2F54330900E66577 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C83822F54330000E66577 /* Theme.swift */; };
+		E18C83BC2F54330900E66577 /* MockService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C83832F54330100E66577 /* MockService.swift */; };
+		E18C83BD2F54330900E66577 /* APIService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C83842F54330100E66577 /* APIService.swift */; };
+		E18C83BE2F54330900E66577 /* AppConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C83852F54330200E66577 /* AppConfig.swift */; };
+		E18C83BF2F54330900E66577 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = E18C83862F54330200E66577 /* Assets.xcassets */; };
+		E18C83C02F54330900E66577 /* ExpensesViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C83872F54330300E66577 /* ExpensesViewModel.swift */; };
+		E18C83C12F54330900E66577 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = E18C83892F54330300E66577 /* Preview Assets.xcassets */; };
+		E18C83C22F54330900E66577 /* BudgetBuddyApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C838A2F54330400E66577 /* BudgetBuddyApp.swift */; };
+		E18C83C32F54330900E66577 /* SpendingPlanViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C838B2F54330400E66577 /* SpendingPlanViewModel.swift */; };
+		E18C83C42F54330900E66577 /* VoiceTransactionViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C838D2F54330500E66577 /* VoiceTransactionViewModel.swift */; };
+		E18C83C52F54330900E66577 /* WalletViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C838E2F54330600E66577 /* WalletViewModel.swift */; };
+		E18C83C62F54330900E66577 /* SpeechRecognizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C83902F54330600E66577 /* SpeechRecognizer.swift */; };
+		E18C83C72F54330900E66577 /* PlaidService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C83912F54330600E66577 /* PlaidService.swift */; };
+		E18C83C82F54330900E66577 /* AuthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C83922F54330600E66577 /* AuthManager.swift */; };
+		E18C83C92F54330900E66577 /* PlaidLinkManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C83932F54330600E66577 /* PlaidLinkManager.swift */; };
+		E18C83CA2F54330900E66577 /* ProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C83952F54330700E66577 /* ProfileView.swift */; };
+		E18C83CB2F54330900E66577 /* RecommendationsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C83962F54330700E66577 /* RecommendationsView.swift */; };
+		E18C83CC2F54330900E66577 /* PlanQuestionFlowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C83982F54330700E66577 /* PlanQuestionFlowView.swift */; };
+		E18C83CD2F54330900E66577 /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C839A2F54330700E66577 /* LoginView.swift */; };
+		E18C83CE2F54330900E66577 /* OTPView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C839B2F54330700E66577 /* OTPView.swift */; };
+		E18C83CF2F54330900E66577 /* EnterPhoneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C839C2F54330700E66577 /* EnterPhoneView.swift */; };
+		E18C83D02F54330900E66577 /* ExpensesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C839D2F54330700E66577 /* ExpensesView.swift */; };
+		E18C83D12F54330900E66577 /* PlanView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C839E2F54330700E66577 /* PlanView.swift */; };
+		E18C83D22F54330900E66577 /* QuickActionModalView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C83A02F54330700E66577 /* QuickActionModalView.swift */; };
+		E18C83D32F54330900E66577 /* GenerativeWidgetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C83A12F54330700E66577 /* GenerativeWidgetView.swift */; };
+		E18C83D42F54330900E66577 /* BurndownWidgetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C83A22F54330700E66577 /* BurndownWidgetView.swift */; };
+		E18C83D52F54330900E66577 /* PulseHeaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C83A32F54330700E66577 /* PulseHeaderView.swift */; };
+		E18C83D62F54330900E66577 /* PlanDashboardCards.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C83A52F54330700E66577 /* PlanDashboardCards.swift */; };
+		E18C83D72F54330900E66577 /* VoiceTransactionFlowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C83A62F54330700E66577 /* VoiceTransactionFlowView.swift */; };
+		E18C83D82F54330900E66577 /* SmartNudgesCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C83A72F54330700E66577 /* SmartNudgesCard.swift */; };
+		E18C83D92F54330900E66577 /* VoiceTransactionTile.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C83A82F54330700E66577 /* VoiceTransactionTile.swift */; };
+		E18C83DA2F54330900E66577 /* VoiceRecordingSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C83A92F54330700E66577 /* VoiceRecordingSheet.swift */; };
+		E18C83DB2F54330900E66577 /* TransactionConfirmationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C83AA2F54330700E66577 /* TransactionConfirmationView.swift */; };
+		E18C83DC2F54330900E66577 /* GoalProgressSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C83AB2F54330700E66577 /* GoalProgressSection.swift */; };
+		E18C83DD2F54330900E66577 /* VoiceTransactionSuccessView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C83AC2F54330700E66577 /* VoiceTransactionSuccessView.swift */; };
+		E18C83DE2F54330900E66577 /* TopExpensesCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C83AD2F54330700E66577 /* TopExpensesCard.swift */; };
+		E18C83DF2F54330900E66577 /* PlaidLinkView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C83AF2F54330700E66577 /* PlaidLinkView.swift */; };
+		E18C83E02F54330900E66577 /* ChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C83B02F54330700E66577 /* ChatView.swift */; };
+		E18C83E12F54330900E66577 /* WalletView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C83B12F54330700E66577 /* WalletView.swift */; };
+		E18C83E22F54330900E66577 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C83B22F54330700E66577 /* ContentView.swift */; };
+		E18C83E32F54330900E66577 /* OnboardingWizardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C83B42F54330700E66577 /* OnboardingWizardView.swift */; };
+		E18C83E42F54330900E66577 /* ProfileViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C83B52F54330700E66577 /* ProfileViewModel.swift */; };
+		E18C83E52F54330900E66577 /* ChatViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C83B62F54330800E66577 /* ChatViewModel.swift */; };
+		E18C83E62F54330900E66577 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C83B72F54330800E66577 /* Models.swift */; };
+		E18C83E92F54339700E66577 /* PhoneNumberKit in Frameworks */ = {isa = PBXBuildFile; productRef = E18C83E82F54339700E66577 /* PhoneNumberKit */; };
+		E18C83EB2F54339700E66577 /* PhoneNumberKit-Dynamic in Frameworks */ = {isa = PBXBuildFile; productRef = E18C83EA2F54339700E66577 /* PhoneNumberKit-Dynamic */; };
+		E18C83ED2F54339700E66577 /* PhoneNumberKit-Static in Frameworks */ = {isa = PBXBuildFile; productRef = E18C83EC2F54339700E66577 /* PhoneNumberKit-Static */; };
+		E18C83F02F5433AD00E66577 /* LinkKit in Frameworks */ = {isa = PBXBuildFile; productRef = E18C83EF2F5433AD00E66577 /* LinkKit */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		E196E8502F4E32AF00818774 /* BudgetBuddy.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BudgetBuddy.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		E196E8572F4E32B200818774 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		E196E85A2F4E32B200818774 /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
-		E19895722F4E3341002D6720 /* APIService.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = APIService.swift; path = ../../../bb/BudgetBuddy/BudgetBuddy/BudgetBuddy/APIService.swift; sourceTree = "<group>"; };
-		E19895742F4E3370002D6720 /* ChatViewModel.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = ChatViewModel.swift; path = ../../../bb/BudgetBuddy/BudgetBuddy/BudgetBuddy/ChatViewModel.swift; sourceTree = "<group>"; };
-		E19895762F4E3370002D6720 /* ProfileView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ProfileView.swift; sourceTree = "<group>"; };
-		E19895782F4E3370002D6720 /* PlanQuestionFlowView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PlanQuestionFlowView.swift; sourceTree = "<group>"; };
-		E198957A2F4E3370002D6720 /* LoginView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
-		E198957B2F4E3370002D6720 /* OTPView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = OTPView.swift; sourceTree = "<group>"; };
-		E198957C2F4E3370002D6720 /* EnterPhoneView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = EnterPhoneView.swift; sourceTree = "<group>"; };
-		E198957D2F4E3370002D6720 /* PlanView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PlanView.swift; sourceTree = "<group>"; };
-		E198957F2F4E3370002D6720 /* QuickActionModalView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = QuickActionModalView.swift; sourceTree = "<group>"; };
-		E19895802F4E3370002D6720 /* GenerativeWidgetView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = GenerativeWidgetView.swift; sourceTree = "<group>"; };
-		E19895812F4E3370002D6720 /* BurndownWidgetView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BurndownWidgetView.swift; sourceTree = "<group>"; };
-		E19895822F4E3370002D6720 /* PulseHeaderView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PulseHeaderView.swift; sourceTree = "<group>"; };
-		E19895842F4E3370002D6720 /* PlanDashboardCards.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PlanDashboardCards.swift; sourceTree = "<group>"; };
-		E19895852F4E3370002D6720 /* SmartNudgesCard.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SmartNudgesCard.swift; sourceTree = "<group>"; };
-		E19895862F4E3370002D6720 /* GoalProgressSection.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = GoalProgressSection.swift; sourceTree = "<group>"; };
-		E19895872F4E3370002D6720 /* TopExpensesCard.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = TopExpensesCard.swift; sourceTree = "<group>"; };
-		E19895892F4E3370002D6720 /* PlaidLinkView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PlaidLinkView.swift; sourceTree = "<group>"; };
-		E198958A2F4E3370002D6720 /* ChatView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ChatView.swift; sourceTree = "<group>"; };
-		E198958B2F4E3370002D6720 /* WalletView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = WalletView.swift; sourceTree = "<group>"; };
-		E198958C2F4E3370002D6720 /* ContentView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
-		E198958E2F4E3370002D6720 /* OnboardingWizardView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = OnboardingWizardView.swift; sourceTree = "<group>"; };
-		E198958F2F4E3370002D6720 /* Models.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = Models.swift; path = ../../../bb/BudgetBuddy/BudgetBuddy/BudgetBuddy/Models.swift; sourceTree = "<group>"; };
-		E19895912F4E3370002D6720 /* PlaidService.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PlaidService.swift; sourceTree = "<group>"; };
-		E19895922F4E3370002D6720 /* AuthManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AuthManager.swift; sourceTree = "<group>"; };
-		E19895932F4E3370002D6720 /* PlaidLinkManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PlaidLinkManager.swift; sourceTree = "<group>"; };
-		E19895942F4E3370002D6720 /* ProfileViewModel.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = ProfileViewModel.swift; path = ../../../bb/BudgetBuddy/BudgetBuddy/BudgetBuddy/ProfileViewModel.swift; sourceTree = "<group>"; };
-		E19895952F4E3370002D6720 /* MockService.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = MockService.swift; path = ../../../bb/BudgetBuddy/BudgetBuddy/BudgetBuddy/MockService.swift; sourceTree = "<group>"; };
-		E19895972F4E3370002D6720 /* ChatBubbleView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ChatBubbleView.swift; sourceTree = "<group>"; };
-		E19895982F4E3370002D6720 /* BurndownChartView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BurndownChartView.swift; sourceTree = "<group>"; };
-		E19895992F4E3370002D6720 /* BudgetBuddyApp.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = BudgetBuddyApp.swift; path = ../../../bb/BudgetBuddy/BudgetBuddy/BudgetBuddy/BudgetBuddyApp.swift; sourceTree = "<group>"; };
-		E198959A2F4E3370002D6720 /* BudgetBuddy.entitlements */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.entitlements; name = BudgetBuddy.entitlements; path = ../../../bb/BudgetBuddy/BudgetBuddy/BudgetBuddy/BudgetBuddy.entitlements; sourceTree = "<group>"; };
-		E198959D2F4E3371002D6720 /* Theme.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
-		E198959E2F4E3371002D6720 /* SpendingPlanViewModel.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = SpendingPlanViewModel.swift; path = ../../../bb/BudgetBuddy/BudgetBuddy/BudgetBuddy/SpendingPlanViewModel.swift; sourceTree = "<group>"; };
-		E198959F2F4E3371002D6720 /* WalletViewModel.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = WalletViewModel.swift; path = ../../../bb/BudgetBuddy/BudgetBuddy/BudgetBuddy/WalletViewModel.swift; sourceTree = "<group>"; };
+		E18C836C2F54305800E66577 /* BudgetBuddy.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BudgetBuddy.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		E18C83732F54305B00E66577 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		E18C83762F54305B00E66577 /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
+		E18C837D2F5432FF00E66577 /* RecommendationsViewModel.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = RecommendationsViewModel.swift; sourceTree = "<group>"; };
+		E18C837F2F54330000E66577 /* ChatBubbleView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ChatBubbleView.swift; sourceTree = "<group>"; };
+		E18C83802F54330000E66577 /* BurndownChartView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BurndownChartView.swift; sourceTree = "<group>"; };
+		E18C83822F54330000E66577 /* Theme.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
+		E18C83832F54330100E66577 /* MockService.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = MockService.swift; sourceTree = "<group>"; };
+		E18C83842F54330100E66577 /* APIService.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = APIService.swift; sourceTree = "<group>"; };
+		E18C83852F54330200E66577 /* AppConfig.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AppConfig.swift; sourceTree = "<group>"; };
+		E18C83862F54330200E66577 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		E18C83872F54330300E66577 /* ExpensesViewModel.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ExpensesViewModel.swift; sourceTree = "<group>"; };
+		E18C83892F54330300E66577 /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
+		E18C838A2F54330400E66577 /* BudgetBuddyApp.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BudgetBuddyApp.swift; sourceTree = "<group>"; };
+		E18C838B2F54330400E66577 /* SpendingPlanViewModel.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SpendingPlanViewModel.swift; sourceTree = "<group>"; };
+		E18C838C2F54330500E66577 /* BudgetBuddy.entitlements */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.entitlements; path = BudgetBuddy.entitlements; sourceTree = "<group>"; };
+		E18C838D2F54330500E66577 /* VoiceTransactionViewModel.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = VoiceTransactionViewModel.swift; sourceTree = "<group>"; };
+		E18C838E2F54330600E66577 /* WalletViewModel.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = WalletViewModel.swift; sourceTree = "<group>"; };
+		E18C83902F54330600E66577 /* SpeechRecognizer.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SpeechRecognizer.swift; sourceTree = "<group>"; };
+		E18C83912F54330600E66577 /* PlaidService.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PlaidService.swift; sourceTree = "<group>"; };
+		E18C83922F54330600E66577 /* AuthManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AuthManager.swift; sourceTree = "<group>"; };
+		E18C83932F54330600E66577 /* PlaidLinkManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PlaidLinkManager.swift; sourceTree = "<group>"; };
+		E18C83952F54330700E66577 /* ProfileView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ProfileView.swift; sourceTree = "<group>"; };
+		E18C83962F54330700E66577 /* RecommendationsView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = RecommendationsView.swift; sourceTree = "<group>"; };
+		E18C83982F54330700E66577 /* PlanQuestionFlowView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PlanQuestionFlowView.swift; sourceTree = "<group>"; };
+		E18C839A2F54330700E66577 /* LoginView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
+		E18C839B2F54330700E66577 /* OTPView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = OTPView.swift; sourceTree = "<group>"; };
+		E18C839C2F54330700E66577 /* EnterPhoneView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = EnterPhoneView.swift; sourceTree = "<group>"; };
+		E18C839D2F54330700E66577 /* ExpensesView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ExpensesView.swift; sourceTree = "<group>"; };
+		E18C839E2F54330700E66577 /* PlanView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PlanView.swift; sourceTree = "<group>"; };
+		E18C83A02F54330700E66577 /* QuickActionModalView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = QuickActionModalView.swift; sourceTree = "<group>"; };
+		E18C83A12F54330700E66577 /* GenerativeWidgetView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = GenerativeWidgetView.swift; sourceTree = "<group>"; };
+		E18C83A22F54330700E66577 /* BurndownWidgetView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BurndownWidgetView.swift; sourceTree = "<group>"; };
+		E18C83A32F54330700E66577 /* PulseHeaderView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PulseHeaderView.swift; sourceTree = "<group>"; };
+		E18C83A52F54330700E66577 /* PlanDashboardCards.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PlanDashboardCards.swift; sourceTree = "<group>"; };
+		E18C83A62F54330700E66577 /* VoiceTransactionFlowView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = VoiceTransactionFlowView.swift; sourceTree = "<group>"; };
+		E18C83A72F54330700E66577 /* SmartNudgesCard.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SmartNudgesCard.swift; sourceTree = "<group>"; };
+		E18C83A82F54330700E66577 /* VoiceTransactionTile.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = VoiceTransactionTile.swift; sourceTree = "<group>"; };
+		E18C83A92F54330700E66577 /* VoiceRecordingSheet.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = VoiceRecordingSheet.swift; sourceTree = "<group>"; };
+		E18C83AA2F54330700E66577 /* TransactionConfirmationView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = TransactionConfirmationView.swift; sourceTree = "<group>"; };
+		E18C83AB2F54330700E66577 /* GoalProgressSection.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = GoalProgressSection.swift; sourceTree = "<group>"; };
+		E18C83AC2F54330700E66577 /* VoiceTransactionSuccessView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = VoiceTransactionSuccessView.swift; sourceTree = "<group>"; };
+		E18C83AD2F54330700E66577 /* TopExpensesCard.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = TopExpensesCard.swift; sourceTree = "<group>"; };
+		E18C83AF2F54330700E66577 /* PlaidLinkView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PlaidLinkView.swift; sourceTree = "<group>"; };
+		E18C83B02F54330700E66577 /* ChatView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ChatView.swift; sourceTree = "<group>"; };
+		E18C83B12F54330700E66577 /* WalletView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = WalletView.swift; sourceTree = "<group>"; };
+		E18C83B22F54330700E66577 /* ContentView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		E18C83B42F54330700E66577 /* OnboardingWizardView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = OnboardingWizardView.swift; sourceTree = "<group>"; };
+		E18C83B52F54330700E66577 /* ProfileViewModel.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ProfileViewModel.swift; sourceTree = "<group>"; };
+		E18C83B62F54330800E66577 /* ChatViewModel.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ChatViewModel.swift; sourceTree = "<group>"; };
+		E18C83B72F54330800E66577 /* Models.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
-		E196E84D2F4E32AF00818774 /* Frameworks */ = {
+		E18C83692F54305800E66577 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				E19895CA2F4E3846002D6720 /* PhoneNumberKit in Frameworks */,
-				E19895D12F4E390B002D6720 /* LinkKit in Frameworks */,
-				E19895CC2F4E3846002D6720 /* PhoneNumberKit-Dynamic in Frameworks */,
-				E19895CE2F4E3846002D6720 /* PhoneNumberKit-Static in Frameworks */,
+				E18C83E92F54339700E66577 /* PhoneNumberKit in Frameworks */,
+				E18C83F02F5433AD00E66577 /* LinkKit in Frameworks */,
+				E18C83EB2F54339700E66577 /* PhoneNumberKit-Dynamic in Frameworks */,
+				E18C83ED2F54339700E66577 /* PhoneNumberKit-Static in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		E196E8472F4E32AF00818774 = {
+		E18C83632F54305800E66577 = {
 			isa = PBXGroup;
 			children = (
-				E196E8522F4E32AF00818774 /* BudgetBuddy */,
-				E196E8512F4E32AF00818774 /* Products */,
+				E18C836E2F54305800E66577 /* BudgetBuddy */,
+				E18C836D2F54305800E66577 /* Products */,
 			);
 			sourceTree = "<group>";
 		};
-		E196E8512F4E32AF00818774 /* Products */ = {
+		E18C836D2F54305800E66577 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				E196E8502F4E32AF00818774 /* BudgetBuddy.app */,
+				E18C836C2F54305800E66577 /* BudgetBuddy.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
 		};
-		E196E8522F4E32AF00818774 /* BudgetBuddy */ = {
+		E18C836E2F54305800E66577 /* BudgetBuddy */ = {
 			isa = PBXGroup;
 			children = (
-				E198959A2F4E3370002D6720 /* BudgetBuddy.entitlements */,
-				E19895992F4E3370002D6720 /* BudgetBuddyApp.swift */,
-				E19895742F4E3370002D6720 /* ChatViewModel.swift */,
-				E19895962F4E3370002D6720 /* Components */,
-				E198959C2F4E3371002D6720 /* Design */,
-				E19895952F4E3370002D6720 /* MockService.swift */,
-				E198958F2F4E3370002D6720 /* Models.swift */,
-				E19895942F4E3370002D6720 /* ProfileViewModel.swift */,
-				E19895902F4E3370002D6720 /* Services */,
-				E198959E2F4E3371002D6720 /* SpendingPlanViewModel.swift */,
-				E19895752F4E3370002D6720 /* Views */,
-				E198959F2F4E3371002D6720 /* WalletViewModel.swift */,
-				E19895722F4E3341002D6720 /* APIService.swift */,
-				E196E8572F4E32B200818774 /* Assets.xcassets */,
-				E196E8592F4E32B200818774 /* Preview Content */,
+				E18C83842F54330100E66577 /* APIService.swift */,
+				E18C83852F54330200E66577 /* AppConfig.swift */,
+				E18C83862F54330200E66577 /* Assets.xcassets */,
+				E18C838C2F54330500E66577 /* BudgetBuddy.entitlements */,
+				E18C838A2F54330400E66577 /* BudgetBuddyApp.swift */,
+				E18C83B62F54330800E66577 /* ChatViewModel.swift */,
+				E18C837E2F54330000E66577 /* Components */,
+				E18C83812F54330000E66577 /* Design */,
+				E18C83872F54330300E66577 /* ExpensesViewModel.swift */,
+				E18C83832F54330100E66577 /* MockService.swift */,
+				E18C83B72F54330800E66577 /* Models.swift */,
+				E18C83882F54330300E66577 /* Preview Content */,
+				E18C83B52F54330700E66577 /* ProfileViewModel.swift */,
+				E18C837D2F5432FF00E66577 /* RecommendationsViewModel.swift */,
+				E18C838F2F54330600E66577 /* Services */,
+				E18C838B2F54330400E66577 /* SpendingPlanViewModel.swift */,
+				E18C83942F54330700E66577 /* Views */,
+				E18C838D2F54330500E66577 /* VoiceTransactionViewModel.swift */,
+				E18C838E2F54330600E66577 /* WalletViewModel.swift */,
+				E18C83732F54305B00E66577 /* Assets.xcassets */,
+				E18C83752F54305B00E66577 /* Preview Content */,
 			);
 			path = BudgetBuddy;
 			sourceTree = "<group>";
 		};
-		E196E8592F4E32B200818774 /* Preview Content */ = {
+		E18C83752F54305B00E66577 /* Preview Content */ = {
 			isa = PBXGroup;
 			children = (
-				E196E85A2F4E32B200818774 /* Preview Assets.xcassets */,
+				E18C83762F54305B00E66577 /* Preview Assets.xcassets */,
 			);
 			path = "Preview Content";
 			sourceTree = "<group>";
 		};
-		E19895752F4E3370002D6720 /* Views */ = {
+		E18C837E2F54330000E66577 /* Components */ = {
 			isa = PBXGroup;
 			children = (
-				E19895762F4E3370002D6720 /* ProfileView.swift */,
-				E19895772F4E3370002D6720 /* SpendingPlan */,
-				E19895792F4E3370002D6720 /* Auth */,
-				E198957D2F4E3370002D6720 /* PlanView.swift */,
-				E198957E2F4E3370002D6720 /* Components */,
-				E19895832F4E3370002D6720 /* Wallet */,
-				E19895882F4E3370002D6720 /* Plaid */,
-				E198958A2F4E3370002D6720 /* ChatView.swift */,
-				E198958B2F4E3370002D6720 /* WalletView.swift */,
-				E198958C2F4E3370002D6720 /* ContentView.swift */,
-				E198958D2F4E3370002D6720 /* Onboarding */,
-			);
-			name = Views;
-			path = ../../../bb/BudgetBuddy/BudgetBuddy/BudgetBuddy/Views;
-			sourceTree = "<group>";
-		};
-		E19895772F4E3370002D6720 /* SpendingPlan */ = {
-			isa = PBXGroup;
-			children = (
-				E19895782F4E3370002D6720 /* PlanQuestionFlowView.swift */,
-			);
-			path = SpendingPlan;
-			sourceTree = "<group>";
-		};
-		E19895792F4E3370002D6720 /* Auth */ = {
-			isa = PBXGroup;
-			children = (
-				E198957A2F4E3370002D6720 /* LoginView.swift */,
-				E198957B2F4E3370002D6720 /* OTPView.swift */,
-				E198957C2F4E3370002D6720 /* EnterPhoneView.swift */,
-			);
-			path = Auth;
-			sourceTree = "<group>";
-		};
-		E198957E2F4E3370002D6720 /* Components */ = {
-			isa = PBXGroup;
-			children = (
-				E198957F2F4E3370002D6720 /* QuickActionModalView.swift */,
-				E19895802F4E3370002D6720 /* GenerativeWidgetView.swift */,
-				E19895812F4E3370002D6720 /* BurndownWidgetView.swift */,
-				E19895822F4E3370002D6720 /* PulseHeaderView.swift */,
+				E18C837F2F54330000E66577 /* ChatBubbleView.swift */,
+				E18C83802F54330000E66577 /* BurndownChartView.swift */,
 			);
 			path = Components;
 			sourceTree = "<group>";
 		};
-		E19895832F4E3370002D6720 /* Wallet */ = {
+		E18C83812F54330000E66577 /* Design */ = {
 			isa = PBXGroup;
 			children = (
-				E19895842F4E3370002D6720 /* PlanDashboardCards.swift */,
-				E19895852F4E3370002D6720 /* SmartNudgesCard.swift */,
-				E19895862F4E3370002D6720 /* GoalProgressSection.swift */,
-				E19895872F4E3370002D6720 /* TopExpensesCard.swift */,
+				E18C83822F54330000E66577 /* Theme.swift */,
+			);
+			path = Design;
+			sourceTree = "<group>";
+		};
+		E18C83882F54330300E66577 /* Preview Content */ = {
+			isa = PBXGroup;
+			children = (
+				E18C83892F54330300E66577 /* Preview Assets.xcassets */,
+			);
+			path = "Preview Content";
+			sourceTree = "<group>";
+		};
+		E18C838F2F54330600E66577 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				E18C83902F54330600E66577 /* SpeechRecognizer.swift */,
+				E18C83912F54330600E66577 /* PlaidService.swift */,
+				E18C83922F54330600E66577 /* AuthManager.swift */,
+				E18C83932F54330600E66577 /* PlaidLinkManager.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		E18C83942F54330700E66577 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				E18C83952F54330700E66577 /* ProfileView.swift */,
+				E18C83962F54330700E66577 /* RecommendationsView.swift */,
+				E18C83972F54330700E66577 /* SpendingPlan */,
+				E18C83992F54330700E66577 /* Auth */,
+				E18C839D2F54330700E66577 /* ExpensesView.swift */,
+				E18C839E2F54330700E66577 /* PlanView.swift */,
+				E18C839F2F54330700E66577 /* Components */,
+				E18C83A42F54330700E66577 /* Wallet */,
+				E18C83AE2F54330700E66577 /* Plaid */,
+				E18C83B02F54330700E66577 /* ChatView.swift */,
+				E18C83B12F54330700E66577 /* WalletView.swift */,
+				E18C83B22F54330700E66577 /* ContentView.swift */,
+				E18C83B32F54330700E66577 /* Onboarding */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		E18C83972F54330700E66577 /* SpendingPlan */ = {
+			isa = PBXGroup;
+			children = (
+				E18C83982F54330700E66577 /* PlanQuestionFlowView.swift */,
+			);
+			path = SpendingPlan;
+			sourceTree = "<group>";
+		};
+		E18C83992F54330700E66577 /* Auth */ = {
+			isa = PBXGroup;
+			children = (
+				E18C839A2F54330700E66577 /* LoginView.swift */,
+				E18C839B2F54330700E66577 /* OTPView.swift */,
+				E18C839C2F54330700E66577 /* EnterPhoneView.swift */,
+			);
+			path = Auth;
+			sourceTree = "<group>";
+		};
+		E18C839F2F54330700E66577 /* Components */ = {
+			isa = PBXGroup;
+			children = (
+				E18C83A02F54330700E66577 /* QuickActionModalView.swift */,
+				E18C83A12F54330700E66577 /* GenerativeWidgetView.swift */,
+				E18C83A22F54330700E66577 /* BurndownWidgetView.swift */,
+				E18C83A32F54330700E66577 /* PulseHeaderView.swift */,
+			);
+			path = Components;
+			sourceTree = "<group>";
+		};
+		E18C83A42F54330700E66577 /* Wallet */ = {
+			isa = PBXGroup;
+			children = (
+				E18C83A52F54330700E66577 /* PlanDashboardCards.swift */,
+				E18C83A62F54330700E66577 /* VoiceTransactionFlowView.swift */,
+				E18C83A72F54330700E66577 /* SmartNudgesCard.swift */,
+				E18C83A82F54330700E66577 /* VoiceTransactionTile.swift */,
+				E18C83A92F54330700E66577 /* VoiceRecordingSheet.swift */,
+				E18C83AA2F54330700E66577 /* TransactionConfirmationView.swift */,
+				E18C83AB2F54330700E66577 /* GoalProgressSection.swift */,
+				E18C83AC2F54330700E66577 /* VoiceTransactionSuccessView.swift */,
+				E18C83AD2F54330700E66577 /* TopExpensesCard.swift */,
 			);
 			path = Wallet;
 			sourceTree = "<group>";
 		};
-		E19895882F4E3370002D6720 /* Plaid */ = {
+		E18C83AE2F54330700E66577 /* Plaid */ = {
 			isa = PBXGroup;
 			children = (
-				E19895892F4E3370002D6720 /* PlaidLinkView.swift */,
+				E18C83AF2F54330700E66577 /* PlaidLinkView.swift */,
 			);
 			path = Plaid;
 			sourceTree = "<group>";
 		};
-		E198958D2F4E3370002D6720 /* Onboarding */ = {
+		E18C83B32F54330700E66577 /* Onboarding */ = {
 			isa = PBXGroup;
 			children = (
-				E198958E2F4E3370002D6720 /* OnboardingWizardView.swift */,
+				E18C83B42F54330700E66577 /* OnboardingWizardView.swift */,
 			);
 			path = Onboarding;
-			sourceTree = "<group>";
-		};
-		E19895902F4E3370002D6720 /* Services */ = {
-			isa = PBXGroup;
-			children = (
-				E19895912F4E3370002D6720 /* PlaidService.swift */,
-				E19895922F4E3370002D6720 /* AuthManager.swift */,
-				E19895932F4E3370002D6720 /* PlaidLinkManager.swift */,
-			);
-			name = Services;
-			path = ../../../bb/BudgetBuddy/BudgetBuddy/BudgetBuddy/Services;
-			sourceTree = "<group>";
-		};
-		E19895962F4E3370002D6720 /* Components */ = {
-			isa = PBXGroup;
-			children = (
-				E19895972F4E3370002D6720 /* ChatBubbleView.swift */,
-				E19895982F4E3370002D6720 /* BurndownChartView.swift */,
-			);
-			name = Components;
-			path = ../../../bb/BudgetBuddy/BudgetBuddy/BudgetBuddy/Components;
-			sourceTree = "<group>";
-		};
-		E198959C2F4E3371002D6720 /* Design */ = {
-			isa = PBXGroup;
-			children = (
-				E198959D2F4E3371002D6720 /* Theme.swift */,
-			);
-			name = Design;
-			path = ../../../bb/BudgetBuddy/BudgetBuddy/BudgetBuddy/Design;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		E196E84F2F4E32AF00818774 /* BudgetBuddy */ = {
+		E18C836B2F54305800E66577 /* BudgetBuddy */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = E196E85E2F4E32B200818774 /* Build configuration list for PBXNativeTarget "BudgetBuddy" */;
+			buildConfigurationList = E18C837A2F54305B00E66577 /* Build configuration list for PBXNativeTarget "BudgetBuddy" */;
 			buildPhases = (
-				E196E84C2F4E32AF00818774 /* Sources */,
-				E196E84D2F4E32AF00818774 /* Frameworks */,
-				E196E84E2F4E32AF00818774 /* Resources */,
+				E18C83682F54305800E66577 /* Sources */,
+				E18C83692F54305800E66577 /* Frameworks */,
+				E18C836A2F54305800E66577 /* Resources */,
 			);
 			buildRules = (
 			);
@@ -271,32 +317,32 @@
 			);
 			name = BudgetBuddy;
 			packageProductDependencies = (
-				E19895C92F4E3846002D6720 /* PhoneNumberKit */,
-				E19895CB2F4E3846002D6720 /* PhoneNumberKit-Dynamic */,
-				E19895CD2F4E3846002D6720 /* PhoneNumberKit-Static */,
-				E19895D02F4E390B002D6720 /* LinkKit */,
+				E18C83E82F54339700E66577 /* PhoneNumberKit */,
+				E18C83EA2F54339700E66577 /* PhoneNumberKit-Dynamic */,
+				E18C83EC2F54339700E66577 /* PhoneNumberKit-Static */,
+				E18C83EF2F5433AD00E66577 /* LinkKit */,
 			);
 			productName = BudgetBuddy;
-			productReference = E196E8502F4E32AF00818774 /* BudgetBuddy.app */;
+			productReference = E18C836C2F54305800E66577 /* BudgetBuddy.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
-		E196E8482F4E32AF00818774 /* Project object */ = {
+		E18C83642F54305800E66577 /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
 				LastSwiftUpdateCheck = 1520;
 				LastUpgradeCheck = 1520;
 				TargetAttributes = {
-					E196E84F2F4E32AF00818774 = {
+					E18C836B2F54305800E66577 = {
 						CreatedOnToolsVersion = 15.2;
 						LastSwiftMigration = 1520;
 					};
 				};
 			};
-			buildConfigurationList = E196E84B2F4E32AF00818774 /* Build configuration list for PBXProject "BudgetBuddy" */;
+			buildConfigurationList = E18C83672F54305800E66577 /* Build configuration list for PBXProject "BudgetBuddy" */;
 			compatibilityVersion = "Xcode 14.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
@@ -304,77 +350,91 @@
 				en,
 				Base,
 			);
-			mainGroup = E196E8472F4E32AF00818774;
+			mainGroup = E18C83632F54305800E66577;
 			packageReferences = (
-				E19895C82F4E3845002D6720 /* XCRemoteSwiftPackageReference "PhoneNumberKit" */,
-				E19895CF2F4E390B002D6720 /* XCRemoteSwiftPackageReference "plaid-link-ios" */,
+				E18C83E72F54339700E66577 /* XCRemoteSwiftPackageReference "PhoneNumberKit" */,
+				E18C83EE2F5433AD00E66577 /* XCRemoteSwiftPackageReference "plaid-link-ios" */,
 			);
-			productRefGroup = E196E8512F4E32AF00818774 /* Products */;
+			productRefGroup = E18C836D2F54305800E66577 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				E196E84F2F4E32AF00818774 /* BudgetBuddy */,
+				E18C836B2F54305800E66577 /* BudgetBuddy */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-		E196E84E2F4E32AF00818774 /* Resources */ = {
+		E18C836A2F54305800E66577 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				E196E85B2F4E32B200818774 /* Preview Assets.xcassets in Resources */,
-				E196E8582F4E32B200818774 /* Assets.xcassets in Resources */,
+				E18C83C12F54330900E66577 /* Preview Assets.xcassets in Resources */,
+				E18C83772F54305B00E66577 /* Preview Assets.xcassets in Resources */,
+				E18C83BF2F54330900E66577 /* Assets.xcassets in Resources */,
+				E18C83742F54305B00E66577 /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-		E196E84C2F4E32AF00818774 /* Sources */ = {
+		E18C83682F54305800E66577 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				E19895A02F4E3371002D6720 /* ChatViewModel.swift in Sources */,
-				E19895B62F4E3371002D6720 /* AuthManager.swift in Sources */,
-				E19895A72F4E3371002D6720 /* QuickActionModalView.swift in Sources */,
-				E19895A92F4E3371002D6720 /* BurndownWidgetView.swift in Sources */,
-				E19895B12F4E3371002D6720 /* WalletView.swift in Sources */,
-				E19895BF2F4E3371002D6720 /* SpendingPlanViewModel.swift in Sources */,
-				E19895C02F4E3371002D6720 /* WalletViewModel.swift in Sources */,
-				E19895A82F4E3371002D6720 /* GenerativeWidgetView.swift in Sources */,
-				E19895B02F4E3371002D6720 /* ChatView.swift in Sources */,
-				E19895B22F4E3371002D6720 /* ContentView.swift in Sources */,
-				E19895A12F4E3371002D6720 /* ProfileView.swift in Sources */,
-				E19895BC2F4E3371002D6720 /* BudgetBuddyApp.swift in Sources */,
-				E19895AD2F4E3371002D6720 /* GoalProgressSection.swift in Sources */,
-				E19895B82F4E3371002D6720 /* ProfileViewModel.swift in Sources */,
-				E19895B92F4E3371002D6720 /* MockService.swift in Sources */,
-				E19895BB2F4E3371002D6720 /* BurndownChartView.swift in Sources */,
-				E19895A52F4E3371002D6720 /* EnterPhoneView.swift in Sources */,
-				E19895A42F4E3371002D6720 /* OTPView.swift in Sources */,
-				E19895BE2F4E3371002D6720 /* Theme.swift in Sources */,
-				E19895BA2F4E3371002D6720 /* ChatBubbleView.swift in Sources */,
-				E19895B42F4E3371002D6720 /* Models.swift in Sources */,
-				E19895AF2F4E3371002D6720 /* PlaidLinkView.swift in Sources */,
-				E19895AE2F4E3371002D6720 /* TopExpensesCard.swift in Sources */,
-				E19895732F4E3341002D6720 /* APIService.swift in Sources */,
-				E19895B72F4E3371002D6720 /* PlaidLinkManager.swift in Sources */,
-				E19895AB2F4E3371002D6720 /* PlanDashboardCards.swift in Sources */,
-				E19895AC2F4E3371002D6720 /* SmartNudgesCard.swift in Sources */,
-				E19895A32F4E3371002D6720 /* LoginView.swift in Sources */,
-				E19895AA2F4E3371002D6720 /* PulseHeaderView.swift in Sources */,
-				E19895A22F4E3371002D6720 /* PlanQuestionFlowView.swift in Sources */,
-				E19895A62F4E3371002D6720 /* PlanView.swift in Sources */,
-				E19895B52F4E3371002D6720 /* PlaidService.swift in Sources */,
-				E19895B32F4E3371002D6720 /* OnboardingWizardView.swift in Sources */,
+				E18C83DD2F54330900E66577 /* VoiceTransactionSuccessView.swift in Sources */,
+				E18C83B92F54330900E66577 /* ChatBubbleView.swift in Sources */,
+				E18C83D52F54330900E66577 /* PulseHeaderView.swift in Sources */,
+				E18C83C32F54330900E66577 /* SpendingPlanViewModel.swift in Sources */,
+				E18C83C02F54330900E66577 /* ExpensesViewModel.swift in Sources */,
+				E18C83DE2F54330900E66577 /* TopExpensesCard.swift in Sources */,
+				E18C83D22F54330900E66577 /* QuickActionModalView.swift in Sources */,
+				E18C83BC2F54330900E66577 /* MockService.swift in Sources */,
+				E18C83C92F54330900E66577 /* PlaidLinkManager.swift in Sources */,
+				E18C83D32F54330900E66577 /* GenerativeWidgetView.swift in Sources */,
+				E18C83CB2F54330900E66577 /* RecommendationsView.swift in Sources */,
+				E18C83D42F54330900E66577 /* BurndownWidgetView.swift in Sources */,
+				E18C83C82F54330900E66577 /* AuthManager.swift in Sources */,
+				E18C83C22F54330900E66577 /* BudgetBuddyApp.swift in Sources */,
+				E18C83D62F54330900E66577 /* PlanDashboardCards.swift in Sources */,
+				E18C83BB2F54330900E66577 /* Theme.swift in Sources */,
+				E18C83D72F54330900E66577 /* VoiceTransactionFlowView.swift in Sources */,
+				E18C83DA2F54330900E66577 /* VoiceRecordingSheet.swift in Sources */,
+				E18C83BE2F54330900E66577 /* AppConfig.swift in Sources */,
+				E18C83E02F54330900E66577 /* ChatView.swift in Sources */,
+				E18C83E32F54330900E66577 /* OnboardingWizardView.swift in Sources */,
+				E18C83D82F54330900E66577 /* SmartNudgesCard.swift in Sources */,
+				E18C83CA2F54330900E66577 /* ProfileView.swift in Sources */,
+				E18C83BA2F54330900E66577 /* BurndownChartView.swift in Sources */,
+				E18C83E62F54330900E66577 /* Models.swift in Sources */,
+				E18C83C72F54330900E66577 /* PlaidService.swift in Sources */,
+				E18C83BD2F54330900E66577 /* APIService.swift in Sources */,
+				E18C83CF2F54330900E66577 /* EnterPhoneView.swift in Sources */,
+				E18C83CE2F54330900E66577 /* OTPView.swift in Sources */,
+				E18C83E42F54330900E66577 /* ProfileViewModel.swift in Sources */,
+				E18C83E22F54330900E66577 /* ContentView.swift in Sources */,
+				E18C83CC2F54330900E66577 /* PlanQuestionFlowView.swift in Sources */,
+				E18C83DC2F54330900E66577 /* GoalProgressSection.swift in Sources */,
+				E18C83C52F54330900E66577 /* WalletViewModel.swift in Sources */,
+				E18C83D02F54330900E66577 /* ExpensesView.swift in Sources */,
+				E18C83E12F54330900E66577 /* WalletView.swift in Sources */,
+				E18C83C62F54330900E66577 /* SpeechRecognizer.swift in Sources */,
+				E18C83C42F54330900E66577 /* VoiceTransactionViewModel.swift in Sources */,
+				E18C83CD2F54330900E66577 /* LoginView.swift in Sources */,
+				E18C83DF2F54330900E66577 /* PlaidLinkView.swift in Sources */,
+				E18C83DB2F54330900E66577 /* TransactionConfirmationView.swift in Sources */,
+				E18C83B82F54330900E66577 /* RecommendationsViewModel.swift in Sources */,
+				E18C83D12F54330900E66577 /* PlanView.swift in Sources */,
+				E18C83E52F54330900E66577 /* ChatViewModel.swift in Sources */,
+				E18C83D92F54330900E66577 /* VoiceTransactionTile.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin XCBuildConfiguration section */
-		E196E85C2F4E32B200818774 /* Debug */ = {
+		E18C83782F54305B00E66577 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -437,7 +497,7 @@
 			};
 			name = Debug;
 		};
-		E196E85D2F4E32B200818774 /* Release */ = {
+		E18C83792F54305B00E66577 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -493,7 +553,7 @@
 			};
 			name = Release;
 		};
-		E196E85F2F4E32B200818774 /* Debug */ = {
+		E18C837B2F54305B00E66577 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
@@ -523,7 +583,7 @@
 			};
 			name = Debug;
 		};
-		E196E8602F4E32B200818774 /* Release */ = {
+		E18C837C2F54305B00E66577 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
@@ -555,20 +615,20 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		E196E84B2F4E32AF00818774 /* Build configuration list for PBXProject "BudgetBuddy" */ = {
+		E18C83672F54305800E66577 /* Build configuration list for PBXProject "BudgetBuddy" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				E196E85C2F4E32B200818774 /* Debug */,
-				E196E85D2F4E32B200818774 /* Release */,
+				E18C83782F54305B00E66577 /* Debug */,
+				E18C83792F54305B00E66577 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		E196E85E2F4E32B200818774 /* Build configuration list for PBXNativeTarget "BudgetBuddy" */ = {
+		E18C837A2F54305B00E66577 /* Build configuration list for PBXNativeTarget "BudgetBuddy" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				E196E85F2F4E32B200818774 /* Debug */,
-				E196E8602F4E32B200818774 /* Release */,
+				E18C837B2F54305B00E66577 /* Debug */,
+				E18C837C2F54305B00E66577 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
@@ -576,7 +636,7 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
-		E19895C82F4E3845002D6720 /* XCRemoteSwiftPackageReference "PhoneNumberKit" */ = {
+		E18C83E72F54339700E66577 /* XCRemoteSwiftPackageReference "PhoneNumberKit" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/marmelroy/PhoneNumberKit";
 			requirement = {
@@ -584,7 +644,7 @@
 				version = 3.7.0;
 			};
 		};
-		E19895CF2F4E390B002D6720 /* XCRemoteSwiftPackageReference "plaid-link-ios" */ = {
+		E18C83EE2F5433AD00E66577 /* XCRemoteSwiftPackageReference "plaid-link-ios" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/plaid/plaid-link-ios";
 			requirement = {
@@ -595,27 +655,27 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		E19895C92F4E3846002D6720 /* PhoneNumberKit */ = {
+		E18C83E82F54339700E66577 /* PhoneNumberKit */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = E19895C82F4E3845002D6720 /* XCRemoteSwiftPackageReference "PhoneNumberKit" */;
+			package = E18C83E72F54339700E66577 /* XCRemoteSwiftPackageReference "PhoneNumberKit" */;
 			productName = PhoneNumberKit;
 		};
-		E19895CB2F4E3846002D6720 /* PhoneNumberKit-Dynamic */ = {
+		E18C83EA2F54339700E66577 /* PhoneNumberKit-Dynamic */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = E19895C82F4E3845002D6720 /* XCRemoteSwiftPackageReference "PhoneNumberKit" */;
+			package = E18C83E72F54339700E66577 /* XCRemoteSwiftPackageReference "PhoneNumberKit" */;
 			productName = "PhoneNumberKit-Dynamic";
 		};
-		E19895CD2F4E3846002D6720 /* PhoneNumberKit-Static */ = {
+		E18C83EC2F54339700E66577 /* PhoneNumberKit-Static */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = E19895C82F4E3845002D6720 /* XCRemoteSwiftPackageReference "PhoneNumberKit" */;
+			package = E18C83E72F54339700E66577 /* XCRemoteSwiftPackageReference "PhoneNumberKit" */;
 			productName = "PhoneNumberKit-Static";
 		};
-		E19895D02F4E390B002D6720 /* LinkKit */ = {
+		E18C83EF2F5433AD00E66577 /* LinkKit */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = E19895CF2F4E390B002D6720 /* XCRemoteSwiftPackageReference "plaid-link-ios" */;
+			package = E18C83EE2F5433AD00E66577 /* XCRemoteSwiftPackageReference "plaid-link-ios" */;
 			productName = LinkKit;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
-	rootObject = E196E8482F4E32AF00818774 /* Project object */;
+	rootObject = E18C83642F54305800E66577 /* Project object */;
 }

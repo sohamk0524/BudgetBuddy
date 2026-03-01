@@ -11,7 +11,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 // MARK: - Wallet View
-
+@MainActor
 struct WalletView: View {
     @Bindable var walletViewModel: WalletViewModel
     @Bindable var planViewModel: SpendingPlanViewModel

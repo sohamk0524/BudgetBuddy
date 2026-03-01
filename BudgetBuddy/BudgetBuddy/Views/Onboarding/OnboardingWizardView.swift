@@ -2,8 +2,8 @@
 //  OnboardingWizardView.swift
 //  BudgetBuddy
 //
-//  Onboarding wizard – 4-Question Protocol:
-//  1. Name  2. Student Status  3. Primary Motivation  4. Strictness Level
+//  Onboarding wizard – 4/5-Question Protocol:
+//  1. Name  2. Student Status  (2b. School if student)  3. Weekly Spending Limit  4. Strictness Level
 //
 
 import SwiftUI
@@ -11,15 +11,19 @@ import SwiftUI
 struct OnboardingWizardView: View {
     @State private var currentPage = 0
 
-    // 4-Question Protocol fields
+    // Question fields
     @State private var name: String = ""
     @State private var isStudent: Bool = false
-    @State private var userBudgetingGoal: String = "stability"
+    @State private var selectedSchool: String = ""
+    @State private var weeklySpendingLimit: String = ""
     @State private var strictnessLevel: String = "moderate"
 
     var authManager = AuthManager.shared
 
-    private let totalPages = 4
+    /// Total pages changes based on whether the school page is shown.
+    private var totalPages: Int {
+        isStudent ? 5 : 4
+    }
 
     private var canFinish: Bool {
         !name.trimmingCharacters(in: .whitespaces).isEmpty
@@ -65,13 +69,27 @@ struct OnboardingWizardView: View {
                     StudentStatusPage(isStudent: $isStudent)
                         .tag(1)
 
-                    // Page 2: Primary Motivation ("Why")
-                    PrimaryMotivationPage(selectedGoal: $userBudgetingGoal)
-                        .tag(2)
+                    if isStudent {
+                        // Page 2: School Selection (conditional)
+                        SchoolSelectionPage(selectedSchool: $selectedSchool)
+                            .tag(2)
 
-                    // Page 3: Strictness Level
-                    StrictnessLevelPage(selectedStrictness: $strictnessLevel)
-                        .tag(3)
+                        // Page 3: Weekly Spending Limit
+                        WeeklySpendingLimitPage(weeklyLimit: $weeklySpendingLimit)
+                            .tag(3)
+
+                        // Page 4: Strictness Level
+                        StrictnessLevelPage(selectedStrictness: $strictnessLevel)
+                            .tag(4)
+                    } else {
+                        // Page 2: Weekly Spending Limit
+                        WeeklySpendingLimitPage(weeklyLimit: $weeklySpendingLimit)
+                            .tag(2)
+
+                        // Page 3: Strictness Level
+                        StrictnessLevelPage(selectedStrictness: $strictnessLevel)
+                            .tag(3)
+                    }
                 }
                 .tabViewStyle(.page(indexDisplayMode: .never))
 
@@ -136,17 +154,31 @@ struct OnboardingWizardView: View {
                 }
             }
         }
+        .onChange(of: isStudent) {
+            // When toggling student off, reset school and clamp page if needed
+            if !isStudent {
+                selectedSchool = ""
+                if currentPage > 1 {
+                    // Shift page index down since school page was removed
+                    withAnimation {
+                        currentPage = min(currentPage - 1, totalPages - 1)
+                    }
+                }
+            }
+        }
     }
 
     private func finishOnboarding() {
         let trimmedName = name.trimmingCharacters(in: .whitespaces)
+        let limit = Double(weeklySpendingLimit) ?? 0
 
         Task {
             await authManager.completeOnboarding(
                 name: trimmedName,
                 isStudent: isStudent,
-                userBudgetingGoal: userBudgetingGoal,
-                strictnessLevel: strictnessLevel
+                weeklySpendingLimit: limit,
+                strictnessLevel: strictnessLevel,
+                school: selectedSchool
             )
         }
     }
@@ -234,46 +266,94 @@ struct StudentStatusPage: View {
     }
 }
 
-// MARK: - Primary Motivation Page
+// MARK: - School Selection Page
 
-struct PrimaryMotivationPage: View {
-    @Binding var selectedGoal: String
+struct SchoolSelectionPage: View {
+    @Binding var selectedSchool: String
 
     private let options = [
-        ("emergency_fund", "Build Emergency Fund", "Save 3-6 months of expenses"),
-        ("pay_debt", "Pay Off Debt", "Become debt-free"),
-        ("save_purchase", "Save for a Purchase", "Big item like car, vacation, etc."),
-        ("stability", "General Stability", "Maintain financial health")
+        ("uc_berkeley", "UC Berkeley"),
+        ("uc_davis", "UC Davis"),
+        ("uc_irvine", "UC Irvine"),
+        ("uc_los_angeles", "UC Los Angeles"),
+        ("uc_merced", "UC Merced"),
+        ("uc_riverside", "UC Riverside"),
+        ("uc_san_diego", "UC San Diego"),
+        ("uc_santa_barbara", "UC Santa Barbara"),
+        ("uc_santa_cruz", "UC Santa Cruz")
     ]
 
     var body: some View {
         VStack(spacing: 24) {
-            Image(systemName: "flag.fill")
+            Image(systemName: "building.columns.fill")
                 .font(.system(size: 56))
                 .foregroundStyle(Color.accent)
 
-            Text("Why Are You Here?")
+            Text("Which UC Do You Attend?")
                 .font(.roundedHeadline)
                 .foregroundStyle(Color.textPrimary)
 
-            Text("What's your main reason for using BudgetBuddy?")
+            Text("We'll customize tips for your campus")
+                .font(.roundedBody)
+                .foregroundStyle(Color.textSecondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 32)
+
+            ScrollView {
+                VStack(spacing: 12) {
+                    ForEach(options, id: \.0) { value, title in
+                        SelectableOptionCard(
+                            title: title,
+                            subtitle: "",
+                            isSelected: selectedSchool == value
+                        ) {
+                            selectedSchool = value
+                        }
+                    }
+                }
+                .padding(.horizontal, 24)
+            }
+        }
+        .padding(.top, 24)
+    }
+}
+
+// MARK: - Weekly Spending Limit Page
+
+struct WeeklySpendingLimitPage: View {
+    @Binding var weeklyLimit: String
+
+    var body: some View {
+        VStack(spacing: 24) {
+            Image(systemName: "dollarsign.circle.fill")
+                .font(.system(size: 56))
+                .foregroundStyle(Color.accent)
+
+            Text("Weekly Spending Limit")
+                .font(.roundedHeadline)
+                .foregroundStyle(Color.textPrimary)
+
+            Text("How much do you want to spend per week? We'll track your progress against this goal.")
                 .font(.roundedBody)
                 .foregroundStyle(Color.textSecondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 24)
 
-            VStack(spacing: 12) {
-                ForEach(options, id: \.0) { value, title, subtitle in
-                    SelectableOptionCard(
-                        title: title,
-                        subtitle: subtitle,
-                        isSelected: selectedGoal == value
-                    ) {
-                        selectedGoal = value
-                    }
-                }
+            HStack(spacing: 4) {
+                Text("$")
+                    .font(.roundedTitle)
+                    .foregroundStyle(Color.textPrimary)
+
+                TextField("0", text: $weeklyLimit)
+                    .font(.roundedTitle)
+                    .foregroundStyle(Color.textPrimary)
+                    .keyboardType(.decimalPad)
+                    .multilineTextAlignment(.center)
             }
-            .padding(.horizontal, 24)
+            .padding()
+            .background(Color.surface)
+            .clipShape(RoundedRectangle(cornerRadius: 16))
+            .padding(.horizontal, 48)
 
             Spacer()
         }
@@ -343,9 +423,11 @@ struct SelectableOptionCard: View {
                         .font(.roundedHeadline)
                         .foregroundStyle(Color.textPrimary)
 
-                    Text(subtitle)
-                        .font(.roundedCaption)
-                        .foregroundStyle(Color.textSecondary)
+                    if !subtitle.isEmpty {
+                        Text(subtitle)
+                            .font(.roundedCaption)
+                            .foregroundStyle(Color.textSecondary)
+                    }
                 }
 
                 Spacer()
