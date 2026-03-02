@@ -3,458 +3,373 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 56;
+	objectVersion = 70;
 	objects = {
 
 /* Begin PBXBuildFile section */
-		E18C83742F54305B00E66577 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = E18C83732F54305B00E66577 /* Assets.xcassets */; };
-		E18C83772F54305B00E66577 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = E18C83762F54305B00E66577 /* Preview Assets.xcassets */; };
-		E18C83B82F54330900E66577 /* RecommendationsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C837D2F5432FF00E66577 /* RecommendationsViewModel.swift */; };
-		E18C83B92F54330900E66577 /* ChatBubbleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C837F2F54330000E66577 /* ChatBubbleView.swift */; };
-		E18C83BA2F54330900E66577 /* BurndownChartView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C83802F54330000E66577 /* BurndownChartView.swift */; };
-		E18C83BB2F54330900E66577 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C83822F54330000E66577 /* Theme.swift */; };
-		E18C83BC2F54330900E66577 /* MockService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C83832F54330100E66577 /* MockService.swift */; };
-		E18C83BD2F54330900E66577 /* APIService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C83842F54330100E66577 /* APIService.swift */; };
-		E18C83BE2F54330900E66577 /* AppConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C83852F54330200E66577 /* AppConfig.swift */; };
-		E18C83BF2F54330900E66577 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = E18C83862F54330200E66577 /* Assets.xcassets */; };
-		E18C83C02F54330900E66577 /* ExpensesViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C83872F54330300E66577 /* ExpensesViewModel.swift */; };
-		E18C83C12F54330900E66577 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = E18C83892F54330300E66577 /* Preview Assets.xcassets */; };
-		E18C83C22F54330900E66577 /* BudgetBuddyApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C838A2F54330400E66577 /* BudgetBuddyApp.swift */; };
-		E18C83C32F54330900E66577 /* SpendingPlanViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C838B2F54330400E66577 /* SpendingPlanViewModel.swift */; };
-		E18C83C42F54330900E66577 /* VoiceTransactionViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C838D2F54330500E66577 /* VoiceTransactionViewModel.swift */; };
-		E18C83C52F54330900E66577 /* WalletViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C838E2F54330600E66577 /* WalletViewModel.swift */; };
-		E18C83C62F54330900E66577 /* SpeechRecognizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C83902F54330600E66577 /* SpeechRecognizer.swift */; };
-		E18C83C72F54330900E66577 /* PlaidService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C83912F54330600E66577 /* PlaidService.swift */; };
-		E18C83C82F54330900E66577 /* AuthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C83922F54330600E66577 /* AuthManager.swift */; };
-		E18C83C92F54330900E66577 /* PlaidLinkManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C83932F54330600E66577 /* PlaidLinkManager.swift */; };
-		E18C83CA2F54330900E66577 /* ProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C83952F54330700E66577 /* ProfileView.swift */; };
-		E18C83CB2F54330900E66577 /* RecommendationsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C83962F54330700E66577 /* RecommendationsView.swift */; };
-		E18C83CC2F54330900E66577 /* PlanQuestionFlowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C83982F54330700E66577 /* PlanQuestionFlowView.swift */; };
-		E18C83CD2F54330900E66577 /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C839A2F54330700E66577 /* LoginView.swift */; };
-		E18C83CE2F54330900E66577 /* OTPView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C839B2F54330700E66577 /* OTPView.swift */; };
-		E18C83CF2F54330900E66577 /* EnterPhoneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C839C2F54330700E66577 /* EnterPhoneView.swift */; };
-		E18C83D02F54330900E66577 /* ExpensesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C839D2F54330700E66577 /* ExpensesView.swift */; };
-		E18C83D12F54330900E66577 /* PlanView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C839E2F54330700E66577 /* PlanView.swift */; };
-		E18C83D22F54330900E66577 /* QuickActionModalView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C83A02F54330700E66577 /* QuickActionModalView.swift */; };
-		E18C83D32F54330900E66577 /* GenerativeWidgetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C83A12F54330700E66577 /* GenerativeWidgetView.swift */; };
-		E18C83D42F54330900E66577 /* BurndownWidgetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C83A22F54330700E66577 /* BurndownWidgetView.swift */; };
-		E18C83D52F54330900E66577 /* PulseHeaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C83A32F54330700E66577 /* PulseHeaderView.swift */; };
-		E18C83D62F54330900E66577 /* PlanDashboardCards.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C83A52F54330700E66577 /* PlanDashboardCards.swift */; };
-		E18C83D72F54330900E66577 /* VoiceTransactionFlowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C83A62F54330700E66577 /* VoiceTransactionFlowView.swift */; };
-		E18C83D82F54330900E66577 /* SmartNudgesCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C83A72F54330700E66577 /* SmartNudgesCard.swift */; };
-		E18C83D92F54330900E66577 /* VoiceTransactionTile.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C83A82F54330700E66577 /* VoiceTransactionTile.swift */; };
-		E18C83DA2F54330900E66577 /* VoiceRecordingSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C83A92F54330700E66577 /* VoiceRecordingSheet.swift */; };
-		E18C83DB2F54330900E66577 /* TransactionConfirmationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C83AA2F54330700E66577 /* TransactionConfirmationView.swift */; };
-		E18C83DC2F54330900E66577 /* GoalProgressSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C83AB2F54330700E66577 /* GoalProgressSection.swift */; };
-		E18C83DD2F54330900E66577 /* VoiceTransactionSuccessView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C83AC2F54330700E66577 /* VoiceTransactionSuccessView.swift */; };
-		E18C83DE2F54330900E66577 /* TopExpensesCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C83AD2F54330700E66577 /* TopExpensesCard.swift */; };
-		E18C83DF2F54330900E66577 /* PlaidLinkView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C83AF2F54330700E66577 /* PlaidLinkView.swift */; };
-		E18C83E02F54330900E66577 /* ChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C83B02F54330700E66577 /* ChatView.swift */; };
-		E18C83E12F54330900E66577 /* WalletView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C83B12F54330700E66577 /* WalletView.swift */; };
-		E18C83E22F54330900E66577 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C83B22F54330700E66577 /* ContentView.swift */; };
-		E18C83E32F54330900E66577 /* OnboardingWizardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C83B42F54330700E66577 /* OnboardingWizardView.swift */; };
-		E18C83E42F54330900E66577 /* ProfileViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C83B52F54330700E66577 /* ProfileViewModel.swift */; };
-		E18C83E52F54330900E66577 /* ChatViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C83B62F54330800E66577 /* ChatViewModel.swift */; };
-		E18C83E62F54330900E66577 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C83B72F54330800E66577 /* Models.swift */; };
-		E18C83E92F54339700E66577 /* PhoneNumberKit in Frameworks */ = {isa = PBXBuildFile; productRef = E18C83E82F54339700E66577 /* PhoneNumberKit */; };
-		E18C83EB2F54339700E66577 /* PhoneNumberKit-Dynamic in Frameworks */ = {isa = PBXBuildFile; productRef = E18C83EA2F54339700E66577 /* PhoneNumberKit-Dynamic */; };
-		E18C83ED2F54339700E66577 /* PhoneNumberKit-Static in Frameworks */ = {isa = PBXBuildFile; productRef = E18C83EC2F54339700E66577 /* PhoneNumberKit-Static */; };
-		E18C83F02F5433AD00E66577 /* LinkKit in Frameworks */ = {isa = PBXBuildFile; productRef = E18C83EF2F5433AD00E66577 /* LinkKit */; };
-		E19B24992F55295B005C18DA /* ReceiptScanViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = E19B24982F55295A005C18DA /* ReceiptScanViewModel.swift */; };
-		E19B249D2F5529F1005C18DA /* ReceiptLineItemsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E19B249B2F5529F1005C18DA /* ReceiptLineItemsView.swift */; };
-		E19B249E2F5529F1005C18DA /* ReceiptScanView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E19B249C2F5529F1005C18DA /* ReceiptScanView.swift */; };
+		A34CDD402F3E7F0000B9B328 /* LinkKit in Frameworks */ = {isa = PBXBuildFile; productRef = A34CDD3F2F3E7F0000B9B328 /* LinkKit */; };
+		A35C22E92F50D3DF0047A5DA /* PhoneNumberKit in Frameworks */ = {isa = PBXBuildFile; productRef = A35C22E82F50D3DF0047A5DA /* PhoneNumberKit */; };
+		A35C24AC2F51002F0047A5DA /* BudgetBuddyShareExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = A35C24A22F51002F0047A5DA /* BudgetBuddyShareExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		A35C24AA2F51002F0047A5DA /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = ACEBD1AC2F2BE42700FA1D26 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A35C24A12F51002F0047A5DA;
+			remoteInfo = BudgetBuddyShareExtension;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		A35C24B12F51002F0047A5DA /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				A35C24AC2F51002F0047A5DA /* BudgetBuddyShareExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
-		E18C836C2F54305800E66577 /* BudgetBuddy.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BudgetBuddy.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		E18C83732F54305B00E66577 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		E18C83762F54305B00E66577 /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
-		E18C837D2F5432FF00E66577 /* RecommendationsViewModel.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = RecommendationsViewModel.swift; sourceTree = "<group>"; };
-		E18C837F2F54330000E66577 /* ChatBubbleView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ChatBubbleView.swift; sourceTree = "<group>"; };
-		E18C83802F54330000E66577 /* BurndownChartView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BurndownChartView.swift; sourceTree = "<group>"; };
-		E18C83822F54330000E66577 /* Theme.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
-		E18C83832F54330100E66577 /* MockService.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = MockService.swift; sourceTree = "<group>"; };
-		E18C83842F54330100E66577 /* APIService.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = APIService.swift; sourceTree = "<group>"; };
-		E18C83852F54330200E66577 /* AppConfig.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AppConfig.swift; sourceTree = "<group>"; };
-		E18C83862F54330200E66577 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		E18C83872F54330300E66577 /* ExpensesViewModel.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ExpensesViewModel.swift; sourceTree = "<group>"; };
-		E18C83892F54330300E66577 /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
-		E18C838A2F54330400E66577 /* BudgetBuddyApp.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BudgetBuddyApp.swift; sourceTree = "<group>"; };
-		E18C838B2F54330400E66577 /* SpendingPlanViewModel.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SpendingPlanViewModel.swift; sourceTree = "<group>"; };
-		E18C838C2F54330500E66577 /* BudgetBuddy.entitlements */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.entitlements; path = BudgetBuddy.entitlements; sourceTree = "<group>"; };
-		E18C838D2F54330500E66577 /* VoiceTransactionViewModel.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = VoiceTransactionViewModel.swift; sourceTree = "<group>"; };
-		E18C838E2F54330600E66577 /* WalletViewModel.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = WalletViewModel.swift; sourceTree = "<group>"; };
-		E18C83902F54330600E66577 /* SpeechRecognizer.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SpeechRecognizer.swift; sourceTree = "<group>"; };
-		E18C83912F54330600E66577 /* PlaidService.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PlaidService.swift; sourceTree = "<group>"; };
-		E18C83922F54330600E66577 /* AuthManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AuthManager.swift; sourceTree = "<group>"; };
-		E18C83932F54330600E66577 /* PlaidLinkManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PlaidLinkManager.swift; sourceTree = "<group>"; };
-		E18C83952F54330700E66577 /* ProfileView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ProfileView.swift; sourceTree = "<group>"; };
-		E18C83962F54330700E66577 /* RecommendationsView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = RecommendationsView.swift; sourceTree = "<group>"; };
-		E18C83982F54330700E66577 /* PlanQuestionFlowView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PlanQuestionFlowView.swift; sourceTree = "<group>"; };
-		E18C839A2F54330700E66577 /* LoginView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
-		E18C839B2F54330700E66577 /* OTPView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = OTPView.swift; sourceTree = "<group>"; };
-		E18C839C2F54330700E66577 /* EnterPhoneView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = EnterPhoneView.swift; sourceTree = "<group>"; };
-		E18C839D2F54330700E66577 /* ExpensesView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ExpensesView.swift; sourceTree = "<group>"; };
-		E18C839E2F54330700E66577 /* PlanView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PlanView.swift; sourceTree = "<group>"; };
-		E18C83A02F54330700E66577 /* QuickActionModalView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = QuickActionModalView.swift; sourceTree = "<group>"; };
-		E18C83A12F54330700E66577 /* GenerativeWidgetView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = GenerativeWidgetView.swift; sourceTree = "<group>"; };
-		E18C83A22F54330700E66577 /* BurndownWidgetView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BurndownWidgetView.swift; sourceTree = "<group>"; };
-		E18C83A32F54330700E66577 /* PulseHeaderView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PulseHeaderView.swift; sourceTree = "<group>"; };
-		E18C83A52F54330700E66577 /* PlanDashboardCards.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PlanDashboardCards.swift; sourceTree = "<group>"; };
-		E18C83A62F54330700E66577 /* VoiceTransactionFlowView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = VoiceTransactionFlowView.swift; sourceTree = "<group>"; };
-		E18C83A72F54330700E66577 /* SmartNudgesCard.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SmartNudgesCard.swift; sourceTree = "<group>"; };
-		E18C83A82F54330700E66577 /* VoiceTransactionTile.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = VoiceTransactionTile.swift; sourceTree = "<group>"; };
-		E18C83A92F54330700E66577 /* VoiceRecordingSheet.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = VoiceRecordingSheet.swift; sourceTree = "<group>"; };
-		E18C83AA2F54330700E66577 /* TransactionConfirmationView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = TransactionConfirmationView.swift; sourceTree = "<group>"; };
-		E18C83AB2F54330700E66577 /* GoalProgressSection.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = GoalProgressSection.swift; sourceTree = "<group>"; };
-		E18C83AC2F54330700E66577 /* VoiceTransactionSuccessView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = VoiceTransactionSuccessView.swift; sourceTree = "<group>"; };
-		E18C83AD2F54330700E66577 /* TopExpensesCard.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = TopExpensesCard.swift; sourceTree = "<group>"; };
-		E18C83AF2F54330700E66577 /* PlaidLinkView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PlaidLinkView.swift; sourceTree = "<group>"; };
-		E18C83B02F54330700E66577 /* ChatView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ChatView.swift; sourceTree = "<group>"; };
-		E18C83B12F54330700E66577 /* WalletView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = WalletView.swift; sourceTree = "<group>"; };
-		E18C83B22F54330700E66577 /* ContentView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
-		E18C83B42F54330700E66577 /* OnboardingWizardView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = OnboardingWizardView.swift; sourceTree = "<group>"; };
-		E18C83B52F54330700E66577 /* ProfileViewModel.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ProfileViewModel.swift; sourceTree = "<group>"; };
-		E18C83B62F54330800E66577 /* ChatViewModel.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ChatViewModel.swift; sourceTree = "<group>"; };
-		E18C83B72F54330800E66577 /* Models.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
-		E19B24982F55295A005C18DA /* ReceiptScanViewModel.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ReceiptScanViewModel.swift; sourceTree = "<group>"; };
-		E19B249B2F5529F1005C18DA /* ReceiptLineItemsView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ReceiptLineItemsView.swift; sourceTree = "<group>"; };
-		E19B249C2F5529F1005C18DA /* ReceiptScanView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ReceiptScanView.swift; sourceTree = "<group>"; };
+		A35C24A22F51002F0047A5DA /* BudgetBuddyShareExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = BudgetBuddyShareExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		ACEBD1B42F2BE42700FA1D26 /* BudgetBuddy.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BudgetBuddy.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		A35C24B02F51002F0047A5DA /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = A35C24A12F51002F0047A5DA /* BudgetBuddyShareExtension */;
+		};
+		ACEBD1C12F2BE42A00FA1D26 /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = ACEBD1B32F2BE42700FA1D26 /* BudgetBuddy */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		A35C24A32F51002F0047A5DA /* BudgetBuddyShareExtension */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (A35C24B02F51002F0047A5DA /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = BudgetBuddyShareExtension; sourceTree = "<group>"; };
+		ACEBD1B62F2BE42700FA1D26 /* BudgetBuddy */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (ACEBD1C12F2BE42A00FA1D26 /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = BudgetBuddy; sourceTree = "<group>"; };
+/* End PBXFileSystemSynchronizedRootGroup section */
+
 /* Begin PBXFrameworksBuildPhase section */
-		E18C83692F54305800E66577 /* Frameworks */ = {
+		A35C249F2F51002F0047A5DA /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				E18C83E92F54339700E66577 /* PhoneNumberKit in Frameworks */,
-				E18C83F02F5433AD00E66577 /* LinkKit in Frameworks */,
-				E18C83EB2F54339700E66577 /* PhoneNumberKit-Dynamic in Frameworks */,
-				E18C83ED2F54339700E66577 /* PhoneNumberKit-Static in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		ACEBD1B12F2BE42700FA1D26 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A34CDD402F3E7F0000B9B328 /* LinkKit in Frameworks */,
+				A35C22E92F50D3DF0047A5DA /* PhoneNumberKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		E18C83632F54305800E66577 = {
+		ACEBD1AB2F2BE42700FA1D26 = {
 			isa = PBXGroup;
 			children = (
-				E18C836E2F54305800E66577 /* BudgetBuddy */,
-				E18C836D2F54305800E66577 /* Products */,
+				ACEBD1B62F2BE42700FA1D26 /* BudgetBuddy */,
+				A35C24A32F51002F0047A5DA /* BudgetBuddyShareExtension */,
+				ACEBD1B52F2BE42700FA1D26 /* Products */,
 			);
 			sourceTree = "<group>";
 		};
-		E18C836D2F54305800E66577 /* Products */ = {
+		ACEBD1B52F2BE42700FA1D26 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				E18C836C2F54305800E66577 /* BudgetBuddy.app */,
+				ACEBD1B42F2BE42700FA1D26 /* BudgetBuddy.app */,
+				A35C24A22F51002F0047A5DA /* BudgetBuddyShareExtension.appex */,
 			);
 			name = Products;
-			sourceTree = "<group>";
-		};
-		E18C836E2F54305800E66577 /* BudgetBuddy */ = {
-			isa = PBXGroup;
-			children = (
-				E19B24982F55295A005C18DA /* ReceiptScanViewModel.swift */,
-				E18C83842F54330100E66577 /* APIService.swift */,
-				E18C83852F54330200E66577 /* AppConfig.swift */,
-				E18C83862F54330200E66577 /* Assets.xcassets */,
-				E18C838C2F54330500E66577 /* BudgetBuddy.entitlements */,
-				E18C838A2F54330400E66577 /* BudgetBuddyApp.swift */,
-				E18C83B62F54330800E66577 /* ChatViewModel.swift */,
-				E18C837E2F54330000E66577 /* Components */,
-				E18C83812F54330000E66577 /* Design */,
-				E18C83872F54330300E66577 /* ExpensesViewModel.swift */,
-				E18C83832F54330100E66577 /* MockService.swift */,
-				E18C83B72F54330800E66577 /* Models.swift */,
-				E18C83882F54330300E66577 /* Preview Content */,
-				E18C83B52F54330700E66577 /* ProfileViewModel.swift */,
-				E18C837D2F5432FF00E66577 /* RecommendationsViewModel.swift */,
-				E18C838F2F54330600E66577 /* Services */,
-				E18C838B2F54330400E66577 /* SpendingPlanViewModel.swift */,
-				E18C83942F54330700E66577 /* Views */,
-				E18C838D2F54330500E66577 /* VoiceTransactionViewModel.swift */,
-				E18C838E2F54330600E66577 /* WalletViewModel.swift */,
-				E18C83732F54305B00E66577 /* Assets.xcassets */,
-				E18C83752F54305B00E66577 /* Preview Content */,
-			);
-			path = BudgetBuddy;
-			sourceTree = "<group>";
-		};
-		E18C83752F54305B00E66577 /* Preview Content */ = {
-			isa = PBXGroup;
-			children = (
-				E18C83762F54305B00E66577 /* Preview Assets.xcassets */,
-			);
-			path = "Preview Content";
-			sourceTree = "<group>";
-		};
-		E18C837E2F54330000E66577 /* Components */ = {
-			isa = PBXGroup;
-			children = (
-				E18C837F2F54330000E66577 /* ChatBubbleView.swift */,
-				E18C83802F54330000E66577 /* BurndownChartView.swift */,
-			);
-			path = Components;
-			sourceTree = "<group>";
-		};
-		E18C83812F54330000E66577 /* Design */ = {
-			isa = PBXGroup;
-			children = (
-				E18C83822F54330000E66577 /* Theme.swift */,
-			);
-			path = Design;
-			sourceTree = "<group>";
-		};
-		E18C83882F54330300E66577 /* Preview Content */ = {
-			isa = PBXGroup;
-			children = (
-				E18C83892F54330300E66577 /* Preview Assets.xcassets */,
-			);
-			path = "Preview Content";
-			sourceTree = "<group>";
-		};
-		E18C838F2F54330600E66577 /* Services */ = {
-			isa = PBXGroup;
-			children = (
-				E18C83902F54330600E66577 /* SpeechRecognizer.swift */,
-				E18C83912F54330600E66577 /* PlaidService.swift */,
-				E18C83922F54330600E66577 /* AuthManager.swift */,
-				E18C83932F54330600E66577 /* PlaidLinkManager.swift */,
-			);
-			path = Services;
-			sourceTree = "<group>";
-		};
-		E18C83942F54330700E66577 /* Views */ = {
-			isa = PBXGroup;
-			children = (
-				E19B249A2F5529F1005C18DA /* Receipt */,
-				E18C83952F54330700E66577 /* ProfileView.swift */,
-				E18C83962F54330700E66577 /* RecommendationsView.swift */,
-				E18C83972F54330700E66577 /* SpendingPlan */,
-				E18C83992F54330700E66577 /* Auth */,
-				E18C839D2F54330700E66577 /* ExpensesView.swift */,
-				E18C839E2F54330700E66577 /* PlanView.swift */,
-				E18C839F2F54330700E66577 /* Components */,
-				E18C83A42F54330700E66577 /* Wallet */,
-				E18C83AE2F54330700E66577 /* Plaid */,
-				E18C83B02F54330700E66577 /* ChatView.swift */,
-				E18C83B12F54330700E66577 /* WalletView.swift */,
-				E18C83B22F54330700E66577 /* ContentView.swift */,
-				E18C83B32F54330700E66577 /* Onboarding */,
-			);
-			path = Views;
-			sourceTree = "<group>";
-		};
-		E18C83972F54330700E66577 /* SpendingPlan */ = {
-			isa = PBXGroup;
-			children = (
-				E18C83982F54330700E66577 /* PlanQuestionFlowView.swift */,
-			);
-			path = SpendingPlan;
-			sourceTree = "<group>";
-		};
-		E18C83992F54330700E66577 /* Auth */ = {
-			isa = PBXGroup;
-			children = (
-				E18C839A2F54330700E66577 /* LoginView.swift */,
-				E18C839B2F54330700E66577 /* OTPView.swift */,
-				E18C839C2F54330700E66577 /* EnterPhoneView.swift */,
-			);
-			path = Auth;
-			sourceTree = "<group>";
-		};
-		E18C839F2F54330700E66577 /* Components */ = {
-			isa = PBXGroup;
-			children = (
-				E18C83A02F54330700E66577 /* QuickActionModalView.swift */,
-				E18C83A12F54330700E66577 /* GenerativeWidgetView.swift */,
-				E18C83A22F54330700E66577 /* BurndownWidgetView.swift */,
-				E18C83A32F54330700E66577 /* PulseHeaderView.swift */,
-			);
-			path = Components;
-			sourceTree = "<group>";
-		};
-		E18C83A42F54330700E66577 /* Wallet */ = {
-			isa = PBXGroup;
-			children = (
-				E18C83A52F54330700E66577 /* PlanDashboardCards.swift */,
-				E18C83A62F54330700E66577 /* VoiceTransactionFlowView.swift */,
-				E18C83A72F54330700E66577 /* SmartNudgesCard.swift */,
-				E18C83A82F54330700E66577 /* VoiceTransactionTile.swift */,
-				E18C83A92F54330700E66577 /* VoiceRecordingSheet.swift */,
-				E18C83AA2F54330700E66577 /* TransactionConfirmationView.swift */,
-				E18C83AB2F54330700E66577 /* GoalProgressSection.swift */,
-				E18C83AC2F54330700E66577 /* VoiceTransactionSuccessView.swift */,
-				E18C83AD2F54330700E66577 /* TopExpensesCard.swift */,
-			);
-			path = Wallet;
-			sourceTree = "<group>";
-		};
-		E18C83AE2F54330700E66577 /* Plaid */ = {
-			isa = PBXGroup;
-			children = (
-				E18C83AF2F54330700E66577 /* PlaidLinkView.swift */,
-			);
-			path = Plaid;
-			sourceTree = "<group>";
-		};
-		E18C83B32F54330700E66577 /* Onboarding */ = {
-			isa = PBXGroup;
-			children = (
-				E18C83B42F54330700E66577 /* OnboardingWizardView.swift */,
-			);
-			path = Onboarding;
-			sourceTree = "<group>";
-		};
-		E19B249A2F5529F1005C18DA /* Receipt */ = {
-			isa = PBXGroup;
-			children = (
-				E19B249B2F5529F1005C18DA /* ReceiptLineItemsView.swift */,
-				E19B249C2F5529F1005C18DA /* ReceiptScanView.swift */,
-			);
-			path = Receipt;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		E18C836B2F54305800E66577 /* BudgetBuddy */ = {
+		A35C24A12F51002F0047A5DA /* BudgetBuddyShareExtension */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = E18C837A2F54305B00E66577 /* Build configuration list for PBXNativeTarget "BudgetBuddy" */;
+			buildConfigurationList = A35C24AD2F51002F0047A5DA /* Build configuration list for PBXNativeTarget "BudgetBuddyShareExtension" */;
 			buildPhases = (
-				E18C83682F54305800E66577 /* Sources */,
-				E18C83692F54305800E66577 /* Frameworks */,
-				E18C836A2F54305800E66577 /* Resources */,
+				A35C249E2F51002F0047A5DA /* Sources */,
+				A35C249F2F51002F0047A5DA /* Frameworks */,
+				A35C24A02F51002F0047A5DA /* Resources */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 			);
+			fileSystemSynchronizedGroups = (
+				A35C24A32F51002F0047A5DA /* BudgetBuddyShareExtension */,
+			);
+			name = BudgetBuddyShareExtension;
+			packageProductDependencies = (
+			);
+			productName = BudgetBuddyShareExtension;
+			productReference = A35C24A22F51002F0047A5DA /* BudgetBuddyShareExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+		ACEBD1B32F2BE42700FA1D26 /* BudgetBuddy */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = ACEBD1C22F2BE42A00FA1D26 /* Build configuration list for PBXNativeTarget "BudgetBuddy" */;
+			buildPhases = (
+				ACEBD1B02F2BE42700FA1D26 /* Sources */,
+				ACEBD1B12F2BE42700FA1D26 /* Frameworks */,
+				ACEBD1B22F2BE42700FA1D26 /* Resources */,
+				A35C24B12F51002F0047A5DA /* Embed Foundation Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				A35C24AB2F51002F0047A5DA /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				ACEBD1B62F2BE42700FA1D26 /* BudgetBuddy */,
+			);
 			name = BudgetBuddy;
 			packageProductDependencies = (
-				E18C83E82F54339700E66577 /* PhoneNumberKit */,
-				E18C83EA2F54339700E66577 /* PhoneNumberKit-Dynamic */,
-				E18C83EC2F54339700E66577 /* PhoneNumberKit-Static */,
-				E18C83EF2F5433AD00E66577 /* LinkKit */,
+				A34CDD3F2F3E7F0000B9B328 /* LinkKit */,
+				A35C22E82F50D3DF0047A5DA /* PhoneNumberKit */,
 			);
 			productName = BudgetBuddy;
-			productReference = E18C836C2F54305800E66577 /* BudgetBuddy.app */;
+			productReference = ACEBD1B42F2BE42700FA1D26 /* BudgetBuddy.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
-		E18C83642F54305800E66577 /* Project object */ = {
+		ACEBD1AC2F2BE42700FA1D26 /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
-				LastSwiftUpdateCheck = 1520;
-				LastUpgradeCheck = 1520;
+				LastSwiftUpdateCheck = 2620;
+				LastUpgradeCheck = 2620;
 				TargetAttributes = {
-					E18C836B2F54305800E66577 = {
-						CreatedOnToolsVersion = 15.2;
-						LastSwiftMigration = 1520;
+					A35C24A12F51002F0047A5DA = {
+						CreatedOnToolsVersion = 26.2;
+					};
+					ACEBD1B32F2BE42700FA1D26 = {
+						CreatedOnToolsVersion = 26.2;
 					};
 				};
 			};
-			buildConfigurationList = E18C83672F54305800E66577 /* Build configuration list for PBXProject "BudgetBuddy" */;
-			compatibilityVersion = "Xcode 14.0";
+			buildConfigurationList = ACEBD1AF2F2BE42700FA1D26 /* Build configuration list for PBXProject "BudgetBuddy" */;
+			compatibilityVersion = "Xcode 15.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
 				en,
 				Base,
 			);
-			mainGroup = E18C83632F54305800E66577;
+			mainGroup = ACEBD1AB2F2BE42700FA1D26;
+			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				E18C83E72F54339700E66577 /* XCRemoteSwiftPackageReference "PhoneNumberKit" */,
-				E18C83EE2F5433AD00E66577 /* XCRemoteSwiftPackageReference "plaid-link-ios" */,
+				A34CDD3E2F3E7F0000B9B328 /* XCRemoteSwiftPackageReference "plaid-link-ios-spm" */,
+				A35C22E72F50D3DF0047A5DA /* XCRemoteSwiftPackageReference "PhoneNumberKit" */,
 			);
-			productRefGroup = E18C836D2F54305800E66577 /* Products */;
+			productRefGroup = ACEBD1B52F2BE42700FA1D26 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				E18C836B2F54305800E66577 /* BudgetBuddy */,
+				ACEBD1B32F2BE42700FA1D26 /* BudgetBuddy */,
+				A35C24A12F51002F0047A5DA /* BudgetBuddyShareExtension */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-		E18C836A2F54305800E66577 /* Resources */ = {
+		A35C24A02F51002F0047A5DA /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				E18C83C12F54330900E66577 /* Preview Assets.xcassets in Resources */,
-				E18C83772F54305B00E66577 /* Preview Assets.xcassets in Resources */,
-				E18C83BF2F54330900E66577 /* Assets.xcassets in Resources */,
-				E18C83742F54305B00E66577 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		ACEBD1B22F2BE42700FA1D26 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-		E18C83682F54305800E66577 /* Sources */ = {
+		A35C249E2F51002F0047A5DA /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				E18C83DD2F54330900E66577 /* VoiceTransactionSuccessView.swift in Sources */,
-				E18C83B92F54330900E66577 /* ChatBubbleView.swift in Sources */,
-				E18C83D52F54330900E66577 /* PulseHeaderView.swift in Sources */,
-				E18C83C32F54330900E66577 /* SpendingPlanViewModel.swift in Sources */,
-				E18C83C02F54330900E66577 /* ExpensesViewModel.swift in Sources */,
-				E18C83DE2F54330900E66577 /* TopExpensesCard.swift in Sources */,
-				E18C83D22F54330900E66577 /* QuickActionModalView.swift in Sources */,
-				E18C83BC2F54330900E66577 /* MockService.swift in Sources */,
-				E18C83C92F54330900E66577 /* PlaidLinkManager.swift in Sources */,
-				E18C83D32F54330900E66577 /* GenerativeWidgetView.swift in Sources */,
-				E18C83CB2F54330900E66577 /* RecommendationsView.swift in Sources */,
-				E18C83D42F54330900E66577 /* BurndownWidgetView.swift in Sources */,
-				E18C83C82F54330900E66577 /* AuthManager.swift in Sources */,
-				E18C83C22F54330900E66577 /* BudgetBuddyApp.swift in Sources */,
-				E18C83D62F54330900E66577 /* PlanDashboardCards.swift in Sources */,
-				E18C83BB2F54330900E66577 /* Theme.swift in Sources */,
-				E19B24992F55295B005C18DA /* ReceiptScanViewModel.swift in Sources */,
-				E18C83D72F54330900E66577 /* VoiceTransactionFlowView.swift in Sources */,
-				E18C83DA2F54330900E66577 /* VoiceRecordingSheet.swift in Sources */,
-				E18C83BE2F54330900E66577 /* AppConfig.swift in Sources */,
-				E18C83E02F54330900E66577 /* ChatView.swift in Sources */,
-				E18C83E32F54330900E66577 /* OnboardingWizardView.swift in Sources */,
-				E18C83D82F54330900E66577 /* SmartNudgesCard.swift in Sources */,
-				E18C83CA2F54330900E66577 /* ProfileView.swift in Sources */,
-				E18C83BA2F54330900E66577 /* BurndownChartView.swift in Sources */,
-				E18C83E62F54330900E66577 /* Models.swift in Sources */,
-				E18C83C72F54330900E66577 /* PlaidService.swift in Sources */,
-				E18C83BD2F54330900E66577 /* APIService.swift in Sources */,
-				E19B249E2F5529F1005C18DA /* ReceiptScanView.swift in Sources */,
-				E18C83CF2F54330900E66577 /* EnterPhoneView.swift in Sources */,
-				E18C83CE2F54330900E66577 /* OTPView.swift in Sources */,
-				E18C83E42F54330900E66577 /* ProfileViewModel.swift in Sources */,
-				E18C83E22F54330900E66577 /* ContentView.swift in Sources */,
-				E18C83CC2F54330900E66577 /* PlanQuestionFlowView.swift in Sources */,
-				E18C83DC2F54330900E66577 /* GoalProgressSection.swift in Sources */,
-				E18C83C52F54330900E66577 /* WalletViewModel.swift in Sources */,
-				E18C83D02F54330900E66577 /* ExpensesView.swift in Sources */,
-				E18C83E12F54330900E66577 /* WalletView.swift in Sources */,
-				E18C83C62F54330900E66577 /* SpeechRecognizer.swift in Sources */,
-				E18C83C42F54330900E66577 /* VoiceTransactionViewModel.swift in Sources */,
-				E18C83CD2F54330900E66577 /* LoginView.swift in Sources */,
-				E18C83DF2F54330900E66577 /* PlaidLinkView.swift in Sources */,
-				E18C83DB2F54330900E66577 /* TransactionConfirmationView.swift in Sources */,
-				E18C83B82F54330900E66577 /* RecommendationsViewModel.swift in Sources */,
-				E18C83D12F54330900E66577 /* PlanView.swift in Sources */,
-				E18C83E52F54330900E66577 /* ChatViewModel.swift in Sources */,
-				E18C83D92F54330900E66577 /* VoiceTransactionTile.swift in Sources */,
-				E19B249D2F5529F1005C18DA /* ReceiptLineItemsView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		ACEBD1B02F2BE42700FA1D26 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		A35C24AB2F51002F0047A5DA /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A35C24A12F51002F0047A5DA /* BudgetBuddyShareExtension */;
+			targetProxy = A35C24AA2F51002F0047A5DA /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
-		E18C83782F54305B00E66577 /* Debug */ = {
+		A35C24AE2F51002F0047A5DA /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = NQWLF9RT3X;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = BudgetBuddyShareExtension/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = BudgetBuddyShareExtension;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = sample.BudgetBud.BudgetBuddyShareExtension;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		A35C24AF2F51002F0047A5DA /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = NQWLF9RT3X;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = BudgetBuddyShareExtension/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = BudgetBuddyShareExtension;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = sample.BudgetBud.BudgetBuddyShareExtension;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		ACEBD1C32F2BE42A00FA1D26 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = BudgetBuddy/BudgetBuddy.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = NQWLF9RT3X;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = BudgetBuddy/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = BudgetBud;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.finance";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "BudgetBuddy needs microphone access to record your voice for transaction logging.";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "BudgetBuddy uses speech recognition to transcribe your voice into transaction details.";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = sample.BudgetBud;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		ACEBD1C42F2BE42A00FA1D26 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = BudgetBuddy/BudgetBuddyRelease.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = NQWLF9RT3X;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = BudgetBuddy/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = BudgetBud;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.finance";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "BudgetBuddy needs microphone access to record your voice for transaction logging.";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "BudgetBuddy uses speech recognition to transcribe your voice into transaction details.";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = sample.BudgetBud;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		ACEBD1C52F2BE42A00FA1D26 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -506,7 +421,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 17.2;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
@@ -517,7 +432,7 @@
 			};
 			name = Debug;
 		};
-		E18C83792F54305B00E66577 /* Release */ = {
+		ACEBD1C62F2BE42A00FA1D26 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -563,7 +478,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 17.2;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
@@ -573,82 +488,32 @@
 			};
 			name = Release;
 		};
-		E18C837B2F54305B00E66577 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CLANG_ENABLE_MODULES = YES;
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_ASSET_PATHS = "\"BudgetBuddy/Preview Content\"";
-				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
-				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-				);
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = sample.BudgetBuddy;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-			};
-			name = Debug;
-		};
-		E18C837C2F54305B00E66577 /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CLANG_ENABLE_MODULES = YES;
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_ASSET_PATHS = "\"BudgetBuddy/Preview Content\"";
-				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
-				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-				);
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = sample.BudgetBuddy;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-			};
-			name = Release;
-		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		E18C83672F54305800E66577 /* Build configuration list for PBXProject "BudgetBuddy" */ = {
+		A35C24AD2F51002F0047A5DA /* Build configuration list for PBXNativeTarget "BudgetBuddyShareExtension" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				E18C83782F54305B00E66577 /* Debug */,
-				E18C83792F54305B00E66577 /* Release */,
+				A35C24AE2F51002F0047A5DA /* Debug */,
+				A35C24AF2F51002F0047A5DA /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		E18C837A2F54305B00E66577 /* Build configuration list for PBXNativeTarget "BudgetBuddy" */ = {
+		ACEBD1AF2F2BE42700FA1D26 /* Build configuration list for PBXProject "BudgetBuddy" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				E18C837B2F54305B00E66577 /* Debug */,
-				E18C837C2F54305B00E66577 /* Release */,
+				ACEBD1C52F2BE42A00FA1D26 /* Debug */,
+				ACEBD1C62F2BE42A00FA1D26 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		ACEBD1C22F2BE42A00FA1D26 /* Build configuration list for PBXNativeTarget "BudgetBuddy" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				ACEBD1C32F2BE42A00FA1D26 /* Debug */,
+				ACEBD1C42F2BE42A00FA1D26 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
@@ -656,46 +521,36 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
-		E18C83E72F54339700E66577 /* XCRemoteSwiftPackageReference "PhoneNumberKit" */ = {
+		A34CDD3E2F3E7F0000B9B328 /* XCRemoteSwiftPackageReference "plaid-link-ios-spm" */ = {
 			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/marmelroy/PhoneNumberKit";
+			repositoryURL = "https://github.com/plaid/plaid-link-ios-spm";
 			requirement = {
-				kind = exactVersion;
-				version = 3.7.0;
+				kind = upToNextMajorVersion;
+				minimumVersion = 6.0.4;
 			};
 		};
-		E18C83EE2F5433AD00E66577 /* XCRemoteSwiftPackageReference "plaid-link-ios" */ = {
+		A35C22E72F50D3DF0047A5DA /* XCRemoteSwiftPackageReference "PhoneNumberKit" */ = {
 			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/plaid/plaid-link-ios";
+			repositoryURL = "https://github.com/marmelroy/PhoneNumberKit.git";
 			requirement = {
-				kind = exactVersion;
-				version = 4.7.0;
+				kind = upToNextMajorVersion;
+				minimumVersion = 4.2.5;
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		E18C83E82F54339700E66577 /* PhoneNumberKit */ = {
+		A34CDD3F2F3E7F0000B9B328 /* LinkKit */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = E18C83E72F54339700E66577 /* XCRemoteSwiftPackageReference "PhoneNumberKit" */;
-			productName = PhoneNumberKit;
-		};
-		E18C83EA2F54339700E66577 /* PhoneNumberKit-Dynamic */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = E18C83E72F54339700E66577 /* XCRemoteSwiftPackageReference "PhoneNumberKit" */;
-			productName = "PhoneNumberKit-Dynamic";
-		};
-		E18C83EC2F54339700E66577 /* PhoneNumberKit-Static */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = E18C83E72F54339700E66577 /* XCRemoteSwiftPackageReference "PhoneNumberKit" */;
-			productName = "PhoneNumberKit-Static";
-		};
-		E18C83EF2F5433AD00E66577 /* LinkKit */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = E18C83EE2F5433AD00E66577 /* XCRemoteSwiftPackageReference "plaid-link-ios" */;
+			package = A34CDD3E2F3E7F0000B9B328 /* XCRemoteSwiftPackageReference "plaid-link-ios-spm" */;
 			productName = LinkKit;
+		};
+		A35C22E82F50D3DF0047A5DA /* PhoneNumberKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A35C22E72F50D3DF0047A5DA /* XCRemoteSwiftPackageReference "PhoneNumberKit" */;
+			productName = PhoneNumberKit;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
-	rootObject = E18C83642F54305800E66577 /* Project object */;
+	rootObject = ACEBD1AC2F2BE42700FA1D26 /* Project object */;
 }

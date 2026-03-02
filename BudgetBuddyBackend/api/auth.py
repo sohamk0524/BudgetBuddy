@@ -1,14 +1,9 @@
-"""
-Auth Blueprint — SMS OTP login and user deletion.
-"""
-
 import os
 from flask import Blueprint, jsonify, request
 from twilio.rest import Client
 from twilio.base.exceptions import TwilioRestException
 from dotenv import load_dotenv
 
-# Import only what you need for User management
 from db_models import (
     get_user_by_phone,
     create_user,
@@ -25,6 +20,10 @@ auth_bp = Blueprint('auth', __name__)
 client = Client(os.getenv('TWILIO_ACCOUNT_SID'), os.getenv('TWILIO_AUTH_TOKEN'))
 VERIFY_SERVICE_ID = os.getenv('TWILIO_VERIFY_SERVICE_ID')
 
+# Demo account for App Store review
+DEMO_PHONE = "+15550001234"
+DEMO_OTP   = "123456"
+
 @auth_bp.route("/v1/send_sms_code", methods=["POST"])
 def send_sms_code():
     data = request.get_json()
@@ -33,8 +32,16 @@ def send_sms_code():
     
     phone_number = data.get("phone_number", "").strip()
 
+    # 1. Validation for phone format
+    if not phone_number.startswith("+") or not (10 <= len(phone_number) <= 16):
+        return jsonify({"error": "Invalid format. Use E.164 (e.g., +14155551234)"}), 400
+
+    # 2. Handle Demo Account
+    if phone_number == DEMO_PHONE:
+        return jsonify({"status": "pending", "message": "Demo mode active"})
+
+    # 3. Handle Real Twilio Verify
     try:
-        # Twilio Verify handles generation and storage
         verification = client.verify \
             .v2 \
             .services(VERIFY_SERVICE_ID) \
@@ -56,31 +63,38 @@ def verify_code():
     if not phone_number or not code:
         return jsonify({"error": "Phone and code required"}), 400
 
-    try:
-        verification_check = client.verify \
-            .v2 \
-            .services(VERIFY_SERVICE_ID) \
-            .verification_checks \
-            .create(to=phone_number, code=code)
+    # 1. Check for Demo Account bypass
+    is_approved = False
+    if phone_number == DEMO_PHONE and code == DEMO_OTP:
+        is_approved = True
+    else:
+        # 2. Check with Twilio Verify
+        try:
+            verification_check = client.verify \
+                .v2 \
+                .services(VERIFY_SERVICE_ID) \
+                .verification_checks \
+                .create(to=phone_number, code=code)
+            is_approved = (verification_check.status == "approved")
+        except Exception as e:
+            return jsonify({"error": f"Verification failed: {str(e)}"}), 400
 
-        if verification_check.status == "approved":
-            # --- User Logic Starts Here ---
-            user = get_user_by_phone(phone_number)
-            if not user:
-                user = create_user(phone_number)
+    # 3. Process Login/Registration
+    if is_approved:
+        user = get_user_by_phone(phone_number)
+        if not user:
+            user = create_user(phone_number)
 
-            user_id = user.key.id
-            profile = get_profile(user_id)
+        user_id = user.key.id
+        profile = get_profile(user_id)
 
-            return jsonify({
-                "token": user_id,
-                "hasProfile": profile is not None,
-                "name": user.get('name'),
-            })
-        
-        return jsonify({"error": "Invalid or expired code"}), 401
-    except Exception as e:
-        return jsonify({"error": str(e)}), 400
+        return jsonify({
+            "token": user_id,
+            "hasProfile": profile is not None,
+            "name": user.get('name'),
+        })
+    
+    return jsonify({"error": "Invalid or expired code"}), 401
 
 @auth_bp.route("/v1/user", methods=["DELETE"])
 def delete_user():
