@@ -7,7 +7,6 @@
 
 import SwiftUI
 
-@MainActor
 struct TransactionConfirmationView: View {
     @Bindable var viewModel: VoiceTransactionViewModel
     @Environment(\.dismiss) private var dismiss
@@ -41,23 +40,6 @@ struct TransactionConfirmationView: View {
                         .padding()
                         .background(Color.surface)
                         .clipShape(RoundedRectangle(cornerRadius: 12))
-                    }
-
-                    // MARK: - Voice Input Hero Card
-                    voiceHeroCard
-
-                    // MARK: - "or enter manually" divider
-                    HStack(spacing: 12) {
-                        Rectangle()
-                            .fill(Color.textSecondary.opacity(0.3))
-                            .frame(height: 1)
-                        Text("or enter manually")
-                            .font(.roundedCaption)
-                            .foregroundStyle(Color.textSecondary)
-                            .layoutPriority(1)
-                        Rectangle()
-                            .fill(Color.textSecondary.opacity(0.3))
-                            .frame(height: 1)
                     }
 
                     // MARK: - Manual Form
@@ -231,35 +213,6 @@ struct TransactionConfirmationView: View {
         .onAppear {
             populateFromViewModel()
         }
-    }
-
-    // MARK: - Voice Hero Card
-
-    private var voiceHeroCard: some View {
-        Button {
-            saveLocalStateToViewModel()
-            viewModel.startRecording()
-        } label: {
-            VStack(spacing: 10) {
-                Circle()
-                    .fill(Color.accent)
-                    .frame(width: 40, height: 40)
-                    .overlay(
-                        Image(systemName: "mic.fill")
-                            .font(.system(size: 18))
-                            .foregroundStyle(Color.appBackground)
-                    )
-
-                Text("Log using voice")
-                    .font(.roundedHeadline)
-                    .foregroundStyle(Color.textPrimary)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 16)
-            .background(Color.surface)
-            .clipShape(RoundedRectangle(cornerRadius: 16))
-        }
-        .buttonStyle(.plain)
     }
 
     // MARK: - Helpers

@@ -33,7 +33,10 @@ class ProfileViewModel {
 
     // MARK: - Public Methods
 
+    private var hasLoaded = false
+
     func loadProfile() async {
+        guard !hasLoaded else { return }
         guard let userId = AuthManager.shared.authToken else { return }
 
         isLoading = true
@@ -47,6 +50,7 @@ class ProfileViewModel {
             weeklySpendingLimit = profile.profile?.weeklySpendingLimit ?? 0
             strictnessLevel = profile.profile?.strictnessLevel ?? ""
             plaidItems = profile.plaidItems
+            hasLoaded = true
         } catch {
             print("Failed to load profile: \(error)")
             errorMessage = "Failed to load profile"

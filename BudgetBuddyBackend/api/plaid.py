@@ -21,6 +21,8 @@ from db_models import (
     update_plaid_item,
     delete_plaid_item_cascade,
     get_transactions_for_accounts,
+    find_pending_receipt_transaction,
+    reconcile_manual_with_plaid,
 )
 from services import plaid_service
 
@@ -286,21 +288,33 @@ def sync_plaid_transactions(user_id):
                     if account:
                         existing = get_transaction_by_transaction_id(txn_data["transaction_id"])
                         if not existing:
-                            create_transaction(
-                                account.key.id,
-                                transaction_id=txn_data["transaction_id"],
-                                amount=txn_data["amount"],
-                                date=txn_data["date"],
-                                authorized_date=txn_data["authorized_date"],
-                                name=txn_data["name"],
-                                merchant_name=txn_data["merchant_name"],
-                                category_primary=txn_data["category"],
-                                category_detailed=txn_data["category_detailed"],
-                                category_confidence=txn_data["category_confidence"],
-                                pending=txn_data["pending"],
-                                payment_channel=txn_data["payment_channel"],
+                            # Check if a receipt-created ManualTransaction can be reconciled
+                            pending_receipt = find_pending_receipt_transaction(
+                                user_id,
+                                txn_data["amount"],
+                                txn_data["date"] or '',
+                                txn_data["merchant_name"] or txn_data["name"] or '',
                             )
-                            total_added += 1
+                            if pending_receipt:
+                                # Reconcile the existing ManualTransaction — no duplicate created
+                                reconcile_manual_with_plaid(pending_receipt.key.id, txn_data)
+                                total_added += 1
+                            else:
+                                create_transaction(
+                                    account.key.id,
+                                    transaction_id=txn_data["transaction_id"],
+                                    amount=txn_data["amount"],
+                                    date=txn_data["date"],
+                                    authorized_date=txn_data["authorized_date"],
+                                    name=txn_data["name"],
+                                    merchant_name=txn_data["merchant_name"],
+                                    category_primary=txn_data["category"],
+                                    category_detailed=txn_data["category_detailed"],
+                                    category_confidence=txn_data["category_confidence"],
+                                    pending=txn_data["pending"],
+                                    payment_channel=txn_data["payment_channel"],
+                                )
+                                total_added += 1
 
                 for txn_data in result["modified"]:
                     update_transaction_by_id(
@@ -402,21 +416,31 @@ def plaid_webhook():
                         if account:
                             existing = get_transaction_by_transaction_id(txn_data["transaction_id"])
                             if not existing:
-                                txn = create_transaction(
-                                    account.key.id,
-                                    transaction_id=txn_data["transaction_id"],
-                                    amount=txn_data["amount"],
-                                    date=txn_data["date"],
-                                    authorized_date=txn_data["authorized_date"],
-                                    name=txn_data["name"],
-                                    merchant_name=txn_data["merchant_name"],
-                                    category_primary=txn_data["category"],
-                                    category_detailed=txn_data["category_detailed"],
-                                    category_confidence=txn_data["category_confidence"],
-                                    pending=txn_data["pending"],
-                                    payment_channel=txn_data["payment_channel"],
+                                # Check if a receipt-created ManualTransaction can be reconciled
+                                pending_receipt = find_pending_receipt_transaction(
+                                    user_id,
+                                    txn_data["amount"],
+                                    txn_data["date"] or '',
+                                    txn_data["merchant_name"] or txn_data["name"] or '',
                                 )
-                                new_transactions.append(txn)
+                                if pending_receipt:
+                                    reconcile_manual_with_plaid(pending_receipt.key.id, txn_data)
+                                else:
+                                    txn = create_transaction(
+                                        account.key.id,
+                                        transaction_id=txn_data["transaction_id"],
+                                        amount=txn_data["amount"],
+                                        date=txn_data["date"],
+                                        authorized_date=txn_data["authorized_date"],
+                                        name=txn_data["name"],
+                                        merchant_name=txn_data["merchant_name"],
+                                        category_primary=txn_data["category"],
+                                        category_detailed=txn_data["category_detailed"],
+                                        category_confidence=txn_data["category_confidence"],
+                                        pending=txn_data["pending"],
+                                        payment_channel=txn_data["payment_channel"],
+                                    )
+                                    new_transactions.append(txn)
 
                     for txn_data in result["modified"]:
                         update_transaction_by_id(

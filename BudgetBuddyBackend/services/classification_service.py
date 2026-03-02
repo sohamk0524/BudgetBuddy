@@ -52,6 +52,67 @@ PRIMARY_CATEGORY_DEFAULTS = {
     "MEDICAL": ("essential", 1.0),
 }
 
+# Expanded defaults for discretionary/mixed categories by Plaid detailed category
+DISCRETIONARY_DEFAULTS = {
+    # Entertainment — all discretionary
+    "ENTERTAINMENT_CASINOS_AND_GAMBLING": ("discretionary", 0.0),
+    "ENTERTAINMENT_CONCERTS_AND_EVENTS": ("discretionary", 0.0),
+    "ENTERTAINMENT_MOVIES_AND_MUSIC": ("discretionary", 0.0),
+    "ENTERTAINMENT_SPORTING_EVENTS": ("discretionary", 0.0),
+    "ENTERTAINMENT_TV_AND_MOVIES": ("discretionary", 0.0),
+    "ENTERTAINMENT_VIDEO_GAMES": ("discretionary", 0.0),
+    "ENTERTAINMENT_OTHER_ENTERTAINMENT": ("discretionary", 0.0),
+    # Food & Drink
+    "FOOD_AND_DRINK_BEER_WINE_AND_LIQUOR": ("discretionary", 0.0),
+    "FOOD_AND_DRINK_COFFEE": ("discretionary", 0.0),
+    "FOOD_AND_DRINK_FAST_FOOD": ("discretionary", 0.0),
+    "FOOD_AND_DRINK_RESTAURANTS": ("discretionary", 0.0),
+    "FOOD_AND_DRINK_VENDING_MACHINES": ("discretionary", 0.0),
+    "FOOD_AND_DRINK_GROCERIES": ("mixed", 0.8),  # 80% essential by default
+    # Personal Care
+    "PERSONAL_CARE_HAIR_AND_BEAUTY": ("discretionary", 0.0),
+    "PERSONAL_CARE_GYMS_AND_FITNESS_CENTERS": ("discretionary", 0.0),
+    "PERSONAL_CARE_LAUNDRY_AND_DRY_CLEANING": ("essential", 1.0),
+    # Transportation
+    "TRANSPORTATION_GAS": ("essential", 1.0),
+    "TRANSPORTATION_PARKING": ("mixed", 0.5),
+    "TRANSPORTATION_PUBLIC_TRANSIT": ("essential", 1.0),
+    "TRANSPORTATION_TAXIS_AND_RIDE_SHARING": ("mixed", 0.5),
+    # Travel
+    "TRAVEL_FLIGHTS": ("discretionary", 0.0),
+    "TRAVEL_LODGING": ("discretionary", 0.0),
+    "TRAVEL_RENTAL_CARS": ("discretionary", 0.0),
+    # General Merchandise (mixed)
+    "GENERAL_MERCHANDISE_DISCOUNT_STORES": ("mixed", 0.5),
+    "GENERAL_MERCHANDISE_ONLINE_MARKETPLACES": ("mixed", 0.4),
+    "GENERAL_MERCHANDISE_SUPERSTORES": ("mixed", 0.6),
+    # Government
+    "GOVERNMENT_AND_NON_PROFIT_TAX_PAYMENT": ("essential", 1.0),
+}
+
+# Fallback defaults by Plaid primary category for discretionary/mixed
+PRIMARY_DISCRETIONARY_DEFAULTS = {
+    "ENTERTAINMENT": ("discretionary", 0.0),
+    "FOOD_AND_DRINK": ("mixed", 0.6),
+    "PERSONAL_CARE": ("discretionary", 0.0),
+    "TRAVEL": ("discretionary", 0.0),
+    "GENERAL_MERCHANDISE": ("mixed", 0.5),
+    "TRANSPORTATION": ("mixed", 0.7),
+}
+
+# Categories that are obviously discretionary — used for challenge prompt when user marks as essential
+OBVIOUSLY_DISCRETIONARY_CATEGORIES = {
+    "FOOD_AND_DRINK_COFFEE",
+    "FOOD_AND_DRINK_BEER_WINE_AND_LIQUOR",
+    "ENTERTAINMENT_MOVIES_AND_MUSIC",
+    "ENTERTAINMENT_CONCERTS_AND_EVENTS",
+    "ENTERTAINMENT_TV_AND_MOVIES",
+    "ENTERTAINMENT_VIDEO_GAMES",
+    "ENTERTAINMENT_CASINOS_AND_GAMBLING",
+    "FOOD_AND_DRINK_FAST_FOOD",
+    "ENTERTAINMENT_SPORTING_EVENTS",
+}
+
 
 def normalize_merchant_name(name: Optional[str]) -> str:
     """Normalize merchant name for consistent lookups."""
@@ -65,6 +126,7 @@ def classify_transaction(transaction, user_id: int, use_llm: bool = False) -> No
     Classify a single Datastore transaction entity in-place and persist.
     Priority: user MerchantClassification → pre-seeded by detailed → pre-seeded by primary → LLM → unclassified.
     Skips income transactions (amount <= 0).
+    Uses merchant_name if available, falls back to name field for merchant identity.
     """
     amount = transaction.get('amount')
     if amount is not None and amount <= 0:
@@ -72,7 +134,10 @@ def classify_transaction(transaction, user_id: int, use_llm: bool = False) -> No
 
     from db_models import get_merchant_classification
 
-    merchant = normalize_merchant_name(transaction.get('merchant_name'))
+    # Use merchant_name if set, fall back to transaction name for classification identity
+    merchant = normalize_merchant_name(
+        transaction.get('merchant_name') or transaction.get('name')
+    )
 
     # 1. Check user's merchant classification
     if merchant:
@@ -82,7 +147,7 @@ def classify_transaction(transaction, user_id: int, use_llm: bool = False) -> No
             _save_transaction(transaction)
             return
 
-    # 2. Check pre-seeded defaults by detailed category
+    # 2. Check pre-seeded defaults by detailed category (essential)
     detailed = transaction.get('category_detailed')
     if detailed and detailed in PRE_SEEDED_DEFAULTS:
         classification, ratio = PRE_SEEDED_DEFAULTS[detailed]
@@ -90,10 +155,24 @@ def classify_transaction(transaction, user_id: int, use_llm: bool = False) -> No
         _save_transaction(transaction)
         return
 
-    # 3. Check pre-seeded defaults by primary category
+    # 2b. Check discretionary/mixed defaults by detailed category
+    if detailed and detailed in DISCRETIONARY_DEFAULTS:
+        classification, ratio = DISCRETIONARY_DEFAULTS[detailed]
+        _apply_classification(transaction, classification, ratio)
+        _save_transaction(transaction)
+        return
+
+    # 3. Check pre-seeded defaults by primary category (essential)
     primary = transaction.get('category_primary')
     if primary and primary in PRIMARY_CATEGORY_DEFAULTS:
         classification, ratio = PRIMARY_CATEGORY_DEFAULTS[primary]
+        _apply_classification(transaction, classification, ratio)
+        _save_transaction(transaction)
+        return
+
+    # 3b. Check discretionary/mixed defaults by primary category
+    if primary and primary in PRIMARY_DISCRETIONARY_DEFAULTS:
+        classification, ratio = PRIMARY_DISCRETIONARY_DEFAULTS[primary]
         _apply_classification(transaction, classification, ratio)
         _save_transaction(transaction)
         return
@@ -108,11 +187,11 @@ def classify_transaction(transaction, user_id: int, use_llm: bool = False) -> No
             _store_inferred_classification(user_id, merchant, detailed, classification, ratio)
             return
 
-    # 5. Default to unclassified
-    transaction['sub_category'] = 'unclassified'
+    # 5. Default to unclassified — do not persist, leave sub_category as-is
+    # (avoids overwriting auto-classify results due to Datastore eventual consistency)
+    transaction['sub_category'] = transaction.get('sub_category') or 'unclassified'
     transaction['essential_amount'] = None
     transaction['discretionary_amount'] = None
-    _save_transaction(transaction)
 
 
 def _save_transaction(transaction) -> None:
@@ -135,6 +214,7 @@ def retroactively_reclassify(user_id: int, merchant_name: str, classification: s
     Returns the count of reclassified transactions.
     """
     from db_models import get_plaid_items, get_accounts_for_item, get_client
+    from google.cloud.datastore.query import PropertyFilter
 
     normalized = normalize_merchant_name(merchant_name)
     if not normalized:
@@ -152,9 +232,13 @@ def retroactively_reclassify(user_id: int, merchant_name: str, classification: s
     count = 0
     for account_id in account_ids:
         query = client.query(kind='Transaction')
-        query.add_filter('plaid_account_id', '=', account_id)
+        query.add_filter(filter=PropertyFilter('plaid_account_id', '=', account_id))
         for txn in query.fetch():
-            if normalize_merchant_name(txn.get('merchant_name')) == normalized:
+            # Match on merchant_name first, fall back to name field (same as classify_transaction)
+            effective = normalize_merchant_name(
+                txn.get('merchant_name') or txn.get('name')
+            )
+            if effective == normalized:
                 _apply_classification(txn, classification, essential_ratio)
                 client.put(txn)
                 count += 1
@@ -229,7 +313,7 @@ def llm_classify_merchant(
         agent = Agent(
             name="MerchantClassifier",
             instructions=system_prompt,
-            model="claude-sonnet-4-5-20250929",
+            model="claude-haiku-4-5-20251001",
         )
 
         msg_parts = [f"Merchant: {merchant_name}"]
@@ -317,7 +401,7 @@ Respond with ONLY a JSON array:
         agent = Agent(
             name="BatchMerchantClassifier",
             instructions=system_prompt,
-            model="claude-sonnet-4-5-20250929",
+            model="claude-haiku-4-5-20251001",
         )
 
         lines = []

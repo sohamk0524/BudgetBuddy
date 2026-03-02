@@ -437,6 +437,9 @@ struct ExpenseTransaction: Codable, Identifiable {
     let subCategory: String
     let essentialAmount: Double?
     let discretionaryAmount: Double?
+    let source: String?
+    let notes: String?
+    let receiptItems: [ReceiptLineItem]?
 }
 
 struct ExpensesSummary: Codable {
@@ -479,11 +482,17 @@ struct ClassifiedTransactionInfo: Codable {
     let discretionaryAmount: Double?
 }
 
+struct ChallengeInfo: Codable {
+    let show: Bool
+    let reason: String?
+}
+
 struct ClassifyTransactionResponse: Codable {
     let success: Bool
     let transaction: ClassifiedTransactionInfo
     let updatedMerchantRatio: Double
     let autoApplied: Int?
+    let challenge: ChallengeInfo?
 }
 
 struct UnclassifiedMerchant: Codable, Identifiable {
@@ -510,7 +519,10 @@ struct UnclassifiedTransactionItem: Codable, Identifiable {
     let amount: Double
     let date: String?
     let name: String
+    let source: String?
     let merchantContext: MerchantContext?
+
+    var isVoice: Bool { source == "voice" }
 }
 
 struct UnclassifiedTransactionsResponse: Codable {
@@ -528,6 +540,46 @@ struct AutoClassifyMerchantResult: Codable {
 struct AutoClassifyResponse: Codable {
     let classified: Int
     let merchants: [AutoClassifyMerchantResult]
+}
+
+// MARK: - Receipt Scanning Models
+
+struct ReceiptLineItem: Codable, Identifiable {
+    let id = UUID()
+    let name: String
+    let price: Double
+    let classification: String  // "essential" | "discretionary"
+
+    var isEssential: Bool { classification == "essential" }
+
+    enum CodingKeys: String, CodingKey {
+        case name, price, classification
+    }
+}
+
+struct ReceiptAnalysisResult: Codable {
+    let merchant: String
+    let date: String?
+    let total: Double
+    let items: [ReceiptLineItem]
+    let essentialTotal: Double
+    let discretionaryTotal: Double
+}
+
+struct ReceiptAttachRequest: Codable {
+    let userId: Int
+    let merchant: String
+    let total: Double
+    let items: [ReceiptLineItem]
+    let essentialTotal: Double
+    let discretionaryTotal: Double
+    let date: String
+}
+
+struct ReceiptAttachResponse: Codable {
+    let transactionId: Int
+    let source: String   // "plaid" | "manual"
+    let enriched: Bool
 }
 
 // MARK: - User Profile Models
