@@ -8,13 +8,47 @@
 
 /* Begin PBXBuildFile section */
 		A34CDD402F3E7F0000B9B328 /* LinkKit in Frameworks */ = {isa = PBXBuildFile; productRef = A34CDD3F2F3E7F0000B9B328 /* LinkKit */; };
+		A35C22E92F50D3DF0047A5DA /* PhoneNumberKit in Frameworks */ = {isa = PBXBuildFile; productRef = A35C22E82F50D3DF0047A5DA /* PhoneNumberKit */; };
+		A35C24AC2F51002F0047A5DA /* BudgetBuddyShareExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = A35C24A22F51002F0047A5DA /* BudgetBuddyShareExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		A35C24AA2F51002F0047A5DA /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = ACEBD1AC2F2BE42700FA1D26 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A35C24A12F51002F0047A5DA;
+			remoteInfo = BudgetBuddyShareExtension;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		A35C24B12F51002F0047A5DA /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				A35C24AC2F51002F0047A5DA /* BudgetBuddyShareExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
+		A35C24A22F51002F0047A5DA /* BudgetBuddyShareExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = BudgetBuddyShareExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		ACEBD1B42F2BE42700FA1D26 /* BudgetBuddy.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BudgetBuddy.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		A35C24B02F51002F0047A5DA /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = A35C24A12F51002F0047A5DA /* BudgetBuddyShareExtension */;
+		};
 		ACEBD1C12F2BE42A00FA1D26 /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
@@ -25,15 +59,24 @@
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		A35C24A32F51002F0047A5DA /* BudgetBuddyShareExtension */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (A35C24B02F51002F0047A5DA /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = BudgetBuddyShareExtension; sourceTree = "<group>"; };
 		ACEBD1B62F2BE42700FA1D26 /* BudgetBuddy */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (ACEBD1C12F2BE42A00FA1D26 /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = BudgetBuddy; sourceTree = "<group>"; };
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		A35C249F2F51002F0047A5DA /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		ACEBD1B12F2BE42700FA1D26 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 				A34CDD402F3E7F0000B9B328 /* LinkKit in Frameworks */,
+				A35C22E92F50D3DF0047A5DA /* PhoneNumberKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -44,6 +87,7 @@
 			isa = PBXGroup;
 			children = (
 				ACEBD1B62F2BE42700FA1D26 /* BudgetBuddy */,
+				A35C24A32F51002F0047A5DA /* BudgetBuddyShareExtension */,
 				ACEBD1B52F2BE42700FA1D26 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -52,6 +96,7 @@
 			isa = PBXGroup;
 			children = (
 				ACEBD1B42F2BE42700FA1D26 /* BudgetBuddy.app */,
+				A35C24A22F51002F0047A5DA /* BudgetBuddyShareExtension.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -59,6 +104,28 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		A35C24A12F51002F0047A5DA /* BudgetBuddyShareExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A35C24AD2F51002F0047A5DA /* Build configuration list for PBXNativeTarget "BudgetBuddyShareExtension" */;
+			buildPhases = (
+				A35C249E2F51002F0047A5DA /* Sources */,
+				A35C249F2F51002F0047A5DA /* Frameworks */,
+				A35C24A02F51002F0047A5DA /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				A35C24A32F51002F0047A5DA /* BudgetBuddyShareExtension */,
+			);
+			name = BudgetBuddyShareExtension;
+			packageProductDependencies = (
+			);
+			productName = BudgetBuddyShareExtension;
+			productReference = A35C24A22F51002F0047A5DA /* BudgetBuddyShareExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 		ACEBD1B32F2BE42700FA1D26 /* BudgetBuddy */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = ACEBD1C22F2BE42A00FA1D26 /* Build configuration list for PBXNativeTarget "BudgetBuddy" */;
@@ -66,10 +133,12 @@
 				ACEBD1B02F2BE42700FA1D26 /* Sources */,
 				ACEBD1B12F2BE42700FA1D26 /* Frameworks */,
 				ACEBD1B22F2BE42700FA1D26 /* Resources */,
+				A35C24B12F51002F0047A5DA /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				A35C24AB2F51002F0047A5DA /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				ACEBD1B62F2BE42700FA1D26 /* BudgetBuddy */,
@@ -77,6 +146,7 @@
 			name = BudgetBuddy;
 			packageProductDependencies = (
 				A34CDD3F2F3E7F0000B9B328 /* LinkKit */,
+				A35C22E82F50D3DF0047A5DA /* PhoneNumberKit */,
 			);
 			productName = BudgetBuddy;
 			productReference = ACEBD1B42F2BE42700FA1D26 /* BudgetBuddy.app */;
@@ -92,6 +162,9 @@
 				LastSwiftUpdateCheck = 2620;
 				LastUpgradeCheck = 2620;
 				TargetAttributes = {
+					A35C24A12F51002F0047A5DA = {
+						CreatedOnToolsVersion = 26.2;
+					};
 					ACEBD1B32F2BE42700FA1D26 = {
 						CreatedOnToolsVersion = 26.2;
 					};
@@ -109,17 +182,26 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				A34CDD3E2F3E7F0000B9B328 /* XCRemoteSwiftPackageReference "plaid-link-ios-spm" */,
+				A35C22E72F50D3DF0047A5DA /* XCRemoteSwiftPackageReference "PhoneNumberKit" */,
 			);
 			productRefGroup = ACEBD1B52F2BE42700FA1D26 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
 				ACEBD1B32F2BE42700FA1D26 /* BudgetBuddy */,
+				A35C24A12F51002F0047A5DA /* BudgetBuddyShareExtension */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		A35C24A02F51002F0047A5DA /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		ACEBD1B22F2BE42700FA1D26 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -130,6 +212,13 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		A35C249E2F51002F0047A5DA /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		ACEBD1B02F2BE42700FA1D26 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -139,7 +228,71 @@
 		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		A35C24AB2F51002F0047A5DA /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A35C24A12F51002F0047A5DA /* BudgetBuddyShareExtension */;
+			targetProxy = A35C24AA2F51002F0047A5DA /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
+		A35C24AE2F51002F0047A5DA /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = NQWLF9RT3X;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = BudgetBuddyShareExtension/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = BudgetBuddyShareExtension;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = sample.BudgetBud.BudgetBuddyShareExtension;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		A35C24AF2F51002F0047A5DA /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = NQWLF9RT3X;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = BudgetBuddyShareExtension/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = BudgetBuddyShareExtension;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = sample.BudgetBud.BudgetBuddyShareExtension;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 		ACEBD1C32F2BE42A00FA1D26 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -148,9 +301,14 @@
 				CODE_SIGN_ENTITLEMENTS = BudgetBuddy/BudgetBuddy.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = NQWLF9RT3X;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = BudgetBuddy/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = BudgetBud;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.finance";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "BudgetBuddy needs microphone access to record your voice for transaction logging.";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "BudgetBuddy uses speech recognition to transcribe your voice into transaction details.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -161,7 +319,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = sample.BudgetBuddy;
+				PRODUCT_BUNDLE_IDENTIFIER = sample.BudgetBud;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -178,12 +336,17 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = BudgetBuddy/BudgetBuddy.entitlements;
+				CODE_SIGN_ENTITLEMENTS = BudgetBuddy/BudgetBuddyRelease.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = NQWLF9RT3X;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = BudgetBuddy/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = BudgetBud;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.finance";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "BudgetBuddy needs microphone access to record your voice for transaction logging.";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "BudgetBuddy uses speech recognition to transcribe your voice into transaction details.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -194,7 +357,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = sample.BudgetBuddy;
+				PRODUCT_BUNDLE_IDENTIFIER = sample.BudgetBud;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -328,6 +491,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		A35C24AD2F51002F0047A5DA /* Build configuration list for PBXNativeTarget "BudgetBuddyShareExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A35C24AE2F51002F0047A5DA /* Debug */,
+				A35C24AF2F51002F0047A5DA /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		ACEBD1AF2F2BE42700FA1D26 /* Build configuration list for PBXProject "BudgetBuddy" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
@@ -357,6 +529,14 @@
 				minimumVersion = 6.0.4;
 			};
 		};
+		A35C22E72F50D3DF0047A5DA /* XCRemoteSwiftPackageReference "PhoneNumberKit" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/marmelroy/PhoneNumberKit.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 4.2.5;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -364,6 +544,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = A34CDD3E2F3E7F0000B9B328 /* XCRemoteSwiftPackageReference "plaid-link-ios-spm" */;
 			productName = LinkKit;
+		};
+		A35C22E82F50D3DF0047A5DA /* PhoneNumberKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A35C22E72F50D3DF0047A5DA /* XCRemoteSwiftPackageReference "PhoneNumberKit" */;
+			productName = PhoneNumberKit;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
