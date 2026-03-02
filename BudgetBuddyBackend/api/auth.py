@@ -22,6 +22,10 @@ from db_models import (
 
 auth_bp = Blueprint('auth', __name__)
 
+# Demo account for App Store review — always accepts a fixed OTP, no SMS sent.
+DEMO_PHONE = "+15550001234"
+DEMO_OTP   = "123456"
+
 
 def send_via_twilio(phone_number: str, code: str):
     """Placeholder for Twilio SMS. Prints to console in development."""
@@ -43,14 +47,16 @@ def send_sms_code():
     if not phone_number.startswith("+") or not (10 <= len(phone_number) <= 16):
         return jsonify({"error": "Invalid phone number format. Use E.164 format (e.g., +14155551234)"}), 400
 
-    code = ''.join(random.choices(string.digits, k=6))
+    is_demo = (phone_number == DEMO_PHONE)
+    code = DEMO_OTP if is_demo else ''.join(random.choices(string.digits, k=6))
     expires_at = datetime.utcnow() + timedelta(minutes=5)
 
     # Invalidate existing unused codes
     delete_otps_for_phone(phone_number)
 
     create_otp(phone_number, code, expires_at)
-    send_via_twilio(phone_number, code)
+    if not is_demo:
+        send_via_twilio(phone_number, code)
 
     return jsonify({"status": "success"})
 
