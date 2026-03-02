@@ -7,6 +7,7 @@
 
 import SwiftUI
 
+@MainActor
 struct RecommendationsView: View {
     @State private var viewModel = RecommendationsViewModel()
 

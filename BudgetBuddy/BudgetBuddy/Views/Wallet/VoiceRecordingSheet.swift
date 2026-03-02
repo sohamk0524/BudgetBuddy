@@ -7,6 +7,7 @@
 
 import SwiftUI
 
+@MainActor
 struct VoiceRecordingSheet: View {
     @Bindable var viewModel: VoiceTransactionViewModel
 

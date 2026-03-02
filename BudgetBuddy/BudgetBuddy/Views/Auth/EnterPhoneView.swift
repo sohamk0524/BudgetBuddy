@@ -144,7 +144,7 @@ struct EnterPhoneView: View {
                 Spacer()
 
                 // Terms Text
-                Text("By continuing, you agree to our Terms of Service and Privacy Policy")
+                Text("By providing your phone number, you consent to receive a one-time passcode via SMS for verification purposes. Message and data rates may apply. Repbly STOP to opt out or HELP for help. By continuing, you agree to our Terms of Service and Privacy Policy")
                     .font(.system(.caption2, design: .rounded))
                     .foregroundStyle(Color.textSecondary)
                     .multilineTextAlignment(.center)

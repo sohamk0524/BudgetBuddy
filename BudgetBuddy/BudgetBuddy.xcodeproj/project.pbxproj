@@ -60,6 +60,9 @@
 		E18C83EB2F54339700E66577 /* PhoneNumberKit-Dynamic in Frameworks */ = {isa = PBXBuildFile; productRef = E18C83EA2F54339700E66577 /* PhoneNumberKit-Dynamic */; };
 		E18C83ED2F54339700E66577 /* PhoneNumberKit-Static in Frameworks */ = {isa = PBXBuildFile; productRef = E18C83EC2F54339700E66577 /* PhoneNumberKit-Static */; };
 		E18C83F02F5433AD00E66577 /* LinkKit in Frameworks */ = {isa = PBXBuildFile; productRef = E18C83EF2F5433AD00E66577 /* LinkKit */; };
+		E19B24992F55295B005C18DA /* ReceiptScanViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = E19B24982F55295A005C18DA /* ReceiptScanViewModel.swift */; };
+		E19B249D2F5529F1005C18DA /* ReceiptLineItemsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E19B249B2F5529F1005C18DA /* ReceiptLineItemsView.swift */; };
+		E19B249E2F5529F1005C18DA /* ReceiptScanView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E19B249C2F5529F1005C18DA /* ReceiptScanView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -114,6 +117,9 @@
 		E18C83B52F54330700E66577 /* ProfileViewModel.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ProfileViewModel.swift; sourceTree = "<group>"; };
 		E18C83B62F54330800E66577 /* ChatViewModel.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ChatViewModel.swift; sourceTree = "<group>"; };
 		E18C83B72F54330800E66577 /* Models.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		E19B24982F55295A005C18DA /* ReceiptScanViewModel.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ReceiptScanViewModel.swift; sourceTree = "<group>"; };
+		E19B249B2F5529F1005C18DA /* ReceiptLineItemsView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ReceiptLineItemsView.swift; sourceTree = "<group>"; };
+		E19B249C2F5529F1005C18DA /* ReceiptScanView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ReceiptScanView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -150,6 +156,7 @@
 		E18C836E2F54305800E66577 /* BudgetBuddy */ = {
 			isa = PBXGroup;
 			children = (
+				E19B24982F55295A005C18DA /* ReceiptScanViewModel.swift */,
 				E18C83842F54330100E66577 /* APIService.swift */,
 				E18C83852F54330200E66577 /* AppConfig.swift */,
 				E18C83862F54330200E66577 /* Assets.xcassets */,
@@ -222,6 +229,7 @@
 		E18C83942F54330700E66577 /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				E19B249A2F5529F1005C18DA /* Receipt */,
 				E18C83952F54330700E66577 /* ProfileView.swift */,
 				E18C83962F54330700E66577 /* RecommendationsView.swift */,
 				E18C83972F54330700E66577 /* SpendingPlan */,
@@ -298,6 +306,15 @@
 				E18C83B42F54330700E66577 /* OnboardingWizardView.swift */,
 			);
 			path = Onboarding;
+			sourceTree = "<group>";
+		};
+		E19B249A2F5529F1005C18DA /* Receipt */ = {
+			isa = PBXGroup;
+			children = (
+				E19B249B2F5529F1005C18DA /* ReceiptLineItemsView.swift */,
+				E19B249C2F5529F1005C18DA /* ReceiptScanView.swift */,
+			);
+			path = Receipt;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -399,6 +416,7 @@
 				E18C83C22F54330900E66577 /* BudgetBuddyApp.swift in Sources */,
 				E18C83D62F54330900E66577 /* PlanDashboardCards.swift in Sources */,
 				E18C83BB2F54330900E66577 /* Theme.swift in Sources */,
+				E19B24992F55295B005C18DA /* ReceiptScanViewModel.swift in Sources */,
 				E18C83D72F54330900E66577 /* VoiceTransactionFlowView.swift in Sources */,
 				E18C83DA2F54330900E66577 /* VoiceRecordingSheet.swift in Sources */,
 				E18C83BE2F54330900E66577 /* AppConfig.swift in Sources */,
@@ -410,6 +428,7 @@
 				E18C83E62F54330900E66577 /* Models.swift in Sources */,
 				E18C83C72F54330900E66577 /* PlaidService.swift in Sources */,
 				E18C83BD2F54330900E66577 /* APIService.swift in Sources */,
+				E19B249E2F5529F1005C18DA /* ReceiptScanView.swift in Sources */,
 				E18C83CF2F54330900E66577 /* EnterPhoneView.swift in Sources */,
 				E18C83CE2F54330900E66577 /* OTPView.swift in Sources */,
 				E18C83E42F54330900E66577 /* ProfileViewModel.swift in Sources */,
@@ -428,6 +447,7 @@
 				E18C83D12F54330900E66577 /* PlanView.swift in Sources */,
 				E18C83E52F54330900E66577 /* ChatViewModel.swift in Sources */,
 				E18C83D92F54330900E66577 /* VoiceTransactionTile.swift in Sources */,
+				E19B249D2F5529F1005C18DA /* ReceiptLineItemsView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

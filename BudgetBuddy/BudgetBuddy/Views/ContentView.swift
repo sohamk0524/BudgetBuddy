@@ -7,6 +7,7 @@
 
 import SwiftUI
 
+@MainActor
 struct ContentView: View {
     @State private var authManager = AuthManager.shared
     @State private var selectedTab = 0
