@@ -56,16 +56,6 @@ struct RecommendationsView: View {
 
     private var recommendationsList: some View {
         ScrollView {
-            // Summary
-            if !viewModel.summary.isEmpty {
-                Text(viewModel.summary)
-                    .font(.roundedCaption)
-                    .foregroundStyle(Color.textSecondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 20)
-                    .padding(.top, 12)
-            }
-
             LazyVStack(spacing: 12) {
                 ForEach(viewModel.recommendations) { item in
                     RecommendationCardView(item: item)
