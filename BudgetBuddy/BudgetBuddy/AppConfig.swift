@@ -8,6 +8,6 @@ enum AppConfig {
     #endif
 
     // Update these once GitHub Pages is live
-    static let termsURL   = URL(string: "https://sohamk0524.github.io/BudgetBuddy/terms.html")!
-    static let privacyURL = URL(string: "https://sohamk0524.github.io/BudgetBuddy/privacy.html")!
+    static let termsURL   = URL(string: "https://budgetbuddy.sandeepreehal.com/terms.html")!
+    static let privacyURL = URL(string: "https://budgetbuddy.sandeepreehal.com/privacy.html")!
 }
