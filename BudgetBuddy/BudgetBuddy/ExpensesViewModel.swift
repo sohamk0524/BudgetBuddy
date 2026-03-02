@@ -259,7 +259,6 @@ class ExpensesViewModel {
                 essentialAmount: response.transaction.essentialAmount,
                 discretionaryAmount: response.transaction.discretionaryAmount
             )
-
             // Classification means activity — cancel today's reminder
             NotificationManager.shared.cancelTodayNotification()
 
