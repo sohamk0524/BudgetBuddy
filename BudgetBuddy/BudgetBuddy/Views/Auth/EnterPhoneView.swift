@@ -7,6 +7,7 @@
 
 import SwiftUI
 import PhoneNumberKit
+import SafariServices
 
 struct EnterPhoneView: View {
     @State private var phoneNumber: String = ""
@@ -144,12 +145,20 @@ struct EnterPhoneView: View {
                 Spacer()
 
                 // Terms Text
-                Text("By continuing, you agree to our Terms of Service and Privacy Policy")
+                Text("By continuing, you agree to our [Terms of Service](\(AppConfig.termsURL.absoluteString)) and [Privacy Policy](\(AppConfig.privacyURL.absoluteString))")
                     .font(.system(.caption2, design: .rounded))
                     .foregroundStyle(Color.textSecondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 32)
                     .padding(.bottom, 16)
+                    .environment(\.openURL, OpenURLAction { url in
+                        let vc = SFSafariViewController(url: url)
+                        UIApplication.shared.connectedScenes
+                            .compactMap { $0 as? UIWindowScene }
+                            .first?.windows.first?.rootViewController?
+                            .present(vc, animated: true)
+                        return .handled
+                    })
             }
         }
     }
