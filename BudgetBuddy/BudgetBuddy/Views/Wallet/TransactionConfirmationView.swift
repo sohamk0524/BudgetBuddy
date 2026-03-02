@@ -7,6 +7,7 @@
 
 import SwiftUI
 
+@MainActor
 struct TransactionConfirmationView: View {
     @Bindable var viewModel: VoiceTransactionViewModel
     @Environment(\.dismiss) private var dismiss

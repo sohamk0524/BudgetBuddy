@@ -63,6 +63,8 @@
 		E19B24992F55295B005C18DA /* ReceiptScanViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = E19B24982F55295A005C18DA /* ReceiptScanViewModel.swift */; };
 		E19B249D2F5529F1005C18DA /* ReceiptLineItemsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E19B249B2F5529F1005C18DA /* ReceiptLineItemsView.swift */; };
 		E19B249E2F5529F1005C18DA /* ReceiptScanView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E19B249C2F5529F1005C18DA /* ReceiptScanView.swift */; };
+		E1AB00022F56A10000E66577 /* NotificationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1AB00012F56A10000E66577 /* NotificationManager.swift */; };
+		E1AB00042F56A10000E66577 /* NotificationSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1AB00032F56A10000E66577 /* NotificationSettingsView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -120,6 +122,8 @@
 		E19B24982F55295A005C18DA /* ReceiptScanViewModel.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ReceiptScanViewModel.swift; sourceTree = "<group>"; };
 		E19B249B2F5529F1005C18DA /* ReceiptLineItemsView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ReceiptLineItemsView.swift; sourceTree = "<group>"; };
 		E19B249C2F5529F1005C18DA /* ReceiptScanView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ReceiptScanView.swift; sourceTree = "<group>"; };
+		E1AB00012F56A10000E66577 /* NotificationManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = NotificationManager.swift; sourceTree = "<group>"; };
+		E1AB00032F56A10000E66577 /* NotificationSettingsView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = NotificationSettingsView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -222,6 +226,7 @@
 				E18C83912F54330600E66577 /* PlaidService.swift */,
 				E18C83922F54330600E66577 /* AuthManager.swift */,
 				E18C83932F54330600E66577 /* PlaidLinkManager.swift */,
+				E1AB00012F56A10000E66577 /* NotificationManager.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -243,6 +248,7 @@
 				E18C83B12F54330700E66577 /* WalletView.swift */,
 				E18C83B22F54330700E66577 /* ContentView.swift */,
 				E18C83B32F54330700E66577 /* Onboarding */,
+				E1AB00032F56A10000E66577 /* NotificationSettingsView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -448,6 +454,8 @@
 				E18C83E52F54330900E66577 /* ChatViewModel.swift in Sources */,
 				E18C83D92F54330900E66577 /* VoiceTransactionTile.swift in Sources */,
 				E19B249D2F5529F1005C18DA /* ReceiptLineItemsView.swift in Sources */,
+				E1AB00022F56A10000E66577 /* NotificationManager.swift in Sources */,
+				E1AB00042F56A10000E66577 /* NotificationSettingsView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

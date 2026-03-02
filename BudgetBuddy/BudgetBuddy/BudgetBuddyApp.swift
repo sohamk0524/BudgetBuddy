@@ -23,6 +23,12 @@ struct BudgetBuddyApp: App {
         WindowGroup {
             ContentView()
                 .preferredColorScheme(.dark)
+                .task {
+                    let granted = await NotificationManager.shared.requestPermission()
+                    if granted {
+                        NotificationManager.shared.scheduleDailyReminder(hasLoggedToday: false)
+                    }
+                }
                 .onOpenURL { url in
                     guard url.scheme == "budgetbuddy", url.host == "receipt" else { return }
                     loadSharedReceiptImage()
