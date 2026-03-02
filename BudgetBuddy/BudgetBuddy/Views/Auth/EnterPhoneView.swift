@@ -7,10 +7,13 @@
 
 import SwiftUI
 import PhoneNumberKit
+import SafariServices
 
 struct EnterPhoneView: View {
     @State private var phoneNumber: String = ""
     @State private var selectedCountry: Country = .us
+    @State private var showTerms = false
+    @State private var showPrivacy = false
 
     var authManager = AuthManager.shared
 
@@ -144,12 +147,30 @@ struct EnterPhoneView: View {
                 Spacer()
 
                 // Terms Text
-                Text("By continuing, you agree to our Terms of Service and Privacy Policy")
-                    .font(.system(.caption2, design: .rounded))
-                    .foregroundStyle(Color.textSecondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 32)
-                    .padding(.bottom, 16)
+                VStack(spacing: 2) {
+                    Text("By continuing, you agree to our")
+                        .font(.system(.caption2, design: .rounded))
+                        .foregroundStyle(Color.textSecondary)
+                    HStack(spacing: 4) {
+                        Button("Terms of Service") { showTerms = true }
+                            .font(.system(.caption2, design: .rounded))
+                            .foregroundStyle(Color.accent)
+                        Text("and")
+                            .font(.system(.caption2, design: .rounded))
+                            .foregroundStyle(Color.textSecondary)
+                        Button("Privacy Policy") { showPrivacy = true }
+                            .font(.system(.caption2, design: .rounded))
+                            .foregroundStyle(Color.accent)
+                    }
+                }
+                .padding(.horizontal, 32)
+                .padding(.bottom, 16)
+                .sheet(isPresented: $showTerms) {
+                    SafariView(url: AppConfig.termsURL)
+                }
+                .sheet(isPresented: $showPrivacy) {
+                    SafariView(url: AppConfig.privacyURL)
+                }
             }
         }
     }
@@ -183,6 +204,16 @@ struct EnterPhoneView: View {
         // For other countries, just return digits
         return limited
     }
+}
+
+// MARK: - In-app browser
+
+private struct SafariView: UIViewControllerRepresentable {
+    let url: URL
+    func makeUIViewController(context: Context) -> SFSafariViewController {
+        SFSafariViewController(url: url)
+    }
+    func updateUIViewController(_ uiViewController: SFSafariViewController, context: Context) {}
 }
 
 // MARK: - Country Model
