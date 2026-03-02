@@ -44,6 +44,8 @@ struct ReceiptScanView: View {
             CameraImagePicker { image in
                 showCamera = false
                 Task { await viewModel.analyzeImage(image) }
+            } onCancel: {
+                showCamera = false
             }
             .ignoresSafeArea()
         }
@@ -58,12 +60,11 @@ struct ReceiptScanView: View {
             analyzingView
         case .reviewed:
             if let result = viewModel.analysisResult {
-                ReceiptLineItemsView(result: result) { essentialTotal, discretionaryTotal in
-                    let today = DateFormatter.isoDate.string(from: Date())
-                    let date = result.date ?? today
+                ReceiptLineItemsView(result: result) { essentialTotal, discretionaryTotal, date, merchant in
                     Task {
                         await viewModel.confirmAndAttach(
                             date: date,
+                            merchant: merchant,
                             essentialTotal: essentialTotal,
                             discretionaryTotal: discretionaryTotal
                         )
@@ -203,6 +204,7 @@ struct ReceiptScanView: View {
 
 struct CameraImagePicker: UIViewControllerRepresentable {
     let onCapture: (UIImage) -> Void
+    let onCancel: () -> Void
 
     func makeUIViewController(context: Context) -> UIImagePickerController {
         let picker = UIImagePickerController()
@@ -213,31 +215,25 @@ struct CameraImagePicker: UIViewControllerRepresentable {
 
     func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
 
-    func makeCoordinator() -> Coordinator { Coordinator(onCapture: onCapture) }
+    func makeCoordinator() -> Coordinator { Coordinator(onCapture: onCapture, onCancel: onCancel) }
 
     class Coordinator: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
         let onCapture: (UIImage) -> Void
-        init(onCapture: @escaping (UIImage) -> Void) { self.onCapture = onCapture }
+        let onCancel: () -> Void
+        init(onCapture: @escaping (UIImage) -> Void, onCancel: @escaping () -> Void) {
+            self.onCapture = onCapture
+            self.onCancel = onCancel
+        }
 
         func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]) {
             if let image = info[.originalImage] as? UIImage {
-                onCapture(image)
+                onCapture(image)  // onCapture sets showCamera = false — SwiftUI dismisses the cover
             }
-            picker.dismiss(animated: true)
         }
 
         func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
-            picker.dismiss(animated: true)
+            onCancel()  // sets showCamera = false via SwiftUI binding
         }
     }
 }
 
-// MARK: - DateFormatter helper
-
-private extension DateFormatter {
-    static let isoDate: DateFormatter = {
-        let f = DateFormatter()
-        f.dateFormat = "yyyy-MM-dd"
-        return f
-    }()
-}

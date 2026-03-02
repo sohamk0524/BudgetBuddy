@@ -10,16 +10,21 @@ import SwiftUI
 
 struct ReceiptLineItemsView: View {
     let result: ReceiptAnalysisResult
-    /// Called on confirm with the user-edited essential and discretionary totals.
-    let onConfirm: (_ essentialTotal: Double, _ discretionaryTotal: Double) -> Void
+    /// Called on confirm with user-edited totals, date, and merchant.
+    let onConfirm: (_ essentialTotal: Double, _ discretionaryTotal: Double, _ date: String, _ merchant: String) -> Void
 
     /// Per-item classification overrides (index → "essential" | "discretionary")
     @State private var classifications: [String]
+    @State private var editableMerchant: String
+    @State private var editableDate: Date
 
-    init(result: ReceiptAnalysisResult, onConfirm: @escaping (_ essentialTotal: Double, _ discretionaryTotal: Double) -> Void) {
+    init(result: ReceiptAnalysisResult, onConfirm: @escaping (_ essentialTotal: Double, _ discretionaryTotal: Double, _ date: String, _ merchant: String) -> Void) {
         self.result = result
         self.onConfirm = onConfirm
         _classifications = State(initialValue: result.items.map(\.classification))
+        _editableMerchant = State(initialValue: result.merchant)
+        let parsed = result.date.flatMap { DateFormatter.isoDate.date(from: $0) } ?? Date()
+        _editableDate = State(initialValue: parsed)
     }
 
     // MARK: - Derived totals
@@ -47,8 +52,8 @@ struct ReceiptLineItemsView: View {
         VStack(spacing: 0) {
             // Header card
             VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    Text(result.merchant)
+                HStack(alignment: .center) {
+                    TextField("Store name", text: $editableMerchant)
                         .font(.roundedHeadline)
                         .foregroundStyle(Color.textPrimary)
                     Spacer()
@@ -56,6 +61,17 @@ struct ReceiptLineItemsView: View {
                         .font(.rounded(.title2, weight: .bold))
                         .foregroundStyle(Color.accent)
                         .monospacedDigit()
+                }
+
+                HStack {
+                    Text("Date")
+                        .font(.roundedCaption)
+                        .foregroundStyle(Color.textSecondary)
+                    Spacer()
+                    DatePicker("", selection: $editableDate, displayedComponents: [.date])
+                        .datePickerStyle(.compact)
+                        .labelsHidden()
+                        .tint(Color.accent)
                 }
 
                 // Split bar — updates live as user toggles items
@@ -164,7 +180,8 @@ struct ReceiptLineItemsView: View {
 
             // Confirm button
             Button {
-                onConfirm(currentEssentialTotal, currentDiscretionaryTotal)
+                let dateStr = DateFormatter.isoDate.string(from: editableDate)
+                onConfirm(currentEssentialTotal, currentDiscretionaryTotal, dateStr, editableMerchant)
             } label: {
                 Text("Confirm & Save")
                     .font(.roundedHeadline)
@@ -182,4 +199,14 @@ struct ReceiptLineItemsView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.appBackground)
     }
+}
+
+// MARK: - DateFormatter helper
+
+private extension DateFormatter {
+    static let isoDate: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        return f
+    }()
 }

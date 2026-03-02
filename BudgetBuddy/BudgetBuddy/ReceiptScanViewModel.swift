@@ -56,7 +56,7 @@ class ReceiptScanViewModel {
         }
     }
 
-    func confirmAndAttach(date: String, essentialTotal: Double? = nil, discretionaryTotal: Double? = nil) async {
+    func confirmAndAttach(date: String, merchant: String, essentialTotal: Double? = nil, discretionaryTotal: Double? = nil) async {
         guard let result = analysisResult,
               let userId = AuthManager.shared.authToken else {
             state = .error("Missing data")
@@ -65,9 +65,9 @@ class ReceiptScanViewModel {
 
         state = .attaching
 
-        // Build a result with overridden totals if the user edited classifications
+        // Build a result with user-edited merchant, totals, etc.
         let finalResult = ReceiptAnalysisResult(
-            merchant: result.merchant,
+            merchant: merchant,
             date: result.date,
             total: result.total,
             items: result.items,

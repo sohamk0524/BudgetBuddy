@@ -123,14 +123,14 @@ struct ExpensesView: View {
                                                 .tint(Color.accent)
                                                 .scaleEffect(0.8)
                                         }
-                                        Text(viewModel.isLoadingMore ? "Loading..." : "Load Previous Week")
+                                        Text(viewModel.isLoadingMore ? "Loading..." : viewModel.canLoadMore ? "Load Previous Week" : "No more history")
                                             .font(.roundedBody)
-                                            .foregroundStyle(Color.accent)
+                                            .foregroundStyle(viewModel.canLoadMore ? Color.accent : Color.textSecondary)
                                     }
                                     .frame(maxWidth: .infinity)
                                     .padding(.vertical, 12)
                                 }
-                                .disabled(viewModel.isLoadingMore)
+                                .disabled(viewModel.isLoadingMore || !viewModel.canLoadMore)
                                 .padding(.top, 4)
                             }
                         }

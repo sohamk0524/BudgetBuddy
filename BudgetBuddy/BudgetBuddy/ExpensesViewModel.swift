@@ -170,25 +170,48 @@ class ExpensesViewModel {
         isLoading = false
     }
 
+    /// Whether there is more history to load (under the 3-month cap).
+    var canLoadMore: Bool { weeksBack < 13 }
+
     func loadPreviousWeek() async {
         guard let userId = AuthManager.shared.authToken else { return }
+        guard canLoadMore else { return }
 
         isLoadingMore = true
-        weeksBack += 1
 
-        do {
-            let response = try await apiService.getExpenses(
-                userId: userId,
-                startDate: fetchStartDate,
-                endDate: fetchEndDate,
-                subCategory: nil,
-                limit: 500,
-                offset: 0
-            )
-            allTransactions = response.transactions
-        } catch {
-            print("Failed to load previous week: \(error)")
-            weeksBack -= 1
+        let maxWeeksBack = 13   // ~3 months absolute cap
+        var totalNewFound = 0
+        var lastFetchedCount = allTransactions.count
+
+        while weeksBack < maxWeeksBack {
+            weeksBack += 1
+
+            do {
+                let response = try await apiService.getExpenses(
+                    userId: userId,
+                    startDate: fetchStartDate,
+                    endDate: fetchEndDate,
+                    subCategory: nil,
+                    limit: 500,
+                    offset: 0
+                )
+                let newInThisWeek = response.transactions.count - lastFetchedCount
+                lastFetchedCount = response.transactions.count
+                allTransactions = response.transactions
+
+                // End of available data — show whatever was found and stop
+                if newInThisWeek <= 0 { break }
+
+                totalNewFound += newInThisWeek
+
+                // Accumulated enough new events
+                if totalNewFound >= 5 { break }
+
+            } catch {
+                print("Failed to load previous week: \(error)")
+                weeksBack -= 1
+                break
+            }
         }
 
         isLoadingMore = false
