@@ -13,6 +13,7 @@ struct ExpensesView: View {
     @State private var voiceViewModel = VoiceTransactionViewModel()
     @State private var showReceiptScan = false
     @State private var receiptViewModel = ReceiptScanViewModel()
+    @State private var showAddOptions = false
 
     var body: some View {
         NavigationStack {
@@ -219,63 +220,48 @@ struct ExpensesView: View {
     // MARK: - Log Transaction Button
 
     private var logTransactionButton: some View {
-        HStack(spacing: 8) {
-            // Scan receipt button
-            Button {
-                receiptViewModel.reset()
-                showReceiptScan = true
-            } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "receipt")
-                    Text("Scan")
-                        .font(.roundedHeadline)
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 14)
-                .background(Color.surface)
-                .foregroundStyle(Color.accent)
-                .clipShape(Capsule())
-                .overlay(Capsule().stroke(Color.accent, lineWidth: 1))
+        Button {
+            showAddOptions = true
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "plus")
+                    .font(.system(size: 16, weight: .bold))
+                Text("Add Transaction")
+                    .font(.roundedHeadline)
             }
-
-            // Voice log button
-            Button {
-                voiceViewModel.reset()
-                showVoiceRecording = true
-            } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "mic.fill")
-                    Text("Voice")
-                        .font(.roundedHeadline)
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 14)
-                .background(Color.accent)
-                .foregroundStyle(Color.appBackground)
-                .clipShape(Capsule())
-            }
-
-            // Manual entry button
-            Button {
-                voiceViewModel.startManualEntry()
-                showVoiceRecording = true
-            } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "square.and.pencil")
-                    Text("Manual")
-                        .font(.roundedHeadline)
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 14)
-                .background(Color.surface)
-                .foregroundStyle(Color.accent)
-                .clipShape(Capsule())
-                .overlay(Capsule().stroke(Color.accent, lineWidth: 1))
-            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 14)
+            .background(Color.accent)
+            .foregroundStyle(Color.appBackground)
+            .clipShape(Capsule())
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
         .background(Color.surface)
+        .confirmationDialog("Add Transaction", isPresented: $showAddOptions, titleVisibility: .visible) {
+            Button {
+                voiceViewModel.reset()
+                showVoiceRecording = true
+            } label: {
+                Label("Voice", systemImage: "mic.fill")
+            }
+
+            Button {
+                voiceViewModel.startManualEntry()
+                showVoiceRecording = true
+            } label: {
+                Label("Manual Entry", systemImage: "square.and.pencil")
+            }
+
+            Button {
+                receiptViewModel.reset()
+                showReceiptScan = true
+            } label: {
+                Label("Scan Receipt", systemImage: "receipt")
+            }
+
+            Button("Cancel", role: .cancel) {}
+        }
     }
 }
 

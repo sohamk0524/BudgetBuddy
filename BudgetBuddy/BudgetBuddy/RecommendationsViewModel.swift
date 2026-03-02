@@ -38,7 +38,10 @@ class RecommendationsViewModel {
 
     // MARK: - Actions
 
+    private var hasLoaded = false
+
     func loadRecommendations() async {
+        guard !hasLoaded else { return }
         guard let userId = AuthManager.shared.authToken else { return }
         isLoading = true
         errorMessage = nil
@@ -46,6 +49,7 @@ class RecommendationsViewModel {
         do {
             let response = try await APIService.shared.getRecommendations(userId: userId)
             apply(response)
+            hasLoaded = true
         } catch {
             errorMessage = "Could not load recommendations."
         }

@@ -125,7 +125,8 @@ class VoiceTransactionViewModel {
 
         state = .saving
 
-        let formatter = ISO8601DateFormatter()
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
         let source = transcribedText.isEmpty ? "manual" : "voice"
 
         let request = SaveTransactionRequest(
