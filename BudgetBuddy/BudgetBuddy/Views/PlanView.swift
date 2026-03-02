@@ -7,7 +7,6 @@
 
 import SwiftUI
 
-@MainActor
 struct PlanView: View {
     @Bindable var viewModel: SpendingPlanViewModel
     @Bindable var walletViewModel: WalletViewModel

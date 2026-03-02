@@ -7,7 +7,6 @@
 
 import SwiftUI
 
-@MainActor
 struct ExpensesView: View {
     @Bindable var viewModel: ExpensesViewModel
     @State private var showVoiceRecording = false

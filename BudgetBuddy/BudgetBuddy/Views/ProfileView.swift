@@ -7,7 +7,6 @@
 
 import SwiftUI
 
-@MainActor
 struct ProfileView: View {
     @State private var viewModel = ProfileViewModel()
     @State private var showPlaidLink = false
