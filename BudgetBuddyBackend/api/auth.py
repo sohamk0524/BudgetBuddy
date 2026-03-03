@@ -24,39 +24,28 @@ auth_bp = Blueprint('auth', __name__)
 client = Client(os.getenv('TWILIO_ACCOUNT_SID'), os.getenv('TWILIO_AUTH_TOKEN'))
 VERIFY_SERVICE_ID = os.getenv('TWILIO_VERIFY_SERVICE_ID')
 
-# Demo account for App Store review
-DEMO_PHONE = "+15550001234"
-DEMO_OTP   = "123456"
+# Add this variable to your .env: FLASK_ENV=development
+FLASK_ENV = os.getenv('FLASK_ENV', 'production')
 
 @auth_bp.route("/v1/send_sms_code", methods=["POST"])
 def send_sms_code():
     data = request.get_json()
-    if not data or "phone_number" not in data:
-        return jsonify({"error": "Phone number is required"}), 400
-    
     phone_number = data.get("phone_number", "").strip()
 
-    # 1. Validation for phone format
-    if not phone_number.startswith("+") or not (10 <= len(phone_number) <= 16):
-        return jsonify({"error": "Invalid format. Use E.164 (e.g., +14155551234)"}), 400
+    # --- DEV BYPASS ---
+    if FLASK_ENV == 'development' and phone_number == "+15005550006":
+        return jsonify({"status": "pending", "message": "DEV MODE: Use code 123456"})
+    # ------------------
 
-    # 2. Handle Demo Account
-    if phone_number == DEMO_PHONE:
-        return jsonify({"status": "pending", "message": "Demo mode active"})
-
-    # 3. Handle Real Twilio Verify
     try:
         verification = client.verify \
             .v2 \
             .services(VERIFY_SERVICE_ID) \
             .verifications \
             .create(to=phone_number, channel='sms')
-        
         return jsonify({"status": verification.status})
-    except TwilioRestException as e:
-        return jsonify({"error": f"Twilio error: {e.msg}"}), e.status
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": str(e)}), 400
 
 @auth_bp.route("/v1/verify_code", methods=["POST"])
 def verify_code():
@@ -64,41 +53,28 @@ def verify_code():
     phone_number = data.get("phone_number", "").strip()
     code = data.get("code", "").strip()
 
-    if not phone_number or not code:
-        return jsonify({"error": "Phone and code required"}), 400
-
-    # 1. Check for Demo Account bypass
-    is_approved = False
-    if phone_number == DEMO_PHONE and code == DEMO_OTP:
-        is_approved = True
+    # --- DEV BYPASS ---
+    if FLASK_ENV == 'development' and phone_number == "+15005550006" and code == "123456":
+        approved = True
     else:
-        # 2. Check with Twilio Verify
         try:
-            verification_check = client.verify \
-                .v2 \
-                .services(VERIFY_SERVICE_ID) \
-                .verification_checks \
-                .create(to=phone_number, code=code)
-            is_approved = (verification_check.status == "approved")
-        except Exception as e:
-            return jsonify({"error": f"Verification failed: {str(e)}"}), 400
+            check = client.verify.v2.services(VERIFY_SERVICE_ID) \
+                .verification_checks.create(to=phone_number, code=code)
+            approved = (check.status == "approved")
+        except Exception:
+            approved = False
+    # ------------------
 
-    # 3. Process Login/Registration
-    if is_approved:
-        user = get_user_by_phone(phone_number)
-        if not user:
-            user = create_user(phone_number)
-
-        user_id = user.key.id
-        profile = get_profile(user_id)
-
+    if approved:
+        user = get_user_by_phone(phone_number) or create_user(phone_number)
+        profile = get_profile(user.key.id)
         return jsonify({
-            "token": user_id,
+            "token": user.key.id,
             "hasProfile": profile is not None,
             "name": user.get('name'),
         })
     
-    return jsonify({"error": "Invalid or expired code"}), 401
+    return jsonify({"error": "Invalid code"}), 401
 
 @auth_bp.route("/v1/user", methods=["DELETE"])
 def delete_user():
