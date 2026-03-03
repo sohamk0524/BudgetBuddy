@@ -29,6 +29,19 @@ struct OnboardingWizardView: View {
         !name.trimmingCharacters(in: .whitespaces).isEmpty
     }
 
+    /// Returns an error message if the given page has incomplete required fields, nil if valid.
+    private func validationMessage(for page: Int) -> String? {
+        switch page {
+        case 0:
+            if name.trimmingCharacters(in: .whitespaces).isEmpty {
+                return "Please enter your name to continue."
+            }
+        default:
+            break
+        }
+        return nil
+    }
+
     var body: some View {
         ZStack {
             Color.appBackground
@@ -95,6 +108,15 @@ struct OnboardingWizardView: View {
 
                 Spacer()
 
+                // Error Message (from server)
+                if let error = authManager.errorMessage {
+                    Text(error)
+                        .font(.roundedCaption)
+                        .foregroundStyle(Color.danger)
+                        .padding(.horizontal, 24)
+                        .padding(.bottom, 8)
+                }
+
                 // Navigation Buttons
                 HStack(spacing: 16) {
                     // Back Button
@@ -139,18 +161,23 @@ struct OnboardingWizardView: View {
                     }
                     .background(Color.accent)
                     .clipShape(RoundedRectangle(cornerRadius: 12))
-                    .disabled(currentPage == totalPages - 1 && !canFinish)
-                    .opacity(currentPage == totalPages - 1 && !canFinish ? 0.6 : 1.0)
+                    .disabled(validationMessage(for: currentPage) != nil)
+                    .opacity(validationMessage(for: currentPage) != nil ? 0.6 : 1.0)
                 }
                 .padding(.horizontal, 24)
                 .padding(.bottom, 32)
-
-                // Error Message
-                if let error = authManager.errorMessage {
-                    Text(error)
-                        .font(.roundedCaption)
-                        .foregroundStyle(Color.danger)
-                        .padding(.bottom, 16)
+            }
+        }
+        .onChange(of: currentPage) { oldPage, newPage in
+            // Guard against swiping past a page with validation errors
+            if newPage > oldPage {
+                for page in oldPage..<newPage {
+                    if validationMessage(for: page) != nil {
+                        withAnimation {
+                            currentPage = page
+                        }
+                        return
+                    }
                 }
             }
         }
@@ -170,6 +197,17 @@ struct OnboardingWizardView: View {
 
     private func finishOnboarding() {
         let trimmedName = name.trimmingCharacters(in: .whitespaces)
+
+        // Final validation: find the first page with an error and navigate there
+        for page in 0..<totalPages {
+            if validationMessage(for: page) != nil {
+                withAnimation {
+                    currentPage = page
+                }
+                return
+            }
+        }
+
         let limit = Double(weeklySpendingLimit) ?? 0
 
         Task {
@@ -272,15 +310,17 @@ struct SchoolSelectionPage: View {
     @Binding var selectedSchool: String
 
     private let options = [
-        ("uc_berkeley", "UC Berkeley"),
         ("uc_davis", "UC Davis"),
+        ("uc_berkeley", "UC Berkeley"),
         ("uc_irvine", "UC Irvine"),
         ("uc_los_angeles", "UC Los Angeles"),
         ("uc_merced", "UC Merced"),
         ("uc_riverside", "UC Riverside"),
         ("uc_san_diego", "UC San Diego"),
         ("uc_santa_barbara", "UC Santa Barbara"),
-        ("uc_santa_cruz", "UC Santa Cruz")
+        ("uc_santa_cruz", "UC Santa Cruz"),
+        ("sac_state", "Sacramento State"),
+        ("sjsu", "San Jose State")
     ]
 
     var body: some View {
@@ -289,7 +329,7 @@ struct SchoolSelectionPage: View {
                 .font(.system(size: 56))
                 .foregroundStyle(Color.accent)
 
-            Text("Which UC Do You Attend?")
+            Text("Which School Do You Attend?")
                 .font(.roundedHeadline)
                 .foregroundStyle(Color.textPrimary)
 

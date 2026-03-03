@@ -123,21 +123,32 @@ struct OTPView: View {
     }
 
     private func handleDigitChange(index: Int, oldValue: String, newValue: String) {
-        // Only allow single digit
-        if newValue.count > 1 {
-            otpDigits[index] = String(newValue.suffix(1))
+        // Filter to digits only
+        let digits = newValue.filter { $0.isNumber }
+
+        // Handle backspace: move focus back when field becomes empty
+        if digits.isEmpty {
+            otpDigits[index] = ""
+            if index > 0 {
+                focusedField = index - 1
+            }
             return
         }
 
-        // Only allow digits
-        if !newValue.isEmpty && !newValue.allSatisfy({ $0.isNumber }) {
-            otpDigits[index] = oldValue
-            return
-        }
-
-        // Auto-advance to next field
-        if !newValue.isEmpty && index < 5 {
-            focusedField = index + 1
+        // Handle paste / auto-fill: distribute digits across fields starting at this index
+        if digits.count > 1 {
+            let digitChars = Array(digits)
+            for i in 0..<min(digitChars.count, 6 - index) {
+                otpDigits[index + i] = String(digitChars[i])
+            }
+            let nextFocus = min(index + digitChars.count, 5)
+            focusedField = nextFocus
+        } else {
+            otpDigits[index] = digits
+            // Auto-advance to next field
+            if index < 5 {
+                focusedField = index + 1
+            }
         }
 
         // Auto-submit when complete
