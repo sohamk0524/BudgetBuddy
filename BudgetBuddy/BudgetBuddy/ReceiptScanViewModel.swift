@@ -79,6 +79,7 @@ class ReceiptScanViewModel {
             let response = try await APIService.shared.attachReceipt(userId: userId, result: finalResult, date: date)
             attachResponse = response
             state = .done
+            NotificationCenter.default.post(name: .transactionAdded, object: nil)
         } catch {
             state = .error("Failed to save receipt: \(error.localizedDescription)")
         }

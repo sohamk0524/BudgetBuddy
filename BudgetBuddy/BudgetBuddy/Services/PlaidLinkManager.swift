@@ -166,4 +166,5 @@ class PlaidLinkManager {
 extension Notification.Name {
     static let plaidBankLinked = Notification.Name("plaidBankLinked")
     static let onboardingCompleted = Notification.Name("onboardingCompleted")
+    static let transactionAdded = Notification.Name("transactionAdded")
 }

@@ -10,6 +10,7 @@ import SwiftUI
 
 struct OnboardingWizardView: View {
     @State private var currentPage = 0
+    @FocusState private var isTextFieldFocused: Bool
 
     // Question fields
     @State private var name: String = ""
@@ -62,7 +63,7 @@ struct OnboardingWizardView: View {
                 // Pages
                 TabView(selection: $currentPage) {
                     // Page 0: Name
-                    NamePage(name: $name)
+                    NamePage(name: $name, isFocused: $isTextFieldFocused)
                         .tag(0)
 
                     // Page 1: Student Status
@@ -75,7 +76,7 @@ struct OnboardingWizardView: View {
                             .tag(2)
 
                         // Page 3: Weekly Spending Limit
-                        WeeklySpendingLimitPage(weeklyLimit: $weeklySpendingLimit)
+                        WeeklySpendingLimitPage(weeklyLimit: $weeklySpendingLimit, isFocused: $isTextFieldFocused)
                             .tag(3)
 
                         // Page 4: Strictness Level
@@ -83,7 +84,7 @@ struct OnboardingWizardView: View {
                             .tag(4)
                     } else {
                         // Page 2: Weekly Spending Limit
-                        WeeklySpendingLimitPage(weeklyLimit: $weeklySpendingLimit)
+                        WeeklySpendingLimitPage(weeklyLimit: $weeklySpendingLimit, isFocused: $isTextFieldFocused)
                             .tag(2)
 
                         // Page 3: Strictness Level
@@ -100,6 +101,7 @@ struct OnboardingWizardView: View {
                     // Back Button
                     if currentPage > 0 {
                         Button {
+                            isTextFieldFocused = false
                             withAnimation {
                                 currentPage -= 1
                             }
@@ -116,6 +118,7 @@ struct OnboardingWizardView: View {
 
                     // Next / Finish Button
                     Button {
+                        isTextFieldFocused = false
                         if currentPage < totalPages - 1 {
                             withAnimation {
                                 currentPage += 1
@@ -188,6 +191,7 @@ struct OnboardingWizardView: View {
 
 struct NamePage: View {
     @Binding var name: String
+    var isFocused: FocusState<Bool>.Binding
 
     var body: some View {
         VStack(spacing: 24) {
@@ -213,6 +217,7 @@ struct NamePage: View {
                 .background(Color.surface)
                 .clipShape(RoundedRectangle(cornerRadius: 16))
                 .padding(.horizontal, 48)
+                .focused(isFocused)
 
             Spacer()
         }
@@ -322,6 +327,7 @@ struct SchoolSelectionPage: View {
 
 struct WeeklySpendingLimitPage: View {
     @Binding var weeklyLimit: String
+    var isFocused: FocusState<Bool>.Binding
 
     var body: some View {
         VStack(spacing: 24) {
@@ -349,6 +355,7 @@ struct WeeklySpendingLimitPage: View {
                     .foregroundStyle(Color.textPrimary)
                     .keyboardType(.decimalPad)
                     .multilineTextAlignment(.center)
+                    .focused(isFocused)
             }
             .padding()
             .background(Color.surface)

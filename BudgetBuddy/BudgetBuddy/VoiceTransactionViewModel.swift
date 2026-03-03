@@ -145,6 +145,7 @@ class VoiceTransactionViewModel {
             let response = try await apiService.saveManualTransaction(request: request)
             if response.success {
                 state = .success
+                NotificationCenter.default.post(name: .transactionAdded, object: nil)
             } else {
                 state = .error("Failed to save transaction")
             }
