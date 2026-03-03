@@ -144,7 +144,7 @@ def _compare_spending(
             nudges.append({
                 "type": "spending_reduction",
                 "title": f"{display} Over Budget",
-                "message": f"You've spent ${actual_amount:.0f} of your ${plan_amount:.0f} {display} budget. Consider cutting back ${overspend:.0f} this month.",
+                "message": f"You're ${overspend:.0f} over your ${plan_amount:.0f} {display} budget — time to rein it in!",
                 "category": display,
                 "potentialSavings": round(overspend, 2)
             })
@@ -153,8 +153,8 @@ def _compare_spending(
             display = _display_name(plan_name)
             nudges.append({
                 "type": "positive_reinforcement",
-                "title": f"Great job on {display}!",
-                "message": f"You're ${saved:.0f} under your {display} budget. Keep it up!",
+                "title": f"Crushing it on {display}!",
+                "message": f"${saved:.0f} under budget — nice work, keep it going!",
                 "category": display,
                 "potentialSavings": 0
             })
@@ -178,7 +178,7 @@ def _get_goal_nudges(user_id: int) -> List[Dict[str, Any]]:
             return [{
                 "type": "goal_reminder",
                 "title": "Stay on track",
-                "message": f"Your plan allocates ${total_savings:.0f}/mo toward savings. Make sure to set it aside early in the month.",
+                "message": f"You've got ${total_savings:.0f}/mo earmarked for savings — set it aside early!",
                 "potentialSavings": 0,
             }]
     except (json.JSONDecodeError, TypeError):

@@ -134,15 +134,15 @@ def _analyze_food_spending(food_txns: List[Dict[str, Any]]) -> Optional[Dict[str
     }
 
 
-_FOOD_TIP_PROMPT = """You are a student budget assistant. From these search results, extract ONE specific local food tip for a student near {school} who frequently eats at: {merchants}.
+_FOOD_TIP_PROMPT = """You are a student budget assistant with an upbeat, friendly tone. From these search results, extract ONE specific local food tip for a student near {school} who frequently eats at: {merchants}.
 
 Search results:
 {context}
 
-Return ONLY a single sentence naming a specific restaurant, deal, or discount that serves similar food to what the student already buys. Examples of good responses:
-- "Ike's offers student discounts, and Woodstock's has $5 lunch slices"
-- "Try Taqueria Davis for $8 burritos instead of $12 Chipotle bowls"
-- "Shah's Halal has $7 combo plates — cheaper than McDonald's"
+Return ONLY a single short sentence (max 15 words) naming a specific restaurant, deal, or discount. Sound like an excited friend sharing a find! Examples:
+- "Woodstock's has $5 lunch slices — way cheaper!"
+- "Try Taqueria Davis for $8 burritos instead of $12 Chipotle bowls!"
+- "Shah's Halal does $7 combo plates — better deal than McDonald's!"
 
 Pick the result most relevant to the type of food the student already eats. Do NOT return generic advice. If truly nothing specific is found, return: NONE"""
 
@@ -239,8 +239,8 @@ def _get_school_food_tip(user_id: int, analysis: Dict[str, Any]) -> Optional[str
         if not tip or "NONE" in tip.upper() or len(tip) < 10:
             return None
 
-        if len(tip) > 120:
-            tip = tip[:117].rsplit(" ", 1)[0] + "..."
+        if len(tip) > 90:
+            tip = tip[:87].rsplit(" ", 1)[0] + "..."
 
         print(f"[food_tip] Extracted: {tip}")
         return tip
