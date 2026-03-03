@@ -162,6 +162,13 @@ class ExpensesViewModel {
                 offset: 0
             )
             allTransactions = response.transactions
+
+            // Update daily reminder based on today's activity
+            if hasLoggedTransactionToday() {
+                NotificationManager.shared.cancelTodayNotification()
+            } else {
+                NotificationManager.shared.scheduleDailyReminder(hasLoggedToday: false)
+            }
         } catch {
             print("Failed to fetch expenses: \(error)")
             errorMessage = "Unable to load expenses"
@@ -252,6 +259,8 @@ class ExpensesViewModel {
                 essentialAmount: response.transaction.essentialAmount,
                 discretionaryAmount: response.transaction.discretionaryAmount
             )
+            // Classification means activity — cancel today's reminder
+            NotificationManager.shared.cancelTodayNotification()
 
             // If bulk auto-apply happened, refresh to capture all changed records
             if autoApplied > 0 {
@@ -287,6 +296,9 @@ class ExpensesViewModel {
         do {
             _ = try await classifyTransactionForSheet(transactionId: transactionId, subCategory: subCategory, essentialRatio: essentialRatio)
             showClassificationSheet = false
+
+            // Classification means activity — cancel today's reminder
+            NotificationManager.shared.cancelTodayNotification()
         } catch {
             print("Failed to classify transaction: \(error)")
         }
@@ -336,6 +348,14 @@ class ExpensesViewModel {
     }
 
     // MARK: - Private Helpers
+
+    func hasLoggedTransactionToday() -> Bool {
+        let calendar = Calendar.current
+        return allTransactions.contains { txn in
+            guard let dateStr = txn.date, let date = Self.parseDate(dateStr) else { return false }
+            return calendar.isDateInToday(date)
+        }
+    }
 
     private func applyClassificationLocally(
         transactionId: Int,

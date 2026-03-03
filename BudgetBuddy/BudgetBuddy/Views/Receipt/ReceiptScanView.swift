@@ -8,6 +8,7 @@
 import SwiftUI
 import PhotosUI
 
+@MainActor
 struct ReceiptScanView: View {
     @Bindable var viewModel: ReceiptScanViewModel
     let onDismiss: () -> Void

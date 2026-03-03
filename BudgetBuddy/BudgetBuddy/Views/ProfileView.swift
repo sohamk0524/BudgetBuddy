@@ -7,6 +7,7 @@
 
 import SwiftUI
 
+@MainActor
 struct ProfileView: View {
     @State private var viewModel = ProfileViewModel()
     @State private var showPlaidLink = false
@@ -20,6 +21,9 @@ struct ProfileView: View {
 
                 // MARK: - Financial Profile
                 financialProfileSection
+
+                // MARK: - Notification Settings
+                notificationSettingsSection
 
                 // MARK: - Linked Accounts
                 linkedAccountsSection
@@ -206,6 +210,29 @@ struct ProfileView: View {
             .frame(width: 160, alignment: .trailing)
         }
         .padding(.vertical, 4)
+    }
+
+    // MARK: - Notification Settings Section
+
+    private var notificationSettingsSection: some View {
+        NavigationLink {
+            NotificationSettingsView()
+        } label: {
+            HStack {
+                Label("Notifications", systemImage: "bell")
+                    .font(.roundedHeadline)
+                    .foregroundStyle(Color.textPrimary)
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .font(.roundedCaption)
+                    .foregroundStyle(Color.textSecondary)
+            }
+            .padding()
+            .background(Color.surface)
+            .clipShape(RoundedRectangle(cornerRadius: 16))
+        }
     }
 
     // MARK: - Linked Accounts Section

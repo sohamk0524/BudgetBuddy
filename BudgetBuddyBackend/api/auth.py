@@ -2,17 +2,13 @@
 Auth Blueprint — SMS OTP login and user deletion.
 """
 
-import random
-import string
-from datetime import datetime, timedelta
-
+import os
 from flask import Blueprint, jsonify, request
+from twilio.rest import Client
+from twilio.base.exceptions import TwilioRestException
+from dotenv import load_dotenv
 
 from db_models import (
-    create_otp,
-    get_pending_otp,
-    mark_otp_verified,
-    delete_otps_for_phone,
     get_user_by_phone,
     create_user,
     get_profile,
@@ -20,87 +16,86 @@ from db_models import (
     delete_user_cascade,
 )
 
+load_dotenv()
+
 auth_bp = Blueprint('auth', __name__)
 
-# Demo account for App Store review — always accepts a fixed OTP, no SMS sent.
+# --- App Store Review Credentials ---
+# These MUST work in production so reviewers can enter your app.
 DEMO_PHONE = "+15550001234"
 DEMO_OTP   = "123456"
 
+# --- Dev/Local Credentials ---
+# Used for your local testing with FLASK_ENV=development
+MAGIC_PHONE = "+15005550006"
+MAGIC_OTP   = "123456"
 
-def send_via_twilio(phone_number: str, code: str):
-    """Placeholder for Twilio SMS. Prints to console in development."""
-    print(f"\n{'='*50}")
-    print(f"SMS to {phone_number}: Your BudgetBuddy code is {code}")
-    print(f"{'='*50}\n")
-
+# Credentials
+client = Client(os.getenv('TWILIO_ACCOUNT_SID'), os.getenv('TWILIO_AUTH_TOKEN'))
+VERIFY_SERVICE_ID = os.getenv('TWILIO_VERIFY_SERVICE_ID')
+FLASK_ENV = os.getenv('FLASK_ENV', 'production')
 
 @auth_bp.route("/v1/send_sms_code", methods=["POST"])
 def send_sms_code():
     data = request.get_json()
-    if not data:
-        return jsonify({"error": "Request body must be JSON"}), 400
-
     phone_number = data.get("phone_number", "").strip()
-    if not phone_number:
-        return jsonify({"error": "Phone number is required"}), 400
 
-    if not phone_number.startswith("+") or not (10 <= len(phone_number) <= 16):
-        return jsonify({"error": "Invalid phone number format. Use E.164 format (e.g., +14155551234)"}), 400
+    # 1. Check for Demo Account (Always allow in Prod and Dev)
+    if phone_number == DEMO_PHONE:
+        return jsonify({"status": "pending", "message": "Demo mode: use 123456"})
 
-    is_demo = (phone_number == DEMO_PHONE)
-    code = DEMO_OTP if is_demo else ''.join(random.choices(string.digits, k=6))
-    expires_at = datetime.utcnow() + timedelta(minutes=5)
+    # 2. Check for Dev "Magic" Number
+    if FLASK_ENV == 'development' and phone_number == MAGIC_PHONE:
+        return jsonify({"status": "pending", "message": "DEV MODE: Use code 123456"})
 
-    # Invalidate existing unused codes
-    delete_otps_for_phone(phone_number)
-
-    create_otp(phone_number, code, expires_at)
-    if not is_demo:
-        send_via_twilio(phone_number, code)
-
-    return jsonify({"status": "success"})
-
+    # 3. Real Twilio Verify Request
+    try:
+        verification = client.verify \
+            .v2 \
+            .services(VERIFY_SERVICE_ID) \
+            .verifications \
+            .create(to=phone_number, channel='sms')
+        return jsonify({"status": verification.status})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
 
 @auth_bp.route("/v1/verify_code", methods=["POST"])
 def verify_code():
     data = request.get_json()
-    if not data:
-        return jsonify({"error": "Request body must be JSON"}), 400
-
     phone_number = data.get("phone_number", "").strip()
     code = data.get("code", "").strip()
 
-    if not phone_number or not code:
-        return jsonify({"error": "Phone number and code are required"}), 400
+    approved = False
 
-    otp = get_pending_otp(phone_number)
-    if not otp:
-        return jsonify({"error": "No verification code found. Please request a new one."}), 400
+    # 1. Validate Demo Account
+    if phone_number == DEMO_PHONE and code == DEMO_OTP:
+        approved = True
 
-    expires_at = otp['expires_at']
-    if hasattr(expires_at, 'tzinfo') and expires_at.tzinfo is not None:
-        expires_at = expires_at.replace(tzinfo=None)
-    if datetime.utcnow() > expires_at:
-        return jsonify({"error": "Verification code has expired. Please request a new one."}), 400
+    # 2. Validate Dev Magic Number
+    elif FLASK_ENV == 'development' and phone_number == MAGIC_PHONE and code == MAGIC_OTP:
+        approved = True
 
-    if otp['code'] != code:
-        return jsonify({"error": "Invalid verification code"}), 401
+    # 3. Validate via Twilio Verify
+    else:
+        try:
+            check = client.verify.v2.services(VERIFY_SERVICE_ID) \
+                .verification_checks.create(to=phone_number, code=code)
+            approved = (check.status == "approved")
+        except Exception:
+            approved = False
 
-    mark_otp_verified(otp.key)
-
-    user = get_user_by_phone(phone_number)
-    if not user:
-        user = create_user(phone_number)
-
-    user_id = user.key.id
-    profile = get_profile(user_id)
-
-    return jsonify({
-        "token": user_id,
-        "hasProfile": profile is not None,
-        "name": user.get('name'),
-    })
-
+    if approved:
+        # Create user if they don't exist
+        user = get_user_by_phone(phone_number) or create_user(phone_number)
+        profile = get_profile(user.key.id)
+        
+        return jsonify({
+            "token": user.key.id,
+            "hasProfile": profile is not None,
+            "name": user.get('name'),
+        })
+    
+    return jsonify({"error": "Invalid code"}), 401
 
 @auth_bp.route("/v1/user", methods=["DELETE"])
 def delete_user():
@@ -110,11 +105,9 @@ def delete_user():
 
     try:
         user_id = int(user_id)
+        user = get_user(user_id)
+        if user:
+            delete_user_cascade(user_id)
+        return "", 204
     except ValueError:
         return jsonify({"error": "Invalid userId"}), 400
-
-    user = get_user(user_id)
-    if user:
-        delete_user_cascade(user_id)
-
-    return "", 204
