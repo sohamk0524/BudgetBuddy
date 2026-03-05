@@ -32,7 +32,7 @@ actor APIService {
     ///   - text: The user's message
     ///   - userId: The authenticated user's ID (from AuthManager.authToken)
     /// - Returns: An AssistantResponse with text and optional visual component
-    func sendMessage(text: String, userId: Int?) async throws -> AssistantResponse {
+    func sendMessage(text: String, userId: String?) async throws -> AssistantResponse {
         let url = baseURL.appendingPathComponent("chat")
 
         var request = URLRequest(url: url)
@@ -67,7 +67,7 @@ actor APIService {
     ///   - fileURL: Local URL to the PDF or CSV file
     ///   - userId: The authenticated user's ID (statement will be saved if provided)
     /// - Returns: An AssistantResponse with analysis and optional visual component
-    func uploadStatement(fileURL: URL, userId: Int?) async throws -> AssistantResponse {
+    func uploadStatement(fileURL: URL, userId: String?) async throws -> AssistantResponse {
         let url = baseURL.appendingPathComponent("upload-statement")
 
         // Read file data
@@ -118,9 +118,9 @@ actor APIService {
     /// Gets the financial summary derived from the user's saved statement
     /// - Parameter userId: The authenticated user's ID
     /// - Returns: A FinancialSummary with net worth, safe to spend, and statement info
-    func getFinancialSummary(userId: Int) async throws -> FinancialSummary {
+    func getFinancialSummary(userId: String) async throws -> FinancialSummary {
         var urlComponents = URLComponents(url: baseURL.appendingPathComponent("user/financial-summary"), resolvingAgainstBaseURL: false)!
-        urlComponents.queryItems = [URLQueryItem(name: "userId", value: String(userId))]
+        urlComponents.queryItems = [URLQueryItem(name: "userId", value: userId)]
 
         guard let url = urlComponents.url else {
             throw APIError.invalidResponse
@@ -142,9 +142,9 @@ actor APIService {
 
     /// Deletes the user's saved statement
     /// - Parameter userId: The authenticated user's ID
-    func deleteStatement(userId: Int) async throws {
+    func deleteStatement(userId: String) async throws {
         var urlComponents = URLComponents(url: baseURL.appendingPathComponent("user/statement"), resolvingAgainstBaseURL: false)!
-        urlComponents.queryItems = [URLQueryItem(name: "userId", value: String(userId))]
+        urlComponents.queryItems = [URLQueryItem(name: "userId", value: userId)]
 
         guard let url = urlComponents.url else {
             throw APIError.invalidResponse
@@ -192,7 +192,7 @@ actor APIService {
     ///   - userId: The authenticated user's ID
     ///   - planInput: The data collected from the question flow
     /// - Returns: A SpendingPlanResponse with the generated plan
-    func generatePlan(userId: Int, planInput: SpendingPlanInput) async throws -> SpendingPlanResponse {
+    func generatePlan(userId: String, planInput: SpendingPlanInput) async throws -> SpendingPlanResponse {
         let url = baseURL.appendingPathComponent("generate-plan")
 
         var request = URLRequest(url: url)
@@ -283,7 +283,7 @@ actor APIService {
     /// Gets the user's most recent spending plan
     /// - Parameter userId: The authenticated user's ID
     /// - Returns: A GetPlanResponse with the plan if it exists
-    func getPlan(userId: Int) async throws -> GetPlanResponse {
+    func getPlan(userId: String) async throws -> GetPlanResponse {
         let url = baseURL.appendingPathComponent("get-plan/\(userId)")
 
         let (data, response) = try await URLSession.shared.data(from: url)
@@ -303,7 +303,7 @@ actor APIService {
     // MARK: - User Profile API
 
     /// Gets the user's profile including name, email, financial info, and linked accounts
-    func getUserProfile(userId: Int) async throws -> UserProfile {
+    func getUserProfile(userId: String) async throws -> UserProfile {
         let url = baseURL.appendingPathComponent("user/profile/\(userId)")
 
         let (data, response) = try await URLSession.shared.data(from: url)
@@ -317,7 +317,7 @@ actor APIService {
     }
 
     /// Updates the user's profile (partial update)
-    func updateUserProfile(userId: Int, update: UserProfileUpdateRequest) async throws {
+    func updateUserProfile(userId: String, update: UserProfileUpdateRequest) async throws {
         let url = baseURL.appendingPathComponent("user/profile/\(userId)")
 
         var request = URLRequest(url: url)
@@ -334,7 +334,7 @@ actor APIService {
     }
 
     /// Gets top spending categories
-    func getTopExpenses(userId: Int, days: Int = 30) async throws -> TopExpensesResponse {
+    func getTopExpenses(userId: String, days: Int = 30) async throws -> TopExpensesResponse {
         var urlComponents = URLComponents(url: baseURL.appendingPathComponent("user/top-expenses/\(userId)"), resolvingAgainstBaseURL: false)!
         urlComponents.queryItems = [URLQueryItem(name: "days", value: String(days))]
 
@@ -353,7 +353,7 @@ actor APIService {
     }
 
     /// Gets category preferences
-    func getCategoryPreferences(userId: Int) async throws -> CategoryPreferencesResponse {
+    func getCategoryPreferences(userId: String) async throws -> CategoryPreferencesResponse {
         let url = baseURL.appendingPathComponent("user/category-preferences/\(userId)")
 
         let (data, response) = try await URLSession.shared.data(from: url)
@@ -367,7 +367,7 @@ actor APIService {
     }
 
     /// Updates category preferences
-    func updateCategoryPreferences(userId: Int, categories: [String]) async throws {
+    func updateCategoryPreferences(userId: String, categories: [String]) async throws {
         let url = baseURL.appendingPathComponent("user/category-preferences/\(userId)")
 
         var request = URLRequest(url: url)
@@ -418,7 +418,7 @@ actor APIService {
     // MARK: - Expense Classification API
 
     /// Gets expenses with sub-category classification data
-    func getExpenses(userId: Int, startDate: String? = nil, endDate: String? = nil, category: String? = nil, subCategory: String? = nil, limit: Int = 100, offset: Int = 0) async throws -> ExpensesResponse {
+    func getExpenses(userId: String, startDate: String? = nil, endDate: String? = nil, category: String? = nil, subCategory: String? = nil, limit: Int = 100, offset: Int = 0) async throws -> ExpensesResponse {
         var urlComponents = URLComponents(url: baseURL.appendingPathComponent("expenses/\(userId)"), resolvingAgainstBaseURL: false)!
         var queryItems = [
             URLQueryItem(name: "limit", value: String(limit)),
@@ -440,7 +440,7 @@ actor APIService {
     }
 
     /// Classifies a merchant for a user (retroactive)
-    func classifyMerchant(userId: Int, merchantName: String, classification: String, essentialRatio: Double? = nil) async throws -> ClassifyMerchantResponse {
+    func classifyMerchant(userId: String, merchantName: String, classification: String, essentialRatio: Double? = nil) async throws -> ClassifyMerchantResponse {
         let url = baseURL.appendingPathComponent("merchant/classify")
 
         var request = URLRequest(url: url)
@@ -482,7 +482,7 @@ actor APIService {
     }
 
     /// Gets all merchant classifications for a user
-    func getMerchantClassifications(userId: Int) async throws -> MerchantClassificationsResponse {
+    func getMerchantClassifications(userId: String) async throws -> MerchantClassificationsResponse {
         let url = baseURL.appendingPathComponent("merchant/classifications/\(userId)")
 
         let (data, response) = try await URLSession.shared.data(from: url)
@@ -493,7 +493,7 @@ actor APIService {
     }
 
     /// Gets unclassified transactions sorted by merchant impact (round-robin)
-    func getUnclassifiedTransactions(userId: Int, limit: Int = 10) async throws -> UnclassifiedTransactionsResponse {
+    func getUnclassifiedTransactions(userId: String, limit: Int = 10) async throws -> UnclassifiedTransactionsResponse {
         var urlComponents = URLComponents(url: baseURL.appendingPathComponent("expenses/unclassified/\(userId)"), resolvingAgainstBaseURL: false)!
         urlComponents.queryItems = [URLQueryItem(name: "limit", value: String(limit))]
 
@@ -509,7 +509,7 @@ actor APIService {
     // MARK: - Device Token API
 
     /// Registers a device token for push notifications
-    func registerDeviceToken(userId: Int, token: String) async throws {
+    func registerDeviceToken(userId: String, token: String) async throws {
         let url = baseURL.appendingPathComponent("device/register")
 
         var request = URLRequest(url: url)
@@ -530,7 +530,7 @@ actor APIService {
     }
 
     /// Unregisters a device token (e.g., on logout)
-    func unregisterDeviceToken(userId: Int, token: String) async throws {
+    func unregisterDeviceToken(userId: String, token: String) async throws {
         let url = baseURL.appendingPathComponent("device/unregister")
 
         var request = URLRequest(url: url)
@@ -550,7 +550,7 @@ actor APIService {
     }
 
     /// Triggers LLM-based batch auto-classification for unclassified merchants
-    func autoClassifyMerchants(userId: Int) async throws -> AutoClassifyResponse {
+    func autoClassifyMerchants(userId: String) async throws -> AutoClassifyResponse {
         let url = baseURL.appendingPathComponent("expenses/auto-classify/\(userId)")
 
         var request = URLRequest(url: url)
@@ -567,7 +567,7 @@ actor APIService {
     // MARK: - Receipt API
 
     /// Uploads a receipt image for Claude Vision analysis
-    func analyzeReceipt(imageData: Data, userId: Int) async throws -> ReceiptAnalysisResult {
+    func analyzeReceipt(imageData: Data, userId: String) async throws -> ReceiptAnalysisResult {
         let url = baseURL.appendingPathComponent("receipt/analyze")
 
         let boundary = UUID().uuidString
@@ -600,7 +600,7 @@ actor APIService {
     }
 
     /// Attaches an analyzed receipt to an existing transaction or creates a new one
-    func attachReceipt(userId: Int, result: ReceiptAnalysisResult, date: String) async throws -> ReceiptAttachResponse {
+    func attachReceipt(userId: String, result: ReceiptAnalysisResult, date: String) async throws -> ReceiptAttachResponse {
         let url = baseURL.appendingPathComponent("receipt/attach")
 
         let requestBody = ReceiptAttachRequest(
@@ -627,7 +627,7 @@ actor APIService {
     }
 
     /// Gets smart nudges
-    func getNudges(userId: Int) async throws -> NudgesResponse {
+    func getNudges(userId: String) async throws -> NudgesResponse {
         let url = baseURL.appendingPathComponent("user/nudges/\(userId)")
 
         let (data, response) = try await URLSession.shared.data(from: url)
@@ -641,7 +641,7 @@ actor APIService {
     }
 
     /// Gets cached or fresh recommendations
-    func getRecommendations(userId: Int) async throws -> RecommendationsResponse {
+    func getRecommendations(userId: String) async throws -> RecommendationsResponse {
         let url = baseURL.appendingPathComponent("recommendations/\(userId)")
 
         let (data, response) = try await URLSession.shared.data(from: url)
@@ -655,7 +655,7 @@ actor APIService {
     }
 
     /// Force-generates fresh recommendations
-    func generateRecommendations(userId: Int, action: String = "general") async throws -> RecommendationsResponse {
+    func generateRecommendations(userId: String, action: String = "general") async throws -> RecommendationsResponse {
         let url = baseURL.appendingPathComponent("recommendations/generate")
 
         var request = URLRequest(url: url)

@@ -7,6 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A3E3160D2F5A12D9005BF54C /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = A3E3160C2F5A12D9005BF54C /* FirebaseAuth */; };
+		A3E3160F2F5A12D9005BF54C /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = A3E3160E2F5A12D9005BF54C /* FirebaseCore */; };
+		A3E316112F5A14B3005BF54C /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = A3E316102F5A14B2005BF54C /* GoogleService-Info.plist */; };
 		E18C83B82F54330900E66577 /* RecommendationsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C837D2F5432FF00E66577 /* RecommendationsViewModel.swift */; };
 		E18C83B92F54330900E66577 /* ChatBubbleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C837F2F54330000E66577 /* ChatBubbleView.swift */; };
 		E18C83BA2F54330900E66577 /* BurndownChartView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C83802F54330000E66577 /* BurndownChartView.swift */; };
@@ -78,6 +81,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		A3E316102F5A14B2005BF54C /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
 		E18C836C2F54305800E66577 /* BudgetBuddy.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BudgetBuddy.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		E18C83762F54305B00E66577 /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
 		E18C837D2F5432FF00E66577 /* RecommendationsViewModel.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = RecommendationsViewModel.swift; sourceTree = "<group>"; };
@@ -141,8 +145,10 @@
 			buildActionMask = 2147483647;
 			files = (
 				E18C83E92F54339700E66577 /* PhoneNumberKit in Frameworks */,
+				A3E3160F2F5A12D9005BF54C /* FirebaseCore in Frameworks */,
 				E18C83F02F5433AD00E66577 /* LinkKit in Frameworks */,
 				E18C83ED2F54339700E66577 /* PhoneNumberKit-Static in Frameworks */,
+				A3E3160D2F5A12D9005BF54C /* FirebaseAuth in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -176,6 +182,7 @@
 		E18C836E2F54305800E66577 /* BudgetBuddy */ = {
 			isa = PBXGroup;
 			children = (
+				A3E316102F5A14B2005BF54C /* GoogleService-Info.plist */,
 				E19B24982F55295A005C18DA /* ReceiptScanViewModel.swift */,
 				E18C83842F54330100E66577 /* APIService.swift */,
 				E18C83852F54330200E66577 /* AppConfig.swift */,
@@ -359,6 +366,8 @@
 				E18C83E82F54339700E66577 /* PhoneNumberKit */,
 				E18C83EC2F54339700E66577 /* PhoneNumberKit-Static */,
 				E18C83EF2F5433AD00E66577 /* LinkKit */,
+				A3E3160C2F5A12D9005BF54C /* FirebaseAuth */,
+				A3E3160E2F5A12D9005BF54C /* FirebaseCore */,
 			);
 			productName = BudgetBuddy;
 			productReference = E18C836C2F54305800E66577 /* BudgetBuddy.app */;
@@ -392,6 +401,7 @@
 			packageReferences = (
 				E18C83E72F54339700E66577 /* XCRemoteSwiftPackageReference "PhoneNumberKit" */,
 				E18C83EE2F5433AD00E66577 /* XCRemoteSwiftPackageReference "plaid-link-ios" */,
+				A3E3160B2F5A12D9005BF54C /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
 			);
 			productRefGroup = E18C836D2F54305800E66577 /* Products */;
 			projectDirPath = "";
@@ -409,6 +419,7 @@
 			files = (
 				E18C83C12F54330900E66577 /* Preview Assets.xcassets in Resources */,
 				E18C83BF2F54330900E66577 /* Assets.xcassets in Resources */,
+				A3E316112F5A14B3005BF54C /* GoogleService-Info.plist in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -689,6 +700,14 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		A3E3160B2F5A12D9005BF54C /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/firebase/firebase-ios-sdk";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 12.10.0;
+			};
+		};
 		E18C83E72F54339700E66577 /* XCRemoteSwiftPackageReference "PhoneNumberKit" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/marmelroy/PhoneNumberKit";
@@ -708,6 +727,16 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		A3E3160C2F5A12D9005BF54C /* FirebaseAuth */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A3E3160B2F5A12D9005BF54C /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAuth;
+		};
+		A3E3160E2F5A12D9005BF54C /* FirebaseCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A3E3160B2F5A12D9005BF54C /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseCore;
+		};
 		E18C83E82F54339700E66577 /* PhoneNumberKit */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = E18C83E72F54339700E66577 /* XCRemoteSwiftPackageReference "PhoneNumberKit" */;

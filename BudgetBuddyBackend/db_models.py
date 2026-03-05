@@ -32,23 +32,21 @@ def get_client() -> datastore.Client:
 # User
 # ---------------------------------------------------------------------------
 
-def get_user(user_id: int) -> Optional[datastore.Entity]:
+def get_user(user_id: str) -> Optional[datastore.Entity]:
     client = get_client()
     key = client.key('User', user_id)
     return client.get(key)
 
 
-def get_user_by_phone(phone: str) -> Optional[datastore.Entity]:
+def get_user_by_firebase_uid(firebase_uid: str) -> Optional[datastore.Entity]:
     client = get_client()
-    query = client.query(kind='User')
-    query.add_filter(filter=PropertyFilter('phone_number', '=', phone))
-    results = list(query.fetch(limit=1))
-    return results[0] if results else None
+    key = client.key('User', firebase_uid)
+    return client.get(key)
 
 
-def create_user(phone: str, name: str = None) -> datastore.Entity:
+def create_user(firebase_uid: str, phone: str = None, name: str = None) -> datastore.Entity:
     client = get_client()
-    key = client.key('User')
+    key = client.key('User', firebase_uid)
     entity = datastore.Entity(key=key)
     entity.update({
         'phone_number': phone,
@@ -59,7 +57,7 @@ def create_user(phone: str, name: str = None) -> datastore.Entity:
     return entity
 
 
-def update_user(user_id: int, **kwargs) -> bool:
+def update_user(user_id: str, **kwargs) -> bool:
     client = get_client()
     key = client.key('User', user_id)
     entity = client.get(key)
@@ -70,13 +68,9 @@ def update_user(user_id: int, **kwargs) -> bool:
     return True
 
 
-def delete_user_cascade(user_id: int):
+def delete_user_cascade(user_id: str):
     """Delete a user and all related Datastore entities."""
     client = get_client()
-    user = get_user(user_id)
-    if user:
-        delete_otps_for_phone(user['phone_number'])
-
     _delete_kind_for_user(client, 'FinancialProfile', user_id)
     _delete_kind_for_user(client, 'BudgetPlan', user_id)
 
@@ -91,7 +85,7 @@ def delete_user_cascade(user_id: int):
     client.delete(client.key('User', user_id))
 
 
-def _delete_kind_for_user(client: datastore.Client, kind: str, user_id: int):
+def _delete_kind_for_user(client: datastore.Client, kind: str, user_id: str):
     query = client.query(kind=kind)
     query.add_filter(filter=PropertyFilter('user_id', '=', user_id))
     keys = [e.key for e in query.fetch()]

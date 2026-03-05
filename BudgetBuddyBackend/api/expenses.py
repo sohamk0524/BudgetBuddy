@@ -77,7 +77,7 @@ def _get_account_ids_and_map(user_id):
     return account_ids, account_id_map
 
 
-@expenses_bp.route("/expenses/<int:user_id>", methods=["GET"])
+@expenses_bp.route("/expenses/<user_id>", methods=["GET"])
 def get_expenses(user_id):
     """
     Get expenses with sub-category classification data.
@@ -295,7 +295,6 @@ def classify_merchant():
             essential_ratio = 0.5
 
     normalized = normalize_merchant_name(merchant_name)
-    user_id = int(user_id)
 
     mc = get_merchant_classification(user_id, normalized)
     upsert_merchant_classification(
@@ -441,7 +440,7 @@ def classify_single_transaction(transaction_id):
     })
 
 
-@expenses_bp.route("/merchant/classifications/<int:user_id>", methods=["GET"])
+@expenses_bp.route("/merchant/classifications/<user_id>", methods=["GET"])
 def get_merchant_classifications(user_id):
     """Get all merchant classifications for a user."""
     user = get_user(user_id)
@@ -463,7 +462,7 @@ def get_merchant_classifications(user_id):
     })
 
 
-@expenses_bp.route("/expenses/unclassified/<int:user_id>", methods=["GET"])
+@expenses_bp.route("/expenses/unclassified/<user_id>", methods=["GET"])
 def get_unclassified_transactions(user_id):
     """Get individual unclassified transactions sorted by merchant impact, round-robin."""
     user = get_user(user_id)
@@ -590,7 +589,7 @@ def get_unclassified_transactions(user_id):
     return jsonify({"transactions": result_txns, "totalUnclassified": total_unclassified})
 
 
-@expenses_bp.route("/expenses/auto-classify/<int:user_id>", methods=["POST"])
+@expenses_bp.route("/expenses/auto-classify/<user_id>", methods=["POST"])
 def auto_classify_with_llm(user_id):
     """
     Trigger LLM-based batch classification for unclassified merchants.
@@ -678,11 +677,11 @@ def register_device_token():
     if not user_id or not token:
         return jsonify({"error": "userId and token are required"}), 400
 
-    user = get_user(int(user_id))
+    user = get_user(user_id)
     if not user:
         return jsonify({"error": "User not found"}), 404
 
-    upsert_device_token(int(user_id), token, platform=platform, is_active=True)
+    upsert_device_token(user_id, token, platform=platform, is_active=True)
     return jsonify({"success": True})
 
 
@@ -699,7 +698,7 @@ def unregister_device_token():
     if not user_id or not token:
         return jsonify({"error": "userId and token are required"}), 400
 
-    existing = get_device_token(int(user_id), token)
+    existing = get_device_token(user_id, token)
     if existing:
         existing['is_active'] = False
         get_client().put(existing)

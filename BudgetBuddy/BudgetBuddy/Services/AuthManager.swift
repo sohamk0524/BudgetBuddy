@@ -2,11 +2,14 @@
 //  AuthManager.swift
 //  BudgetBuddy
 //
-//  Manages user authentication state and API calls for SMS-based auth
+//  Manages user authentication state using Firebase Phone Auth.
+//  Firebase handles the SMS OTP flow client-side; we exchange the
+//  resulting ID token with our backend to get the app session.
 //
 
 import SwiftUI
 import Observation
+import FirebaseAuth
 
 // MARK: - Auth State
 
@@ -29,13 +32,11 @@ class AuthManager {
     var errorMessage: String?
 
     var isAuthenticated: Bool {
-        if case .authenticated = authState {
-            return true
-        }
+        if case .authenticated = authState { return true }
         return false
     }
 
-    var authToken: Int? {
+    var authToken: String? {
         didSet {
             if let token = authToken {
                 UserDefaults.standard.setValue(token, forKey: "authToken")
@@ -57,7 +58,6 @@ class AuthManager {
 
     private let baseURL = AppConfig.baseURL
 
-    /// Ephemeral session to avoid caching issues
     @ObservationIgnored
     private var session: URLSession = {
         let config = URLSessionConfiguration.ephemeral
@@ -65,9 +65,13 @@ class AuthManager {
         return URLSession(configuration: config)
     }()
 
+    /// Firebase verification ID stored between sendCode and verifyCode steps
+    @ObservationIgnored
+    private var verificationID: String?
+
     init() {
-        // Restore cached values for immediate UI — restoreSession() validates with backend
-        if let token = UserDefaults.standard.value(forKey: "authToken") as? Int {
+        // Restore cached token for immediate UI — restoreSession() validates with Firebase
+        if let token = UserDefaults.standard.string(forKey: "authToken") {
             self.authToken = token
             self.authState = .authenticated
         }
@@ -78,34 +82,30 @@ class AuthManager {
 
     // MARK: - Session Restore
 
-    /// Validates the saved token against the backend and refreshes user state.
-    /// Call once on app launch when a persisted token exists.
+    /// On app launch, re-checks Firebase current user and refreshes backend profile.
     func restoreSession() async {
-        guard let userId = authToken else { return }
+        guard Auth.auth().currentUser != nil, let userId = authToken else {
+            await MainActor.run { self.signOut() }
+            return
+        }
 
         do {
             let url = baseURL.appendingPathComponent("user/profile/\(userId)")
             let (data, response) = try await URLSession.shared.data(from: url)
 
-            guard let httpResponse = response as? HTTPURLResponse else {
-                throw AuthError.invalidResponse
-            }
+            guard let httpResponse = response as? HTTPURLResponse else { return }
 
             if httpResponse.statusCode == 200 {
-                let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+                let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
                 let name = json?["name"] as? String
                 let hasProfile = json?["profile"] != nil && !(json?["profile"] is NSNull)
-
                 await MainActor.run {
                     self.userName = name
                     self.needsOnboarding = !hasProfile
                     self.authState = .authenticated
                 }
             } else {
-                // User no longer exists on backend — clear local session
-                await MainActor.run {
-                    self.signOut()
-                }
+                await MainActor.run { self.signOut() }
             }
         } catch {
             // Network error — keep existing session so the app is usable offline
@@ -113,7 +113,7 @@ class AuthManager {
         }
     }
 
-    // MARK: - Send Verification Code
+    // MARK: - Send Verification Code (Firebase)
 
     func sendCode(phoneNumber: String) async {
         await MainActor.run {
@@ -122,52 +122,22 @@ class AuthManager {
         }
 
         do {
-            let url = baseURL.appendingPathComponent("v1/send_sms_code")
-            var request = URLRequest(url: url)
-            request.httpMethod = "POST"
-            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-
-            let body: [String: Any] = [
-                "phone_number": phoneNumber
-            ]
-            request.httpBody = try JSONSerialization.data(withJSONObject: body)
-
-            let (data, response) = try await session.data(for: request)
-
-            guard let httpResponse = response as? HTTPURLResponse else {
-                throw AuthError.invalidResponse
-            }
-
-            // Try to parse JSON response
-            let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
-
-            if httpResponse.statusCode == 200 {
-                await MainActor.run {
-                    self.currentPhoneNumber = phoneNumber
-                    self.authState = .verifyOTP(phoneNumber: phoneNumber)
-                    self.isLoading = false
-                }
-            } else {
-                let error = json?["error"] as? String ?? "Failed to send verification code (status: \(httpResponse.statusCode))"
-                await MainActor.run {
-                    self.errorMessage = error
-                    self.isLoading = false
-                }
-            }
-        } catch let urlError as URLError {
+            let id = try await PhoneAuthProvider.provider().verifyPhoneNumber(phoneNumber, uiDelegate: nil)
             await MainActor.run {
-                self.errorMessage = self.friendlyErrorMessage(for: urlError)
+                self.verificationID = id
+                self.currentPhoneNumber = phoneNumber
+                self.authState = .verifyOTP(phoneNumber: phoneNumber)
                 self.isLoading = false
             }
         } catch {
             await MainActor.run {
-                self.errorMessage = "Connection failed. Is the server running?"
+                self.errorMessage = self.friendlyFirebaseError(error)
                 self.isLoading = false
             }
         }
     }
 
-    // MARK: - Verify Code
+    // MARK: - Verify Code (Firebase + Backend)
 
     func verifyCode(phoneNumber: String, code: String) async {
         await MainActor.run {
@@ -175,73 +145,77 @@ class AuthManager {
             errorMessage = nil
         }
 
-        do {
-            let url = baseURL.appendingPathComponent("v1/verify_code")
-            var request = URLRequest(url: url)
-            request.httpMethod = "POST"
-            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-
-            let body: [String: Any] = [
-                "phone_number": phoneNumber,
-                "code": code
-            ]
-            request.httpBody = try JSONSerialization.data(withJSONObject: body)
-
-            let (data, response) = try await session.data(for: request)
-
-            guard let httpResponse = response as? HTTPURLResponse else {
-                throw AuthError.invalidResponse
-            }
-
-            let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
-
-            if httpResponse.statusCode == 200 {
-                guard let token = json?["token"] as? Int,
-                      let hasProfile = json?["hasProfile"] as? Bool else {
-                    throw AuthError.invalidResponse
-                }
-
-                let name = json?["name"] as? String
-
-                await MainActor.run {
-                    self.authToken = token
-                    self.userName = name
-                    self.authState = .authenticated
-                    self.needsOnboarding = !hasProfile
-                    self.isLoading = false
-                }
-            } else {
-                let error = json?["error"] as? String ?? "Verification failed"
-                await MainActor.run {
-                    self.errorMessage = error
-                    self.isLoading = false
-                }
-            }
-        } catch let urlError as URLError {
+        guard let verificationID else {
             await MainActor.run {
-                self.errorMessage = self.friendlyErrorMessage(for: urlError)
+                self.errorMessage = "Session expired. Please request a new code."
+                self.isLoading = false
+            }
+            return
+        }
+
+        do {
+            // 1. Exchange code for Firebase credential
+            let credential = PhoneAuthProvider.provider().credential(
+                withVerificationID: verificationID,
+                verificationCode: code
+            )
+
+            // 2. Sign in to Firebase
+            let result = try await Auth.auth().signIn(with: credential)
+
+            // 3. Get Firebase ID token and send to our backend
+            let idToken = try await result.user.getIDToken()
+            try await exchangeFirebaseToken(idToken)
+
+        } catch let authError as NSError where authError.domain == AuthErrorDomain {
+            await MainActor.run {
+                self.errorMessage = self.friendlyFirebaseError(authError)
                 self.isLoading = false
             }
         } catch {
             await MainActor.run {
-                self.errorMessage = "Connection failed. Is the server running?"
+                self.errorMessage = error.localizedDescription
                 self.isLoading = false
             }
         }
     }
 
-    // MARK: - Error Helpers
+    // MARK: - Backend Token Exchange
 
-    private func friendlyErrorMessage(for error: URLError) -> String {
-        switch error.code {
-        case .notConnectedToInternet:
-            return "No internet connection"
-        case .cannotConnectToHost, .cannotFindHost:
-            return "Cannot connect to server. Make sure the backend is running."
-        case .timedOut:
-            return "Request timed out. Please try again."
-        default:
-            return "Network error: \(error.localizedDescription)"
+    private func exchangeFirebaseToken(_ idToken: String) async throws {
+        let url = baseURL.appendingPathComponent("v1/auth/firebase")
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: ["idToken": idToken])
+
+        let (data, response) = try await session.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw AuthError.invalidResponse
+        }
+
+        let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+
+        if httpResponse.statusCode == 200 {
+            guard let token = json?["token"] as? String,
+                  let hasProfile = json?["hasProfile"] as? Bool else {
+                throw AuthError.invalidResponse
+            }
+            let name = json?["name"] as? String
+            await MainActor.run {
+                self.authToken = token
+                self.userName = name
+                self.authState = .authenticated
+                self.needsOnboarding = !hasProfile
+                self.isLoading = false
+            }
+        } else {
+            let message = json?["error"] as? String ?? "Authentication failed"
+            await MainActor.run {
+                self.errorMessage = message
+                self.isLoading = false
+            }
         }
     }
 
@@ -257,7 +231,7 @@ class AuthManager {
 
         do {
             var components = URLComponents(url: baseURL.appendingPathComponent("v1/user"), resolvingAgainstBaseURL: false)!
-            components.queryItems = [URLQueryItem(name: "userId", value: String(userId))]
+            components.queryItems = [URLQueryItem(name: "userId", value: userId)]
 
             var request = URLRequest(url: components.url!)
             request.httpMethod = "DELETE"
@@ -269,9 +243,8 @@ class AuthManager {
             }
 
             if httpResponse.statusCode == 204 {
-                await MainActor.run {
-                    self.signOut()
-                }
+                try? Auth.auth().signOut()
+                await MainActor.run { self.signOut() }
             } else {
                 await MainActor.run {
                     self.errorMessage = "Failed to delete account"
@@ -321,12 +294,8 @@ class AuthManager {
                 "weeklySpendingLimit": weeklySpendingLimit,
                 "strictnessLevel": strictnessLevel
             ]
-            if !name.isEmpty {
-                body["name"] = name
-            }
-            if !school.isEmpty {
-                body["school"] = school
-            }
+            if !name.isEmpty { body["name"] = name }
+            if !school.isEmpty { body["school"] = school }
             request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
             let (data, response) = try await session.data(for: request)
@@ -337,13 +306,9 @@ class AuthManager {
 
             if httpResponse.statusCode == 200 {
                 await MainActor.run {
-                    if !name.isEmpty {
-                        self.userName = name
-                    }
+                    if !name.isEmpty { self.userName = name }
                     self.needsOnboarding = false
                     self.isLoading = false
-
-                    // Post notification that onboarding completed
                     NotificationCenter.default.post(name: .onboardingCompleted, object: nil)
                 }
             } else {
@@ -365,14 +330,39 @@ class AuthManager {
     // MARK: - Sign Out
 
     func signOut() {
+        try? Auth.auth().signOut()
         authState = .enterPhone
         needsOnboarding = false
         authToken = nil
         userName = nil
         currentPhoneNumber = nil
+        verificationID = nil
         errorMessage = nil
         isLoading = false
         PlaidLinkManager.shared.reset()
+    }
+
+    // MARK: - Error Helpers
+
+    private func friendlyFirebaseError(_ error: Error) -> String {
+        let nsError = error as NSError
+        guard nsError.domain == AuthErrorDomain else {
+            return error.localizedDescription
+        }
+        switch AuthErrorCode(rawValue: nsError.code) {
+        case .invalidPhoneNumber:
+            return "Invalid phone number. Please include country code (e.g. +1)."
+        case .invalidVerificationCode:
+            return "Incorrect code. Please try again."
+        case .sessionExpired:
+            return "Code expired. Please request a new one."
+        case .tooManyRequests:
+            return "Too many attempts. Please wait and try again."
+        case .networkError:
+            return "No internet connection."
+        default:
+            return nsError.localizedDescription
+        }
     }
 }
 

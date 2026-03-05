@@ -1,15 +1,19 @@
 """
-Auth Blueprint — SMS OTP login and user deletion.
+Auth Blueprint — Firebase phone auth verification and user management.
+
+The iOS app handles the full SMS OTP flow via the Firebase SDK.
+After the user verifies their phone number client-side, it sends the
+Firebase ID token here. We verify it, then create/return our app user.
 """
 
 import os
+import firebase_admin
+from firebase_admin import credentials, auth as firebase_auth
 from flask import Blueprint, jsonify, request
-from twilio.rest import Client
-from twilio.base.exceptions import TwilioRestException
 from dotenv import load_dotenv
 
 from db_models import (
-    get_user_by_phone,
+    get_user_by_firebase_uid,
     create_user,
     get_profile,
     get_user,
@@ -20,82 +24,55 @@ load_dotenv()
 
 auth_bp = Blueprint('auth', __name__)
 
-# --- App Store Review Credentials ---
-# These MUST work in production so reviewers can enter your app.
-DEMO_PHONE = "+15550001234"
-DEMO_OTP   = "123456"
+# Initialize Firebase Admin SDK once
+_firebase_initialized = False
 
-# --- Dev/Local Credentials ---
-# Used for your local testing with FLASK_ENV=development
-MAGIC_PHONE = "+15005550006"
-MAGIC_OTP   = "123456"
+def _get_firebase_app():
+    global _firebase_initialized
+    if not _firebase_initialized:
+        cred_path = os.getenv('FIREBASE_CREDENTIALS')
+        cred = credentials.Certificate(cred_path)
+        firebase_admin.initialize_app(cred)
+        _firebase_initialized = True
 
-# Credentials
-client = Client(os.getenv('TWILIO_ACCOUNT_SID'), os.getenv('TWILIO_AUTH_TOKEN'))
-VERIFY_SERVICE_ID = os.getenv('TWILIO_VERIFY_SERVICE_ID')
-FLASK_ENV = os.getenv('FLASK_ENV', 'production')
 
-@auth_bp.route("/v1/send_sms_code", methods=["POST"])
-def send_sms_code():
+@auth_bp.route("/v1/auth/firebase", methods=["POST"])
+def firebase_login():
+    """
+    Called after Firebase phone auth completes on iOS.
+    Body: { "idToken": "<firebase_id_token>" }
+    Returns: { "token": "<firebase_uid>", "hasProfile": bool, "name": str|null }
+    """
+    _get_firebase_app()
+
     data = request.get_json()
-    phone_number = data.get("phone_number", "").strip()
+    id_token = (data or {}).get("idToken", "").strip()
 
-    # 1. Check for Demo Account (Always allow in Prod and Dev)
-    if phone_number == DEMO_PHONE:
-        return jsonify({"status": "pending", "message": "Demo mode: use 123456"})
+    if not id_token:
+        return jsonify({"error": "idToken is required"}), 400
 
-    # 2. Check for Dev "Magic" Number
-    if FLASK_ENV == 'development' and phone_number == MAGIC_PHONE:
-        return jsonify({"status": "pending", "message": "DEV MODE: Use code 123456"})
-
-    # 3. Real Twilio Verify Request
     try:
-        verification = client.verify \
-            .v2 \
-            .services(VERIFY_SERVICE_ID) \
-            .verifications \
-            .create(to=phone_number, channel='sms')
-        return jsonify({"status": verification.status})
+        decoded = firebase_auth.verify_id_token(id_token)
+    except firebase_auth.ExpiredIdTokenError:
+        return jsonify({"error": "Token expired"}), 401
+    except firebase_auth.InvalidIdTokenError:
+        return jsonify({"error": "Invalid token"}), 401
     except Exception as e:
-        return jsonify({"error": str(e)}), 400
+        return jsonify({"error": str(e)}), 401
 
-@auth_bp.route("/v1/verify_code", methods=["POST"])
-def verify_code():
-    data = request.get_json()
-    phone_number = data.get("phone_number", "").strip()
-    code = data.get("code", "").strip()
+    firebase_uid = decoded["uid"]
+    phone_number = decoded.get("phone_number")
 
-    approved = False
+    # Create user record if this is their first login
+    user = get_user_by_firebase_uid(firebase_uid) or create_user(firebase_uid, phone=phone_number)
+    profile = get_profile(firebase_uid)
 
-    # 1. Validate Demo Account
-    if phone_number == DEMO_PHONE and code == DEMO_OTP:
-        approved = True
+    return jsonify({
+        "token": firebase_uid,
+        "hasProfile": profile is not None,
+        "name": user.get("name"),
+    })
 
-    # 2. Validate Dev Magic Number
-    elif FLASK_ENV == 'development' and phone_number == MAGIC_PHONE and code == MAGIC_OTP:
-        approved = True
-
-    # 3. Validate via Twilio Verify
-    else:
-        try:
-            check = client.verify.v2.services(VERIFY_SERVICE_ID) \
-                .verification_checks.create(to=phone_number, code=code)
-            approved = (check.status == "approved")
-        except Exception:
-            approved = False
-
-    if approved:
-        # Create user if they don't exist
-        user = get_user_by_phone(phone_number) or create_user(phone_number)
-        profile = get_profile(user.key.id)
-        
-        return jsonify({
-            "token": user.key.id,
-            "hasProfile": profile is not None,
-            "name": user.get('name'),
-        })
-    
-    return jsonify({"error": "Invalid code"}), 401
 
 @auth_bp.route("/v1/user", methods=["DELETE"])
 def delete_user():
@@ -103,11 +80,7 @@ def delete_user():
     if not user_id:
         return jsonify({"error": "userId is required"}), 400
 
-    try:
-        user_id = int(user_id)
-        user = get_user(user_id)
-        if user:
-            delete_user_cascade(user_id)
-        return "", 204
-    except ValueError:
-        return jsonify({"error": "Invalid userId"}), 400
+    user = get_user(user_id)
+    if user:
+        delete_user_cascade(user_id)
+    return "", 204

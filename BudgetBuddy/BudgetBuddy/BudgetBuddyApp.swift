@@ -8,6 +8,8 @@
 import SwiftUI
 import UIKit
 import UserNotifications
+import FirebaseCore
+import FirebaseAuth
 
 @main
 struct BudgetBuddyApp: App {
@@ -68,6 +70,7 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
+        FirebaseApp.configure()
         UNUserNotificationCenter.current().delegate = self
         requestPushNotificationPermission()
         return true
@@ -104,6 +107,27 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
 
     func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
         print("Failed to register for remote notifications: \(error)")
+    }
+
+    // Forward remote notifications to Firebase Auth (required for phone auth)
+    func application(
+        _ application: UIApplication,
+        didReceiveRemoteNotification userInfo: [AnyHashable: Any],
+        fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void
+    ) {
+        if Auth.auth().canHandleNotification(userInfo) {
+            completionHandler(.noData)
+            return
+        }
+        completionHandler(.noData)
+    }
+
+    // Forward URL callbacks to Firebase Auth (required for reCAPTCHA fallback)
+    func application(_ app: UIApplication, open url: URL, options: [UIApplication.OpenURLOptionsKey: Any] = [:]) -> Bool {
+        if Auth.auth().canHandle(url) {
+            return true
+        }
+        return false
     }
 
     // Handle notifications when app is in foreground

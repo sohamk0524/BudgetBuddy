@@ -88,10 +88,6 @@ def get_financial_summary():
     user_id = request.args.get("userId")
     if not user_id:
         return jsonify({"error": "userId is required"}), 400
-    try:
-        user_id = int(user_id)
-    except ValueError:
-        return jsonify({"error": "Invalid userId"}), 400
 
     user = get_user(user_id)
     if not user:
@@ -200,10 +196,6 @@ def delete_statement():
     user_id = request.args.get("userId")
     if not user_id:
         return jsonify({"error": "userId is required"}), 400
-    try:
-        user_id = int(user_id)
-    except ValueError:
-        return jsonify({"error": "Invalid userId"}), 400
 
     statement = get_statement(user_id)
     if statement:
@@ -218,7 +210,7 @@ def delete_statement():
     return "", 204
 
 
-@user_bp.route("/user/profile/<int:user_id>", methods=["GET"])
+@user_bp.route("/user/profile/<user_id>", methods=["GET"])
 def get_user_profile(user_id):
     user = get_user(user_id)
     if not user:
@@ -261,7 +253,7 @@ def get_user_profile(user_id):
     })
 
 
-@user_bp.route("/user/profile/<int:user_id>", methods=["PUT"])
+@user_bp.route("/user/profile/<user_id>", methods=["PUT"])
 def update_user_profile(user_id):
     user = get_user(user_id)
     if not user:
@@ -292,7 +284,7 @@ def update_user_profile(user_id):
     return jsonify({"status": "success"})
 
 
-@user_bp.route("/user/top-expenses/<int:user_id>", methods=["GET"])
+@user_bp.route("/user/top-expenses/<user_id>", methods=["GET"])
 def get_top_expenses(user_id):
     user = get_user(user_id)
     if not user:
@@ -369,7 +361,7 @@ def get_top_expenses(user_id):
     })
 
 
-@user_bp.route("/user/category-preferences/<int:user_id>", methods=["GET"])
+@user_bp.route("/user/category-preferences/<user_id>", methods=["GET"])
 def get_category_preferences(user_id):
     user = get_user(user_id)
     if not user:
@@ -388,7 +380,7 @@ def get_category_preferences(user_id):
     })
 
 
-@user_bp.route("/user/category-preferences/<int:user_id>", methods=["PUT"])
+@user_bp.route("/user/category-preferences/<user_id>", methods=["PUT"])
 def update_category_preferences(user_id):
     user = get_user(user_id)
     if not user:
@@ -402,7 +394,7 @@ def update_category_preferences(user_id):
     return jsonify({"status": "success"})
 
 
-@user_bp.route("/user/nudges/<int:user_id>", methods=["GET"])
+@user_bp.route("/user/nudges/<user_id>", methods=["GET"])
 def get_nudges(user_id):
     user = get_user(user_id)
     if not user:
@@ -469,10 +461,6 @@ def save_manual_transaction():
     user_id = data.get("userId")
     if not user_id:
         return jsonify({"error": "userId is required"}), 400
-    try:
-        user_id = int(user_id)
-    except (ValueError, TypeError):
-        return jsonify({"error": "Invalid userId"}), 400
 
     user = get_user(user_id)
     if not user:
