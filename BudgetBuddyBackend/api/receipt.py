@@ -99,8 +99,7 @@ def attach_receipt():
     merchant = data.get('merchant', '')
     total = data.get('total', 0.0)
     items = data.get('items', [])
-    essential_total = data.get('essentialTotal', 0.0)
-    discretionary_total = data.get('discretionaryTotal', 0.0)
+    category = data.get('category', 'other')
     date_str = data.get('date') or datetime.utcnow().strftime('%Y-%m-%d')
     image_url = data.get('imageUrl')
 
@@ -113,18 +112,9 @@ def attach_receipt():
 
     receipt_items_json = json.dumps(items)
 
-    # Determine sub_category based on ratio
-    if total > 0:
-        essential_ratio = essential_total / total
-    else:
-        essential_ratio = 0.5
-
-    if discretionary_total < 0.01:
-        sub_category = 'essential'
-    elif essential_total < 0.01:
-        sub_category = 'discretionary'
-    else:
-        sub_category = 'mixed'
+    # Use the category directly as sub_category
+    valid_categories = ('food', 'drink', 'transportation', 'entertainment', 'other')
+    sub_category = category.lower() if category.lower() in valid_categories else 'other'
 
     # Try to find a matching Plaid transaction to enrich
     matching_txn = find_matching_transaction(user_id, total, date_str, merchant)
@@ -133,8 +123,8 @@ def attach_receipt():
         updated = update_transaction_receipt(
             txn_id=matching_txn.key.id,
             receipt_items_json=receipt_items_json,
-            essential_amount=round(essential_total, 2),
-            discretionary_amount=round(discretionary_total, 2),
+            essential_amount=None,
+            discretionary_amount=None,
             sub_category=sub_category,
             image_url=image_url,
         )
@@ -152,8 +142,8 @@ def attach_receipt():
         store=merchant,
         notes=f"Receipt: {merchant}",
         sub_category=sub_category,
-        essential_amount=round(essential_total, 2),
-        discretionary_amount=round(discretionary_total, 2),
+        essential_amount=None,
+        discretionary_amount=None,
         receipt_items=receipt_items_json,
         receipt_image_url=image_url,
         pending_plaid_reconcile=True,

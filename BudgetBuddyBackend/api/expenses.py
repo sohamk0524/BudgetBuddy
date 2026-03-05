@@ -26,33 +26,11 @@ from services.classification_service import (
     normalize_merchant_name,
     llm_classify_merchants_batch,
     CONFIDENCE_THRESHOLD,
-    OBVIOUSLY_DISCRETIONARY_CATEGORIES,
 )
 
 expenses_bp = Blueprint('expenses', __name__)
 
-_CHALLENGE_REASONS = {
-    "FOOD_AND_DRINK_COFFEE": "Coffee shops are almost always discretionary spending. Are you sure this is essential?",
-    "FOOD_AND_DRINK_BEER_WINE_AND_LIQUOR": "Alcohol is typically discretionary. Are you sure this is essential?",
-    "FOOD_AND_DRINK_FAST_FOOD": "Fast food is usually discretionary spending. Are you sure this is essential?",
-    "ENTERTAINMENT_MOVIES_AND_MUSIC": "Movie and music purchases are discretionary. Are you sure this is essential?",
-    "ENTERTAINMENT_CONCERTS_AND_EVENTS": "Concert and event tickets are discretionary. Are you sure this is essential?",
-    "ENTERTAINMENT_TV_AND_MOVIES": "Streaming and TV subscriptions are discretionary. Are you sure this is essential?",
-    "ENTERTAINMENT_VIDEO_GAMES": "Video games are discretionary spending. Are you sure this is essential?",
-    "ENTERTAINMENT_CASINOS_AND_GAMBLING": "Gambling is discretionary. Are you sure this is essential?",
-    "ENTERTAINMENT_SPORTING_EVENTS": "Sporting event tickets are discretionary. Are you sure this is essential?",
-}
-
-
-def _build_challenge(sub_category: str, category_detailed: str | None) -> dict:
-    """Return a challenge dict if sub_category is essential and category is obviously discretionary."""
-    if sub_category == 'essential' and category_detailed in OBVIOUSLY_DISCRETIONARY_CATEGORIES:
-        reason = _CHALLENGE_REASONS.get(
-            category_detailed,
-            "This category is typically discretionary. Are you sure this is essential?"
-        )
-        return {"show": True, "reason": reason}
-    return {"show": False, "reason": None}
+VALID_CATEGORIES = ('food', 'drink', 'transportation', 'entertainment', 'other')
 
 
 def _parse_receipt_items(raw):
@@ -126,34 +104,21 @@ def get_expenses(user_id):
         filtered = [t for t in filtered if t.get('category_primary') == category]
 
     if sub_category:
-        if sub_category == 'essential':
-            filtered = [
-                t for t in filtered
-                if t.get('sub_category') == 'essential' or
-                (t.get('sub_category') == 'mixed' and (t.get('essential_amount') or 0) > 0)
-            ]
-        elif sub_category == 'discretionary':
-            filtered = [
-                t for t in filtered
-                if t.get('sub_category') == 'discretionary' or
-                (t.get('sub_category') == 'mixed' and (t.get('discretionary_amount') or 0) > 0)
-            ]
+        if sub_category == 'unclassified':
+            filtered = [t for t in filtered if t.get('sub_category') in (None, 'unclassified')]
         else:
             filtered = [t for t in filtered if t.get('sub_category') == sub_category]
 
-    # Compute summary
-    total_essential = sum(
-        (t.get('essential_amount') or 0) for t in filtered
-        if t.get('sub_category') in ('essential', 'mixed')
-    )
-    total_discretionary = sum(
-        (t.get('discretionary_amount') or 0) for t in filtered
-        if t.get('sub_category') in ('discretionary', 'mixed')
-    )
-    total_unclassified = sum(
-        (t.get('amount') or 0) for t in filtered
-        if t.get('sub_category') in (None, 'unclassified')
-    )
+    # Compute summary by category
+    summary_totals = {cat: 0.0 for cat in VALID_CATEGORIES}
+    summary_totals['unclassified'] = 0.0
+    for t in filtered:
+        t_sub = t.get('sub_category') or 'unclassified'
+        t_amount = t.get('amount') or 0
+        if t_sub in summary_totals:
+            summary_totals[t_sub] += t_amount
+        else:
+            summary_totals['unclassified'] += t_amount
 
     total = len(filtered)
     paged = filtered[offset:offset + limit]
@@ -194,30 +159,21 @@ def get_expenses(user_id):
 
         mt_amount = mt.get('amount') or 0
         mt_sub = mt.get('sub_category') or 'unclassified'
-        mt_essential = mt.get('essential_amount')
-        mt_discretionary = mt.get('discretionary_amount')
 
         # Apply sub_category filter if set
         if sub_category:
-            if sub_category == 'essential' and mt_sub not in ('essential', 'mixed'):
+            if sub_category == 'unclassified' and mt_sub not in (None, 'unclassified'):
                 continue
-            elif sub_category == 'discretionary' and mt_sub not in ('discretionary', 'mixed'):
-                continue
-            elif sub_category not in ('essential', 'discretionary') and mt_sub != sub_category:
+            elif sub_category != 'unclassified' and mt_sub != sub_category:
                 continue
 
         total += 1
 
         # Accumulate into summary totals
-        if mt_sub == 'essential':
-            total_essential += mt_essential or mt_amount
-        elif mt_sub == 'discretionary':
-            total_discretionary += mt_discretionary or mt_amount
-        elif mt_sub == 'mixed':
-            total_essential += mt_essential or 0
-            total_discretionary += mt_discretionary or 0
+        if mt_sub in summary_totals:
+            summary_totals[mt_sub] += mt_amount
         else:
-            total_unclassified += mt_amount
+            summary_totals['unclassified'] += mt_amount
 
         mt_source = mt.get('source') or 'manual'
         result.append({
@@ -234,8 +190,8 @@ def get_expenses(user_id):
             "pending": False,
             "paymentChannel": mt_source,
             "subCategory": mt_sub,
-            "essentialAmount": mt_essential,
-            "discretionaryAmount": mt_discretionary,
+            "essentialAmount": None,
+            "discretionaryAmount": None,
             "source": mt_source,
             "notes": mt.get('notes'),
             "receiptItems": _parse_receipt_items(mt.get('receipt_items')),
@@ -251,11 +207,12 @@ def get_expenses(user_id):
     return jsonify({
         "transactions": result,
         "summary": {
-            "totalEssential": round(total_essential, 2),
-            "totalDiscretionary": round(total_discretionary, 2),
-            "totalFunMoney": round(total_discretionary, 2),
-            "totalMixed": 0,
-            "totalUnclassified": round(total_unclassified, 2),
+            "totalFood": round(summary_totals['food'], 2),
+            "totalDrink": round(summary_totals['drink'], 2),
+            "totalTransportation": round(summary_totals['transportation'], 2),
+            "totalEntertainment": round(summary_totals['entertainment'], 2),
+            "totalOther": round(summary_totals['other'], 2),
+            "totalUnclassified": round(summary_totals['unclassified'], 2),
         },
         "total": total,
         "hasMore": offset + limit < total,
@@ -280,19 +237,8 @@ def classify_merchant():
     if not user_id or not merchant_name or not classification:
         return jsonify({"error": "userId, merchantName, and classification are required"}), 400
 
-    if classification == 'split':
-        classification = 'mixed'
-
-    if classification not in ('essential', 'discretionary', 'mixed'):
-        return jsonify({"error": "classification must be essential, discretionary, mixed, or split"}), 400
-
-    if essential_ratio is None:
-        if classification == 'essential':
-            essential_ratio = 1.0
-        elif classification == 'discretionary':
-            essential_ratio = 0.0
-        else:
-            essential_ratio = 0.5
+    if classification not in VALID_CATEGORIES:
+        return jsonify({"error": f"classification must be one of: {', '.join(VALID_CATEGORIES)}"}), 400
 
     normalized = normalize_merchant_name(merchant_name)
 
@@ -300,12 +246,12 @@ def classify_merchant():
     upsert_merchant_classification(
         user_id, normalized,
         classification=classification,
-        essential_ratio=essential_ratio,
+        essential_ratio=0.0,
         confidence='user_set',
         classification_count=(mc.get('classification_count') or 0) + 1 if mc else 1,
     )
 
-    count = retroactively_reclassify(user_id, merchant_name, classification, essential_ratio)
+    count = retroactively_reclassify(user_id, merchant_name, classification, 0.0)
     return jsonify({"success": True, "reclassifiedCount": count})
 
 
@@ -320,21 +266,9 @@ def classify_single_transaction(transaction_id):
         return jsonify({"error": "Request body must be JSON"}), 400
 
     sub_category = data.get("subCategory")
-    essential_ratio = data.get("essentialRatio")
 
-    if sub_category == 'split':
-        sub_category = 'mixed'
-
-    if not sub_category or sub_category not in ('essential', 'discretionary', 'mixed'):
-        return jsonify({"error": "subCategory must be essential, discretionary, mixed, or split"}), 400
-
-    if essential_ratio is None:
-        if sub_category == 'essential':
-            essential_ratio = 1.0
-        elif sub_category == 'discretionary':
-            essential_ratio = 0.0
-        else:
-            essential_ratio = 0.5
+    if not sub_category or sub_category not in VALID_CATEGORIES:
+        return jsonify({"error": f"subCategory must be one of: {', '.join(VALID_CATEGORIES)}"}), 400
 
     client = get_client()
 
@@ -347,30 +281,27 @@ def classify_single_transaction(transaction_id):
     if not txn:
         return jsonify({"error": "Transaction not found"}), 404
 
-    amount = abs(txn.get('amount') or 0.0)
     txn['sub_category'] = sub_category
-    txn['essential_amount'] = round(amount * essential_ratio, 2)
-    txn['discretionary_amount'] = round(amount * (1.0 - essential_ratio), 2)
+    txn['essential_amount'] = None
+    txn['discretionary_amount'] = None
     client.put(txn)
 
     # Manual transactions: just save classification, no merchant-level propagation
     if is_manual:
-        challenge = _build_challenge(sub_category, txn.get('category_detailed'))
         return jsonify({
             "success": True,
             "transaction": {
                 "id": txn.key.id,
                 "subCategory": txn.get('sub_category'),
-                "essentialAmount": txn.get('essential_amount'),
-                "discretionaryAmount": txn.get('discretionary_amount'),
+                "essentialAmount": None,
+                "discretionaryAmount": None,
             },
-            "updatedMerchantRatio": essential_ratio,
+            "updatedMerchantRatio": 0.0,
             "autoApplied": 0,
-            "challenge": challenge,
+            "challenge": {"show": False, "reason": None},
         })
 
-    # Update merchant running average and check auto-apply threshold
-    updated_merchant_ratio = essential_ratio
+    # Update merchant classification and check auto-apply threshold
     auto_applied = 0
     merchant = normalize_merchant_name(txn.get('merchant_name'))
 
@@ -392,22 +323,18 @@ def classify_single_transaction(transaction_id):
             if mc:
                 old_count = mc.get('classification_count') or 0
                 new_count = old_count + 1
-                new_ratio = round(
-                    ((mc.get('essential_ratio', 0.5) * old_count) + essential_ratio) / new_count, 4
-                )
                 upsert_merchant_classification(
                     user_id, merchant,
                     classification=sub_category,
-                    essential_ratio=new_ratio,
+                    essential_ratio=0.0,
                     confidence='user_set',
                     classification_count=new_count,
                 )
-                updated_merchant_ratio = new_ratio
             else:
                 upsert_merchant_classification(
                     user_id, merchant,
                     classification=sub_category,
-                    essential_ratio=essential_ratio,
+                    essential_ratio=0.0,
                     confidence='user_set',
                     classification_count=1,
                 )
@@ -418,25 +345,20 @@ def classify_single_transaction(transaction_id):
                     (mc.get('classification_count') or 0) >= CONFIDENCE_THRESHOLD and
                     mc.get('confidence') == 'user_set'):
                 auto_applied = retroactively_reclassify(
-                    user_id, merchant, mc['classification'], mc['essential_ratio']
+                    user_id, merchant, mc['classification'], 0.0
                 )
-                # Restore this transaction's exact user-set amounts
-                txn['essential_amount'] = round(amount * essential_ratio, 2)
-                txn['discretionary_amount'] = round(amount * (1.0 - essential_ratio), 2)
-                client.put(txn)
 
-    challenge = _build_challenge(sub_category, txn.get('category_detailed'))
     return jsonify({
         "success": True,
         "transaction": {
             "id": txn.key.id,
             "subCategory": txn.get('sub_category'),
-            "essentialAmount": txn.get('essential_amount'),
-            "discretionaryAmount": txn.get('discretionary_amount'),
+            "essentialAmount": None,
+            "discretionaryAmount": None,
         },
-        "updatedMerchantRatio": updated_merchant_ratio,
+        "updatedMerchantRatio": 0.0,
         "autoApplied": auto_applied,
-        "challenge": challenge,
+        "challenge": {"show": False, "reason": None},
     })
 
 
