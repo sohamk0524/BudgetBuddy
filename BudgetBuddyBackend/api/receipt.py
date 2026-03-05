@@ -54,7 +54,7 @@ def analyze_receipt_endpoint():
     if not user_id:
         return jsonify({"error": "userId is required"}), 400
 
-    user = get_user(int(user_id))
+    user = get_user(user_id)
     if not user:
         return jsonify({"error": "User not found"}), 404
 
@@ -106,7 +106,7 @@ def attach_receipt():
     if not user_id:
         return jsonify({"error": "userId is required"}), 400
 
-    user = get_user(int(user_id))
+    user = get_user(user_id)
     if not user:
         return jsonify({"error": "User not found"}), 404
 
@@ -117,7 +117,7 @@ def attach_receipt():
     sub_category = category.lower() if category.lower() in valid_categories else 'other'
 
     # Try to find a matching Plaid transaction to enrich
-    matching_txn = find_matching_transaction(int(user_id), total, date_str, merchant)
+    matching_txn = find_matching_transaction(user_id, total, date_str, merchant)
 
     if matching_txn:
         updated = update_transaction_receipt(
@@ -136,7 +136,7 @@ def attach_receipt():
 
     # No match — create a new ManualTransaction
     manual_txn = create_manual_transaction(
-        int(user_id),
+        user_id,
         amount=round(total, 2),
         date=date_str,
         store=merchant,

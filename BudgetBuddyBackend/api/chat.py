@@ -48,12 +48,7 @@ def upload_statement():
 
     print(f"Received file: {file.filename}")
 
-    user_id = request.form.get("userId")
-    if user_id:
-        try:
-            user_id = int(user_id)
-        except ValueError:
-            user_id = None
+    user_id = request.form.get("userId") or None
 
     file_content = file.read()
     filename = file.filename
@@ -70,7 +65,7 @@ def upload_statement():
     return jsonify(response.to_dict())
 
 
-def _save_statement(user_id: int, filename: str, file_type: str,
+def _save_statement(user_id: str, filename: str, file_type: str,
                     file_content: bytes, analysis: dict):
     """Upload file to GCS and upsert the SavedStatement entity in Datastore."""
     # Delete old GCS file if one exists

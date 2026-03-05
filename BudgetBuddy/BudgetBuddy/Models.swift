@@ -341,7 +341,7 @@ struct PlaidLinkTokenResponse: Codable {
 }
 
 struct PlaidExchangeRequest: Codable {
-    let userId: Int
+    let userId: String
     let publicToken: String
     let institutionId: String?
     let institutionName: String?
@@ -566,7 +566,7 @@ struct ReceiptAnalysisResult: Codable {
 }
 
 struct ReceiptAttachRequest: Codable {
-    let userId: Int
+    let userId: String
     let merchant: String
     let total: Double
     let items: [ReceiptLineItem]
@@ -692,7 +692,7 @@ struct ParsedTransactionResponse: Codable {
 }
 
 struct SaveTransactionRequest: Codable {
-    let userId: Int
+    let userId: String
     let amount: Double
     let category: String  // "Food", "Drink", "Transportation", "Entertainment", "Other"
     let store: String?

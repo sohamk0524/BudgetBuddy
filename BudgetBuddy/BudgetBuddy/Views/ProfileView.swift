@@ -81,7 +81,7 @@ struct ProfileView: View {
         .sheet(isPresented: $showPlaidLink) {
             PlaidLinkView(
                 showPlaidLink: $showPlaidLink,
-                userId: AuthManager.shared.authToken ?? 0,
+                userId: AuthManager.shared.authToken ?? "",
                 onComplete: {
                     showPlaidLink = false
                     Task { await viewModel.loadProfile() }
