@@ -136,8 +136,6 @@ class VoiceTransactionViewModel {
             store: transaction.store,
             date: formatter.string(from: transaction.date),
             notes: transaction.notes,
-            subCategory: transaction.subCategory,
-            essentialRatio: transaction.essentialRatio,
             source: source
         )
 

@@ -482,35 +482,24 @@ def save_manual_transaction():
     if not amount or float(amount) <= 0:
         return jsonify({"error": "amount must be greater than 0"}), 400
 
-    # Determine classification
-    sub_category = data.get("subCategory", "unclassified")
-    if sub_category not in ("essential", "discretionary", "mixed", "unclassified"):
-        sub_category = "unclassified"
+    # Determine classification — use category as sub_category for the new system
+    valid_categories = ('food', 'drink', 'transportation', 'entertainment', 'other')
+    category_value = data.get("category", "Other")
+    sub_category = category_value.lower() if category_value.lower() in valid_categories else "unclassified"
 
-    essential_ratio = data.get("essentialRatio")
     amt = float(amount)
-    if essential_ratio is None:
-        if sub_category == "essential":
-            essential_ratio = 1.0
-        elif sub_category == "discretionary":
-            essential_ratio = 0.0
-        else:
-            essential_ratio = 0.5
-
-    essential_amount = round(amt * essential_ratio, 2) if sub_category != "unclassified" else None
-    discretionary_amount = round(amt * (1.0 - essential_ratio), 2) if sub_category != "unclassified" else None
 
     entity = create_manual_transaction(
         user_id,
         amount=amt,
-        category=data.get("category", "Other"),
+        category=category_value,
         store=data.get("store"),
         date=data.get("date"),
         notes=data.get("notes"),
         source=data.get("source", "manual"),
         sub_category=sub_category,
-        essential_amount=essential_amount,
-        discretionary_amount=discretionary_amount,
+        essential_amount=None,
+        discretionary_amount=None,
     )
 
     return jsonify({

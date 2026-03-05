@@ -600,7 +600,7 @@ actor APIService {
     }
 
     /// Attaches an analyzed receipt to an existing transaction or creates a new one
-    func attachReceipt(userId: Int, result: ReceiptAnalysisResult, date: String) async throws -> ReceiptAttachResponse {
+    func attachReceipt(userId: Int, result: ReceiptAnalysisResult, category: String, date: String) async throws -> ReceiptAttachResponse {
         let url = baseURL.appendingPathComponent("receipt/attach")
 
         let requestBody = ReceiptAttachRequest(
@@ -608,8 +608,7 @@ actor APIService {
             merchant: result.merchant,
             total: result.total,
             items: result.items,
-            essentialTotal: result.essentialTotal,
-            discretionaryTotal: result.discretionaryTotal,
+            category: category,
             date: date
         )
 

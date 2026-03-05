@@ -61,13 +61,12 @@ struct ReceiptScanView: View {
             analyzingView
         case .reviewed:
             if let result = viewModel.analysisResult {
-                ReceiptLineItemsView(result: result) { essentialTotal, discretionaryTotal, date, merchant in
+                ReceiptLineItemsView(result: result) { category, date, merchant in
                     Task {
                         await viewModel.confirmAndAttach(
                             date: date,
                             merchant: merchant,
-                            essentialTotal: essentialTotal,
-                            discretionaryTotal: discretionaryTotal
+                            category: category
                         )
                     }
                 }
@@ -93,7 +92,7 @@ struct ReceiptScanView: View {
                 .font(.roundedHeadline)
                 .foregroundStyle(Color.textPrimary)
 
-            Text("Claude will extract line items and classify what's essential vs fun money.")
+            Text("Claude will extract line items from your receipt.")
                 .font(.roundedBody)
                 .foregroundStyle(Color.textSecondary)
                 .multilineTextAlignment(.center)

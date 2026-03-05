@@ -2,15 +2,18 @@
 //  ExpensesViewModel.swift
 //  BudgetBuddy
 //
-//  ViewModel for the Expenses tab - manages expense classification state
+//  ViewModel for the Expenses tab - manages expense categorization state
 //
 
 import Foundation
 
 enum ExpenseFilter: String, CaseIterable {
     case all = "All"
-    case essential = "Essential"
-    case discretionary = "Fun Money"
+    case food = "Food"
+    case drink = "Drink"
+    case transportation = "Transportation"
+    case entertainment = "Entertainment"
+    case other = "Other"
     case unclassified = "Unclassified"
 }
 
@@ -29,25 +32,30 @@ class ExpensesViewModel {
     /// Filtered view used by the UI. Computed locally — no API call on filter change.
     var transactions: [ExpenseTransaction] {
         switch selectedFilter {
-        case .all:          return allTransactions
-        case .essential:    return allTransactions.filter { ($0.essentialAmount ?? 0) > 0.01 }
-        case .discretionary: return allTransactions.filter { ($0.discretionaryAmount ?? 0) > 0.01 }
-        case .unclassified: return allTransactions.filter { $0.subCategory == "unclassified" }
+        case .all:             return allTransactions
+        case .food:            return allTransactions.filter { $0.subCategory.lowercased() == "food" }
+        case .drink:           return allTransactions.filter { $0.subCategory.lowercased() == "drink" }
+        case .transportation:  return allTransactions.filter { $0.subCategory.lowercased() == "transportation" }
+        case .entertainment:   return allTransactions.filter { $0.subCategory.lowercased() == "entertainment" }
+        case .other:           return allTransactions.filter { $0.subCategory.lowercased() == "other" }
+        case .unclassified:    return allTransactions.filter { isUnclassified($0) }
         }
     }
 
-    /// Summary computed locally from the full list — always reflects the whole picture.
+    /// Summary computed locally from the full list.
     var summary: ExpensesSummary {
-        let essential = allTransactions.reduce(0.0) { $0 + ($1.essentialAmount ?? 0) }
-        let discretionary = allTransactions.reduce(0.0) { $0 + ($1.discretionaryAmount ?? 0) }
-        let unclassified = allTransactions
-            .filter { $0.subCategory == "unclassified" }
-            .reduce(0.0) { $0 + $1.amount }
+        let knownCategories = ["food", "drink", "transportation", "entertainment", "other"]
+        var totals = [String: Double]()
+        for cat in knownCategories {
+            totals[cat] = allTransactions.filter { $0.subCategory.lowercased() == cat }.reduce(0) { $0 + $1.amount }
+        }
+        let unclassified = allTransactions.filter { isUnclassified($0) }.reduce(0.0) { $0 + $1.amount }
         return ExpensesSummary(
-            totalEssential: essential,
-            totalDiscretionary: discretionary,
-            totalFunMoney: discretionary,
-            totalMixed: 0,
+            totalFood: totals["food"] ?? 0,
+            totalDrink: totals["drink"] ?? 0,
+            totalTransportation: totals["transportation"] ?? 0,
+            totalEntertainment: totals["entertainment"] ?? 0,
+            totalOther: totals["other"] ?? 0,
             totalUnclassified: unclassified
         )
     }
@@ -58,16 +66,8 @@ class ExpensesViewModel {
 
     var selectedFilter: ExpenseFilter = .all
 
-    // Swipe classification state
-    var unclassifiedTransactions: [UnclassifiedTransactionItem] = []
-    var totalUnclassifiedCount: Int = 0
-    var currentClassifyIndex: Int = 0
-    var showSplitSheet = false
-    var splitTransaction: UnclassifiedTransactionItem?
-
     var selectedTransaction: ExpenseTransaction?
     var showClassificationSheet = false
-    var isAutoClassifying = false
 
     // MARK: - Dependencies
 
@@ -224,77 +224,9 @@ class ExpensesViewModel {
         isLoadingMore = false
     }
 
-    func fetchUnclassifiedTransactions() async {
-        guard let userId = AuthManager.shared.authToken else { return }
-
+    func classifyTransaction(transactionId: Int, subCategory: String) async {
         do {
-            let response = try await apiService.getUnclassifiedTransactions(userId: userId, limit: 10)
-            unclassifiedTransactions = response.transactions
-            totalUnclassifiedCount = response.totalUnclassified
-            currentClassifyIndex = 0
-        } catch {
-            print("Failed to fetch unclassified transactions: \(error)")
-        }
-    }
-
-    func classifyViaSwipe(transactionId: Int, classification: String, essentialRatio: Double? = nil) async {
-        do {
-            let response = try await apiService.classifyTransaction(
-                transactionId: transactionId,
-                subCategory: classification,
-                essentialRatio: essentialRatio
-            )
-
-            // Advance to next card
-            currentClassifyIndex += 1
-
-            let autoApplied = response.autoApplied ?? 0
-            totalUnclassifiedCount -= (1 + autoApplied)
-            if totalUnclassifiedCount < 0 { totalUnclassifiedCount = 0 }
-
-            // Update local record immediately
-            applyClassificationLocally(
-                transactionId: transactionId,
-                subCategory: response.transaction.subCategory,
-                essentialAmount: response.transaction.essentialAmount,
-                discretionaryAmount: response.transaction.discretionaryAmount
-            )
-            // Classification means activity — cancel today's reminder
-            NotificationManager.shared.cancelTodayNotification()
-
-            // If bulk auto-apply happened, refresh to capture all changed records
-            if autoApplied > 0 {
-                await fetchExpenses()
-            }
-
-            // Load next batch of cards if needed
-            if currentClassifyIndex >= unclassifiedTransactions.count {
-                await fetchUnclassifiedTransactions()
-            }
-        } catch {
-            print("Failed to classify via swipe: \(error)")
-        }
-    }
-
-    func classifyMerchant(merchantName: String, classification: String, essentialRatio: Double? = nil) async {
-        guard let userId = AuthManager.shared.authToken else { return }
-
-        do {
-            _ = try await apiService.classifyMerchant(
-                userId: userId,
-                merchantName: merchantName,
-                classification: classification,
-                essentialRatio: essentialRatio
-            )
-            await fetchExpenses()
-        } catch {
-            print("Failed to classify merchant: \(error)")
-        }
-    }
-
-    func classifyTransaction(transactionId: Int, subCategory: String, essentialRatio: Double? = nil) async {
-        do {
-            _ = try await classifyTransactionForSheet(transactionId: transactionId, subCategory: subCategory, essentialRatio: essentialRatio)
+            _ = try await classifyTransactionForSheet(transactionId: transactionId, subCategory: subCategory)
             showClassificationSheet = false
 
             // Classification means activity — cancel today's reminder
@@ -305,11 +237,10 @@ class ExpensesViewModel {
     }
 
     /// Classifies a transaction and returns the response. Does NOT dismiss the sheet — caller handles dismissal.
-    func classifyTransactionForSheet(transactionId: Int, subCategory: String, essentialRatio: Double? = nil) async throws -> ClassifyTransactionResponse {
+    func classifyTransactionForSheet(transactionId: Int, subCategory: String) async throws -> ClassifyTransactionResponse {
         let response = try await apiService.classifyTransaction(
             transactionId: transactionId,
-            subCategory: subCategory,
-            essentialRatio: essentialRatio
+            subCategory: subCategory
         )
 
         // Update local record immediately — no refetch needed for single classification
@@ -328,23 +259,8 @@ class ExpensesViewModel {
         return response
     }
 
-    func autoClassifyWithAI() async {
-        guard let userId = AuthManager.shared.authToken else { return }
-
-        isAutoClassifying = true
-        do {
-            _ = try await apiService.autoClassifyMerchants(userId: userId)
-            await refresh()
-        } catch {
-            print("Failed to auto-classify: \(error)")
-        }
-        isAutoClassifying = false
-    }
-
     func refresh() async {
-        async let expenses: () = fetchExpenses()
-        async let unclassified: () = fetchUnclassifiedTransactions()
-        _ = await (expenses, unclassified)
+        await fetchExpenses()
     }
 
     // MARK: - Private Helpers
@@ -355,6 +271,12 @@ class ExpensesViewModel {
             guard let dateStr = txn.date, let date = Self.parseDate(dateStr) else { return false }
             return calendar.isDateInToday(date)
         }
+    }
+
+    /// Returns true if a transaction has not been categorized yet.
+    private func isUnclassified(_ txn: ExpenseTransaction) -> Bool {
+        let known = ["food", "drink", "transportation", "entertainment", "other"]
+        return !known.contains(txn.subCategory.lowercased())
     }
 
     private func applyClassificationLocally(
