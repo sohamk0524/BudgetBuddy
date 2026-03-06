@@ -149,3 +149,4 @@ credentials.json
 google-auth.json
 creds.py
 .env
+BudgetBuddyBackend/firebase-adminsdk.json

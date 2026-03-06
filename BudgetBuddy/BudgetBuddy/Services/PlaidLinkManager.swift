@@ -31,7 +31,7 @@ class PlaidLinkManager {
     // MARK: - Public Methods
 
     /// Start the Plaid Link flow for a user
-    func startLink(userId: Int) async {
+    func startLink(userId: String) async {
         await MainActor.run {
             isLoading = true
             errorMessage = nil
@@ -56,7 +56,7 @@ class PlaidLinkManager {
     }
 
     /// Create the Link configuration and handler
-    func createLinkHandler(userId: Int, completion: @escaping (Bool) -> Void) -> Handler? {
+    func createLinkHandler(userId: String, completion: @escaping (Bool) -> Void) -> Handler? {
         guard let linkToken = linkToken else {
             errorMessage = "No link token available"
             return nil
@@ -87,7 +87,7 @@ class PlaidLinkManager {
     }
 
     /// Present Plaid Link
-    func presentLink(from viewController: UIViewController, userId: Int, completion: @escaping (Bool) -> Void) {
+    func presentLink(from viewController: UIViewController, userId: String, completion: @escaping (Bool) -> Void) {
         guard let handler = createLinkHandler(userId: userId, completion: completion) else {
             return
         }
@@ -108,7 +108,7 @@ class PlaidLinkManager {
 
     // MARK: - Private Handlers
 
-    private func handleLinkSuccess(result: LinkSuccess, userId: Int, completion: @escaping (Bool) -> Void) {
+    private func handleLinkSuccess(result: LinkSuccess, userId: String, completion: @escaping (Bool) -> Void) {
         Task {
             await MainActor.run {
                 isLoading = true

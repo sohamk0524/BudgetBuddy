@@ -33,6 +33,14 @@
 			<key>CFBundleURLName</key>
 			<string>com.budgetbuddy.receipt</string>
 		</dict>
+		<dict>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>app-1-937866987362-ios-394822f095b40687588e3b</string>
+			</array>
+			<key>CFBundleURLName</key>
+			<string>app-1-937866987362-ios-394822f095b40687588e3b</string>
+		</dict>
 	</array>
 </dict>
 </plist>
