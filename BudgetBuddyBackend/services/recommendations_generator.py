@@ -11,8 +11,7 @@ from typing import Dict, Any, List, Optional
 from services.llm_service import Agent
 from services.tools import (
     _get_plaid_transactions,
-    _get_user_financial_summary,
-    _get_user_spending_status,
+    _get_weekly_spending_status,
 )
 
 
@@ -29,6 +28,12 @@ WHAT MAKES A GOOD RECOMMENDATION:
 - References specific merchants, amounts, and patterns from the user's real data
 - Targets the highest-impact area first
 - Gives a concrete next step, not vague advice
+
+MERCHANT PATTERN ANALYSIS:
+- Look at the user's transaction data (both bank and voice-logged) for repeated merchants
+- If a merchant appears 3+ times, search for cheaper alternatives using search_local_deals
+- Formulate search queries from actual data: e.g., if 5 Chipotle transactions → "cheaper Mexican food near [school] student deals"
+- Use spending_by_category to identify the top categories, then search for deals in those areas
 
 WHAT TO AVOID:
 - Generic advice that doesn't reference the user's actual numbers
@@ -62,12 +67,12 @@ RULES:
 
 ACTION_PROMPTS = {
     "general": (
-        "Analyze the user's transactions and financial summary below. "
+        "Analyze the user's transactions (both bank and voice-logged) and financial summary below. "
         "Identify the TOP spending categories by dollar amount, look for recurring charges "
         "(subscriptions, repeated merchants), and flag any unusual spikes. "
         "Prioritize recommendations by potential monthly savings — put the biggest wins first. "
-        "If the user is a student, use the get_school_advice tool to find campus-specific deals "
-        "or cheaper alternatives near their school."
+        "If the user is a student, use search_local_deals to find cheaper alternatives near their school "
+        "based on their actual top merchants and spending categories."
     ),
     "budget_balance": (
         "Compare the user's budget allocations to their actual spending in each category. "
@@ -76,12 +81,12 @@ ACTION_PROMPTS = {
         "Focus on the 1-2 categories with the largest overspend gap."
     ),
     "spending_habits": (
-        "Look at the user's transaction history for behavioral patterns: "
+        "Look at the user's transaction history (bank + voice-logged) for behavioral patterns: "
         "Which merchants appear most often? Are there small frequent purchases adding up "
         "(e.g., daily coffee, delivery fees)? Is spending higher on weekends? "
         "Any subscriptions they might have forgotten? "
         "Give concrete alternatives with estimated savings. "
-        "If the user is a student, call get_school_advice to find student discounts or "
+        "If the user is a student, call search_local_deals to find student discounts or "
         "cheaper local options for their most-visited merchants."
     ),
 }
@@ -92,7 +97,7 @@ _RECO_TOOLS = [
         "type": "function",
         "function": {
             "name": "get_plaid_transactions",
-            "description": "Get the user's recent bank transactions.",
+            "description": "Get the user's recent transactions from linked bank accounts AND voice-logged manual entries. Each transaction has a 'source' field ('plaid' or 'manual').",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -105,30 +110,22 @@ _RECO_TOOLS = [
     {
         "type": "function",
         "function": {
-            "name": "get_financial_summary",
-            "description": "Get the user's financial summary (balances, net worth, safe-to-spend).",
+            "name": "get_weekly_spending_status",
+            "description": "Get the user's weekly spending limit, how much they've spent this week, remaining budget, and daily safe-to-spend amount. Always call this to ground recommendations in the user's actual remaining budget.",
             "parameters": {"type": "object", "properties": {}, "required": []},
         },
     },
     {
         "type": "function",
         "function": {
-            "name": "get_spending_status",
-            "description": "Check if the user is on track with their budget.",
-            "parameters": {"type": "object", "properties": {}, "required": []},
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "get_school_advice",
-            "description": "Search the web for school-specific financial advice (student discounts, cheap food, campus resources). Use when the user is a student and recommendations could benefit from school-specific context.",
+            "name": "search_local_deals",
+            "description": "Fast web search for local deals and cheaper alternatives near the user's school. Returns raw results (title, snippet, URL) for you to interpret. Formulate queries from the user's actual merchants and categories (e.g., 'cheap Mexican food near UC Davis student deals').",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "query": {
                         "type": "string",
-                        "description": "The question to search for (e.g., 'student discounts', 'cheap food near campus')"
+                        "description": "Search query derived from user's spending patterns"
                     }
                 },
                 "required": ["query"],
@@ -209,13 +206,12 @@ def _compute_safe_to_spend(user_id: int) -> Dict[str, Any]:
 
 def _tool_executor(user_id: int):
     """Return a tool executor bound to the given user_id."""
-    from services.tools import _get_school_advice
+    from services.tools import _search_local_deals
 
     executors = {
         "get_plaid_transactions": lambda args: _get_plaid_transactions(user_id, args.get("days", 30) if args else 30),
-        "get_financial_summary": lambda _: _get_user_financial_summary(user_id),
-        "get_spending_status": lambda _: _get_user_spending_status(user_id),
-        "get_school_advice": lambda args: _get_school_advice(user_id, args.get("query", "") if args else ""),
+        "get_weekly_spending_status": lambda _: _get_weekly_spending_status(user_id),
+        "search_local_deals": lambda args: _search_local_deals(user_id, args.get("query", "") if args else ""),
     }
 
     def execute(tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
@@ -313,10 +309,11 @@ def generate_recommendations(user_id: int, action: str = "general") -> Dict[str,
             tools=_RECO_TOOLS,
             model="claude-sonnet-4-20250514",
             tool_executor=_tool_executor(user_id),
-            max_iterations=3,
+            max_iterations=5,
         )
 
         if not agent.is_available():
+            print(f"[RECO FALLBACK] user={user_id} reason=llm_unavailable")
             return _cache_and_return(user_id, _fallback_recommendations(user_id))
 
         result = agent.run(user_message)
@@ -324,6 +321,7 @@ def generate_recommendations(user_id: int, action: str = "general") -> Dict[str,
 
         parsed = _parse_recommendations_json(raw_content)
         if not parsed:
+            print(f"[RECO FALLBACK] user={user_id} reason=json_parse_failed raw={raw_content[:200]}")
             return _cache_and_return(user_id, _fallback_recommendations(user_id))
 
         # Compute safe-to-spend from weekly spending limit
@@ -331,15 +329,8 @@ def generate_recommendations(user_id: int, action: str = "general") -> Dict[str,
         safe_to_spend = sts["safe_to_spend"]
         status = sts["status"]
 
-        # Merge template-based recommendations (first) with LLM recommendations
-        from services.recommendation_templates import run_all_templates
-
-        template_recs = run_all_templates(user_id)
-        llm_recs = parsed.get("recommendations", [])
-        combined = (template_recs + llm_recs)[:5]
-
         output = {
-            "recommendations": combined,
+            "recommendations": parsed.get("recommendations", [])[:5],
             "safeToSpend": safe_to_spend,
             "status": status,
             "summary": parsed.get("summary", ""),
@@ -348,7 +339,7 @@ def generate_recommendations(user_id: int, action: str = "general") -> Dict[str,
         return _cache_and_return(user_id, output)
 
     except Exception as e:
-        print(f"Recommendations generation error: {e}")
+        print(f"[RECO FALLBACK] user={user_id} reason=exception error={e}")
         return _cache_and_return(user_id, _fallback_recommendations(user_id))
 
 

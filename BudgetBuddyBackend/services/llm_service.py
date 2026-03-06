@@ -58,17 +58,21 @@ class Agent:
         ] + messages
         all_tool_results = []
 
-        for _ in range(self.max_iterations):
+        print(f"[{self.name}] Starting agent run (model={self.model}, max_iterations={self.max_iterations})")
+
+        for iteration in range(self.max_iterations):
             kwargs = {"model": self.model, "messages": conversation}
             if self.tools:
                 kwargs["tools"] = self.tools
                 kwargs["tool_choice"] = "auto"
 
+            print(f"[{self.name}] Iteration {iteration + 1}/{self.max_iterations} — calling LLM...")
             response = litellm.completion(**kwargs)
             message = response.choices[0].message
 
             # No tool calls — return the text response
             if not message.tool_calls:
+                print(f"[{self.name}] LLM returned final text response ({len(message.content or '')} chars)")
                 return {
                     "content": message.content or "",
                     "tool_results": all_tool_results
@@ -76,6 +80,8 @@ class Agent:
 
             # Add assistant message with tool calls to conversation
             conversation.append(message.model_dump())
+
+            print(f"[{self.name}] LLM requested {len(message.tool_calls)} tool call(s): {[tc.function.name for tc in message.tool_calls]}")
 
             # Execute each tool call
             for tool_call in message.tool_calls:
@@ -85,8 +91,12 @@ class Agent:
                 except json.JSONDecodeError:
                     tool_args = {}
 
+                print(f"[{self.name}] Executing tool: {tool_name}({tool_args})")
+
                 try:
                     result = self.tool_executor(tool_name, tool_args)
+                    result_str = json.dumps(result) if isinstance(result, dict) else str(result)
+                    print(f"[{self.name}] Tool {tool_name} returned ({len(result_str)} chars)")
                     all_tool_results.append({
                         "tool": tool_name,
                         "args": tool_args,
@@ -95,9 +105,10 @@ class Agent:
                     conversation.append({
                         "role": "tool",
                         "tool_call_id": tool_call.id,
-                        "content": json.dumps(result) if isinstance(result, dict) else str(result)
+                        "content": result_str
                     })
                 except Exception as e:
+                    print(f"[{self.name}] Tool {tool_name} FAILED: {e}")
                     conversation.append({
                         "role": "tool",
                         "tool_call_id": tool_call.id,
@@ -105,6 +116,7 @@ class Agent:
                     })
 
         # Max iterations reached — get final response without tools
+        print(f"[{self.name}] Max iterations reached, getting final response without tools")
         response = litellm.completion(model=self.model, messages=conversation)
         return {
             "content": response.choices[0].message.content or "",
