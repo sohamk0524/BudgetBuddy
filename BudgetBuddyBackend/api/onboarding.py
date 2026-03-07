@@ -29,12 +29,12 @@ def onboarding():
     if not user_id:
         return jsonify({"error": "userId is required"}), 400
 
-    user = get_user(int(user_id))
+    user = get_user(user_id)
     if not user:
         return jsonify({"error": "User not found"}), 404
 
     if name:
-        update_user(int(user_id), name=name)
+        update_user(user_id, name=name)
 
     profile_kwargs = dict(
         is_student=is_student,
@@ -44,6 +44,6 @@ def onboarding():
     if school:
         profile_kwargs["school"] = school
 
-    upsert_profile(int(user_id), **profile_kwargs)
+    upsert_profile(user_id, **profile_kwargs)
 
     return jsonify({"status": "success"})

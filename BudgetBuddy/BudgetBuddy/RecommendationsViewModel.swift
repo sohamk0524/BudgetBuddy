@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import Combine
 
 @Observable
 @MainActor
@@ -20,6 +21,18 @@ class RecommendationsViewModel {
     var isLoading = false
     var isGenerating = false
     var errorMessage: String?
+
+    private var cancellables = Set<AnyCancellable>()
+
+    init() {
+        NotificationCenter.default.publisher(for: .transactionAdded)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in
+                guard let self else { return }
+                Task { await self.refreshFinancialData() }
+            }
+            .store(in: &cancellables)
+    }
 
     // MARK: - Computed
 
@@ -70,6 +83,18 @@ class RecommendationsViewModel {
         }
 
         isGenerating = false
+    }
+
+    func refreshFinancialData() async {
+        guard let userId = AuthManager.shared.authToken else { return }
+        do {
+            let summary = try await APIService.shared.getFinancialSummary(userId: userId)
+            if let newSafe = summary.safeToSpend {
+                safeToSpend = newSafe
+            }
+        } catch {
+            // Silently fail — stale value is acceptable
+        }
     }
 
     // MARK: - Private

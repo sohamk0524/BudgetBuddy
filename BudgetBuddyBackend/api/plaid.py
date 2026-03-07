@@ -49,7 +49,7 @@ def create_plaid_link_token():
     if not user_id:
         return jsonify({"error": "userId is required"}), 400
 
-    user = get_user(int(user_id))
+    user = get_user(user_id)
     if not user:
         return jsonify({"error": "User not found"}), 404
 
@@ -80,7 +80,7 @@ def exchange_plaid_token():
     if not user_id or not public_token:
         return jsonify({"error": "userId and publicToken are required"}), 400
 
-    user = get_user(int(user_id))
+    user = get_user(user_id)
     if not user:
         return jsonify({"error": "User not found"}), 404
 
@@ -88,7 +88,7 @@ def exchange_plaid_token():
         encrypted_token, item_id = plaid_service.exchange_public_token(public_token)
 
         plaid_item = create_plaid_item(
-            int(user_id),
+            user_id,
             item_id=item_id,
             access_token_encrypted=encrypted_token,
             institution_id=institution_id,
@@ -164,7 +164,7 @@ def exchange_plaid_token():
         return jsonify({"error": "Failed to exchange token and fetch data"}), 500
 
 
-@plaid_bp.route("/plaid/accounts/<int:user_id>", methods=["GET"])
+@plaid_bp.route("/plaid/accounts/<user_id>", methods=["GET"])
 def get_plaid_accounts(user_id):
     user = get_user(user_id)
     if not user:
@@ -200,7 +200,7 @@ def get_plaid_accounts(user_id):
     return jsonify({"items": result})
 
 
-@plaid_bp.route("/plaid/transactions/<int:user_id>", methods=["GET"])
+@plaid_bp.route("/plaid/transactions/<user_id>", methods=["GET"])
 def get_plaid_transactions(user_id):
     user = get_user(user_id)
     if not user:
@@ -254,7 +254,7 @@ def get_plaid_transactions(user_id):
     })
 
 
-@plaid_bp.route("/plaid/sync/<int:user_id>", methods=["POST"])
+@plaid_bp.route("/plaid/sync/<user_id>", methods=["POST"])
 def sync_plaid_transactions(user_id):
     user = get_user(user_id)
     if not user:
@@ -349,7 +349,7 @@ def sync_plaid_transactions(user_id):
     })
 
 
-@plaid_bp.route("/plaid/unlink/<int:user_id>/<item_id>", methods=["DELETE"])
+@plaid_bp.route("/plaid/unlink/<user_id>/<item_id>", methods=["DELETE"])
 def unlink_plaid_item(user_id, item_id):
     user = get_user(user_id)
     if not user:

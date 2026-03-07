@@ -341,7 +341,7 @@ struct PlaidLinkTokenResponse: Codable {
 }
 
 struct PlaidExchangeRequest: Codable {
-    let userId: Int
+    let userId: String
     let publicToken: String
     let institutionId: String?
     let institutionName: String?
@@ -442,17 +442,19 @@ struct ExpenseTransaction: Codable, Identifiable {
     let receiptItems: [ReceiptLineItem]?
 }
 
-struct ExpensesSummary: Codable {
-    let totalEssential: Double
-    let totalDiscretionary: Double
-    let totalFunMoney: Double?
-    let totalMixed: Double
+struct ExpensesSummary {
+    let totalFood: Double
+    let totalDrink: Double
+    let totalTransportation: Double
+    let totalEntertainment: Double
+    let totalOther: Double
     let totalUnclassified: Double
+
+    var total: Double { totalFood + totalDrink + totalTransportation + totalEntertainment + totalOther + totalUnclassified }
 }
 
 struct ExpensesResponse: Codable {
     let transactions: [ExpenseTransaction]
-    let summary: ExpensesSummary
     let total: Int
     let hasMore: Bool
 }
@@ -548,12 +550,11 @@ struct ReceiptLineItem: Codable, Identifiable {
     let id = UUID()
     let name: String
     let price: Double
-    let classification: String  // "essential" | "discretionary"
-
-    var isEssential: Bool { classification == "essential" }
+    let category: String  // "food", "drink", "transportation", "entertainment", "other"
 
     enum CodingKeys: String, CodingKey {
-        case name, price, classification
+        case name, price
+        case category = "classification"  // JSON key kept for backward compat
     }
 }
 
@@ -562,17 +563,14 @@ struct ReceiptAnalysisResult: Codable {
     let date: String?
     let total: Double
     let items: [ReceiptLineItem]
-    let essentialTotal: Double
-    let discretionaryTotal: Double
 }
 
 struct ReceiptAttachRequest: Codable {
-    let userId: Int
+    let userId: String
     let merchant: String
     let total: Double
     let items: [ReceiptLineItem]
-    let essentialTotal: Double
-    let discretionaryTotal: Double
+    let category: String  // "food", "drink", "transportation", "entertainment", "other"
     let date: String
 }
 
@@ -673,19 +671,15 @@ struct RecommendationsResponse: Codable {
 struct VoiceTransaction: Codable, Identifiable {
     let id: UUID
     var amount: Double?
-    var category: String?
+    var category: String?  // "Food", "Drink", "Transportation", "Entertainment", "Other"
     var store: String?
     var date: Date
     var notes: String?
-    var subCategory: String       // "essential", "discretionary", or "mixed"
-    var essentialRatio: Double     // 0.0 to 1.0
 
     init(id: UUID = UUID(), amount: Double? = nil, category: String? = nil,
-         store: String? = nil, date: Date = Date(), notes: String? = nil,
-         subCategory: String = "essential", essentialRatio: Double = 1.0) {
+         store: String? = nil, date: Date = Date(), notes: String? = nil) {
         self.id = id; self.amount = amount; self.category = category
         self.store = store; self.date = date; self.notes = notes
-        self.subCategory = subCategory; self.essentialRatio = essentialRatio
     }
 }
 
@@ -698,15 +692,13 @@ struct ParsedTransactionResponse: Codable {
 }
 
 struct SaveTransactionRequest: Codable {
-    let userId: Int
+    let userId: String
     let amount: Double
-    let category: String
+    let category: String  // "Food", "Drink", "Transportation", "Entertainment", "Other"
     let store: String?
     let date: String   // ISO 8601
     let notes: String?
-    let subCategory: String        // essential, discretionary, unclassified
-    let essentialRatio: Double?
-    let source: String?            // "manual" or "voice"
+    let source: String?  // "manual" or "voice"
 }
 
 struct SaveTransactionResponse: Codable {

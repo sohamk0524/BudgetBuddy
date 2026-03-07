@@ -181,7 +181,7 @@ def format_savings_goals(goals: List[Dict[str, Any]]) -> str:
 
 
 def get_spending_breakdown(user_id: int) -> str:
-    """Get essential/discretionary spending breakdown from classified transactions."""
+    """Get spending breakdown by category from classified transactions."""
     try:
         from db_models import PlaidItem, Transaction
 
@@ -204,38 +204,20 @@ def get_spending_breakdown(user_id: int) -> str:
         if not transactions:
             return "No recent transactions"
 
-        # Aggregate by primary category with essential/discretionary splits
-        category_data = {}
-        total_essential = 0.0
-        total_discretionary = 0.0
+        # Aggregate by sub_category (food, drink, transportation, entertainment, other)
+        category_totals = {"food": 0.0, "drink": 0.0, "transportation": 0.0, "entertainment": 0.0, "other": 0.0, "unclassified": 0.0}
 
         for txn in transactions:
-            cat = txn.category_primary or "Uncategorized"
-            if cat not in category_data:
-                category_data[cat] = {"total": 0, "essential": 0, "discretionary": 0, "count": 0}
+            sub = getattr(txn, 'sub_category', None) or 'unclassified'
+            if sub in category_totals:
+                category_totals[sub] += txn.amount
+            else:
+                category_totals['unclassified'] += txn.amount
 
-            category_data[cat]["total"] += txn.amount
-            category_data[cat]["count"] += 1
-
-            if txn.sub_category == 'essential':
-                category_data[cat]["essential"] += txn.essential_amount or txn.amount
-                total_essential += txn.essential_amount or txn.amount
-            elif txn.sub_category == 'discretionary':
-                category_data[cat]["discretionary"] += txn.discretionary_amount or txn.amount
-                total_discretionary += txn.discretionary_amount or txn.amount
-            elif txn.sub_category == 'mixed':
-                category_data[cat]["essential"] += txn.essential_amount or 0
-                category_data[cat]["discretionary"] += txn.discretionary_amount or 0
-                total_essential += txn.essential_amount or 0
-                total_discretionary += txn.discretionary_amount or 0
-
-        lines = [f"Total Essential: ${total_essential:,.2f} | Total Discretionary: ${total_discretionary:,.2f}"]
-        lines.append("")
-
-        sorted_cats = sorted(category_data.items(), key=lambda x: x[1]["total"], reverse=True)
-        for cat, data in sorted_cats[:8]:
-            lines.append(f"  {cat}: ${data['total']:,.2f} total ({data['count']} transactions)")
-            lines.append(f"    Essential: ${data['essential']:,.2f} | Discretionary: ${data['discretionary']:,.2f}")
+        lines = ["Spending by category (last 30 days):"]
+        for cat, total in sorted(category_totals.items(), key=lambda x: x[1], reverse=True):
+            if total > 0:
+                lines.append(f"  {cat.capitalize()}: ${total:,.2f}")
 
         return "\n".join(lines)
 

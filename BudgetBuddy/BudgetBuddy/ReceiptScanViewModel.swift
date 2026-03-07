@@ -56,7 +56,7 @@ class ReceiptScanViewModel {
         }
     }
 
-    func confirmAndAttach(date: String, merchant: String, essentialTotal: Double? = nil, discretionaryTotal: Double? = nil) async {
+    func confirmAndAttach(date: String, merchant: String, category: String) async {
         guard let result = analysisResult,
               let userId = AuthManager.shared.authToken else {
             state = .error("Missing data")
@@ -65,20 +65,19 @@ class ReceiptScanViewModel {
 
         state = .attaching
 
-        // Build a result with user-edited merchant, totals, etc.
+        // Build a result with user-edited merchant
         let finalResult = ReceiptAnalysisResult(
             merchant: merchant,
             date: result.date,
             total: result.total,
-            items: result.items,
-            essentialTotal: essentialTotal ?? result.essentialTotal,
-            discretionaryTotal: discretionaryTotal ?? result.discretionaryTotal
+            items: result.items
         )
 
         do {
-            let response = try await APIService.shared.attachReceipt(userId: userId, result: finalResult, date: date)
+            let response = try await APIService.shared.attachReceipt(userId: userId, result: finalResult, category: category, date: date)
             attachResponse = response
             state = .done
+            NotificationCenter.default.post(name: .transactionAdded, object: nil)
         } catch {
             state = .error("Failed to save receipt: \(error.localizedDescription)")
         }

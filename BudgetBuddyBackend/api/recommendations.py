@@ -10,7 +10,7 @@ from services.recommendations_generator import get_cached_or_generate, generate_
 recommendations_bp = Blueprint('recommendations', __name__)
 
 
-@recommendations_bp.route("/recommendations/<int:user_id>", methods=["GET"])
+@recommendations_bp.route("/recommendations/<user_id>", methods=["GET"])
 def get_recommendations(user_id):
     """Return cached recommendations if fresh, otherwise generate new ones."""
     user = get_user(user_id)
@@ -32,7 +32,7 @@ def generate_fresh_recommendations():
     if not user_id:
         return jsonify({"error": "userId is required"}), 400
 
-    user = get_user(int(user_id))
+    user = get_user(user_id)
     if not user:
         return jsonify({"error": "User not found"}), 404
 
@@ -40,5 +40,5 @@ def generate_fresh_recommendations():
     if action not in ("general", "budget_balance", "spending_habits"):
         action = "general"
 
-    result = generate_recommendations(int(user_id), action=action)
+    result = generate_recommendations(user_id, action=action)
     return jsonify(result)

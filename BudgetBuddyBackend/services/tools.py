@@ -14,7 +14,7 @@ TOOL_DEFINITIONS: List[Dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "get_plaid_transactions",
-            "description": "Get the user's recent transactions from their linked bank accounts via Plaid. Use this when the user asks about their recent spending, transactions, purchases, or where their money is going. This provides real transaction data from connected bank accounts.",
+            "description": "Get the user's recent transactions from linked bank accounts (Plaid) AND voice-logged manual transactions. Use this when the user asks about their recent spending, transactions, purchases, or where their money is going. Each transaction includes a 'source' field ('plaid' or 'manual').",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -62,8 +62,19 @@ TOOL_DEFINITIONS: List[Dict[str, Any]] = [
                 "required": []
             }
         }
-    }
-    ,
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_weekly_spending_status",
+            "description": "Get the user's weekly spending limit, how much they've spent this week (from both bank and voice-logged transactions), how much is left for the rest of the week, and the daily safe-to-spend amount for today. Use when the user asks how much they can spend today, or when making recommendations that reference their remaining budget.",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "required": []
+            }
+        }
+    },
     {
         "type": "function",
         "function": {
@@ -75,6 +86,23 @@ TOOL_DEFINITIONS: List[Dict[str, Any]] = [
                     "query": {
                         "type": "string",
                         "description": "The user's question to search for school-specific advice (e.g., 'cheap coffee near campus', 'student discounts')"
+                    }
+                },
+                "required": ["query"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "search_local_deals",
+            "description": "Fast web search for local deals, discounts, and cheaper alternatives near the user's school. Returns raw search results (title, snippet, URL) for the agent to interpret. Use this to find specific deals based on the user's actual spending patterns (e.g., 'cheap burritos near UC Davis student discount', 'affordable grocery stores Davis CA').",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "Search query for local deals (e.g., 'cheap Mexican food near UC Davis student deals')"
                     }
                 },
                 "required": ["query"]
@@ -119,57 +147,76 @@ def _get_plaid_transactions(user_id: Optional[int], days: int = 30) -> Dict[str,
         return {"error": "No user ID provided", "has_plaid": False}
 
     try:
-        from db_models import get_active_plaid_items, get_accounts_for_item, get_transactions_since
+        from db_models import get_active_plaid_items, get_accounts_for_item, get_transactions_since, get_manual_transactions
         from datetime import datetime, timedelta
 
         plaid_items = get_active_plaid_items(user_id)
-        if not plaid_items:
-            return {
-                "has_plaid": False,
-                "message": "No bank accounts linked. The user should connect their bank via Plaid for transaction data."
-            }
+        has_plaid = bool(plaid_items)
 
         account_ids = []
         accounts_info = []
-        for item in plaid_items:
-            for account in get_accounts_for_item(item.key.id):
-                account_ids.append(account.key.id)
-                accounts_info.append({
-                    "name": account.get('name'),
-                    "type": account.get('account_type'),
-                    "balance": account.get('balance_current'),
-                })
-
-        if not account_ids:
-            return {
-                "has_plaid": True,
-                "has_transactions": False,
-                "message": "Bank accounts linked but no account data available.",
-            }
+        if plaid_items:
+            for item in plaid_items:
+                for account in get_accounts_for_item(item.key.id):
+                    account_ids.append(account.key.id)
+                    accounts_info.append({
+                        "name": account.get('name'),
+                        "type": account.get('account_type'),
+                        "balance": account.get('balance_current'),
+                    })
 
         since_date = (datetime.now() - timedelta(days=days)).date()
-        transactions = get_transactions_since(account_ids, since_date)
-        # Sort and cap at 100
-        transactions.sort(key=lambda t: t.get('date', ''), reverse=True)
-        transactions = transactions[:100]
 
-        if not transactions:
+        # Fetch Plaid transactions
+        plaid_txns = []
+        if account_ids:
+            plaid_txns = get_transactions_since(account_ids, since_date)
+
+        # Fetch manual (voice-logged) transactions
+        manual_txns_raw = get_manual_transactions(user_id, limit=500)
+        print(f"[get_plaid_transactions] user={user_id} plaid_txns={len(plaid_txns)} manual_txns_raw={len(manual_txns_raw)}")
+        manual_txns = []
+        for mt in manual_txns_raw:
+            mt_date = mt.get('date')
+            if not mt_date:
+                # No date — include it anyway (recent voice log)
+                manual_txns.append(mt)
+                continue
+            # Normalize to a date object for comparison
+            if isinstance(mt_date, str):
+                try:
+                    mt_date_obj = datetime.fromisoformat(mt_date).date()
+                except ValueError:
+                    mt_date_obj = None
+            elif hasattr(mt_date, 'date'):
+                # datetime object (possibly tz-aware from Datastore)
+                mt_date_obj = mt_date.date()
+            elif hasattr(mt_date, 'isoformat'):
+                # already a date object
+                mt_date_obj = mt_date
+            else:
+                mt_date_obj = None
+            if mt_date_obj is None or mt_date_obj >= since_date:
+                manual_txns.append(mt)
+        print(f"[get_plaid_transactions] after date filter: manual_txns={len(manual_txns)} since_date={since_date}")
+
+        if not plaid_txns and not manual_txns:
             return {
-                "has_plaid": True,
+                "has_plaid": has_plaid,
                 "has_transactions": False,
                 "accounts": accounts_info,
-                "message": f"No transactions found in the last {days} days.",
+                "message": f"No transactions found in the last {days} days." if has_plaid else "No bank accounts linked and no manual transactions found.",
             }
 
+        # Build unified transaction list
         category_totals = {}
         transaction_list = []
 
-        for txn in transactions:
+        for txn in plaid_txns:
             category = txn.get('category_primary') or "Uncategorized"
             amount = txn.get('amount') or 0
             if amount > 0:
                 category_totals[category] = category_totals.get(category, 0) + amount
-
             transaction_list.append({
                 "date": txn.get('date'),
                 "name": txn.get('name'),
@@ -177,14 +224,39 @@ def _get_plaid_transactions(user_id: Optional[int], days: int = 30) -> Dict[str,
                 "amount": amount,
                 "category": category,
                 "pending": txn.get('pending'),
+                "source": "plaid",
             })
+
+        for mt in manual_txns:
+            category = mt.get('category') or "Uncategorized"
+            amount = float(mt.get('amount') or 0)
+            if amount > 0:
+                category_totals[category] = category_totals.get(category, 0) + amount
+            mt_date = mt.get('date')
+            if hasattr(mt_date, 'isoformat'):
+                mt_date = mt_date.isoformat()
+            transaction_list.append({
+                "date": mt_date,
+                "name": mt.get('store') or mt.get('notes') or "Manual entry",
+                "merchant": mt.get('store'),
+                "amount": amount,
+                "category": category,
+                "pending": False,
+                "source": "manual",
+            })
+
+        # Sort combined list by date descending, cap at 100
+        transaction_list.sort(key=lambda t: t.get('date') or '', reverse=True)
+        transaction_list = transaction_list[:100]
 
         sorted_categories = sorted(category_totals.items(), key=lambda x: x[1], reverse=True)
         total_spending = sum(category_totals.values())
-        total_income = sum(-(txn.get('amount') or 0) for txn in transactions if (txn.get('amount') or 0) < 0)
+        all_amounts = [t.get('amount', 0) for t in plaid_txns] + [float(mt.get('amount') or 0) for mt in manual_txns]
+        total_income = sum(-a for a in all_amounts if a < 0)
 
+        total_count = len(plaid_txns) + len(manual_txns)
         return {
-            "has_plaid": True,
+            "has_plaid": has_plaid,
             "has_transactions": True,
             "period_days": days,
             "accounts": accounts_info,
@@ -195,12 +267,14 @@ def _get_plaid_transactions(user_id: Optional[int], days: int = 30) -> Dict[str,
                 for cat, amt in sorted_categories[:10]
             ],
             "recent_transactions": transaction_list[:20],
-            "transaction_count": len(transactions),
-            "summary": f"Found {len(transactions)} transactions in the last {days} days. Total spending: ${total_spending:.2f}, Total income: ${total_income:.2f}",
+            "transaction_count": total_count,
+            "plaid_count": len(plaid_txns),
+            "manual_count": len(manual_txns),
+            "summary": f"Found {total_count} transactions ({len(plaid_txns)} bank, {len(manual_txns)} voice-logged) in the last {days} days. Total spending: ${total_spending:.2f}, Total income: ${total_income:.2f}",
         }
 
     except Exception as e:
-        return {"error": f"Failed to fetch Plaid transactions: {str(e)}", "has_plaid": False}
+        return {"error": f"Failed to fetch transactions: {str(e)}", "has_plaid": False}
 
 
 
@@ -368,6 +442,89 @@ def _get_user_savings_progress(user_id: Optional[int]) -> Dict[str, Any]:
         return {"has_savings_data": False, "message": f"Error fetching savings progress: {str(e)}"}
 
 
+def _get_weekly_spending_status(user_id: Optional[int]) -> Dict[str, Any]:
+    """
+    Get weekly spending limit, amount spent this week, remaining budget,
+    and daily safe-to-spend for the rest of the week.
+    """
+    if not user_id:
+        return {"error": "No user ID provided"}
+
+    try:
+        from db_models import (
+            get_profile,
+            get_active_plaid_items,
+            get_accounts_for_item,
+            get_transactions_for_accounts,
+            get_manual_transactions,
+        )
+        from datetime import datetime, timedelta
+
+        profile = get_profile(user_id)
+        weekly_limit = float(profile.get('weekly_spending_limit', 0)) if profile else 0
+
+        if weekly_limit <= 0:
+            return {
+                "has_weekly_limit": False,
+                "message": "No weekly spending limit set. The user should set one in their profile.",
+            }
+
+        today = datetime.utcnow().date()
+        monday = today - timedelta(days=today.weekday())
+        start_date = monday.isoformat()
+        days_left = max(1, 7 - today.weekday())  # days remaining including today
+
+        total_spent = 0.0
+
+        # Plaid transactions this week
+        plaid_items = get_active_plaid_items(user_id)
+        account_ids = []
+        for item in plaid_items:
+            for acc in get_accounts_for_item(item.key.id):
+                account_ids.append(acc.key.id)
+        if account_ids:
+            txns, _ = get_transactions_for_accounts(account_ids, start_date=start_date, limit=10000)
+            for txn in txns:
+                amt = txn.get('amount') or 0
+                if amt > 0:
+                    total_spent += amt
+
+        # Manual transactions this week
+        manual_txns = get_manual_transactions(user_id, limit=500)
+        for txn in manual_txns:
+            txn_date = txn.get('date')
+            if txn_date:
+                if isinstance(txn_date, str):
+                    try:
+                        txn_date = datetime.fromisoformat(txn_date).date()
+                    except ValueError:
+                        continue
+                elif hasattr(txn_date, 'date'):
+                    txn_date = txn_date.date()
+                if txn_date >= monday:
+                    total_spent += float(txn.get('amount') or 0)
+
+        remaining = round(weekly_limit - total_spent, 2)
+        daily_safe = round(remaining / days_left, 2) if remaining > 0 else 0
+
+        day_name = today.strftime('%A')
+
+        return {
+            "has_weekly_limit": True,
+            "weekly_limit": weekly_limit,
+            "spent_this_week": round(total_spent, 2),
+            "remaining_this_week": remaining,
+            "days_left_in_week": days_left,
+            "daily_safe_to_spend": daily_safe,
+            "today": day_name,
+            "summary": f"Weekly limit: ${weekly_limit:.2f}. Spent so far: ${total_spent:.2f}. "
+                       f"Remaining: ${remaining:.2f} over {days_left} days = ${daily_safe:.2f}/day safe to spend.",
+        }
+
+    except Exception as e:
+        return {"error": f"Failed to get weekly spending status: {str(e)}"}
+
+
 def _get_school_advice(user_id: Optional[int], query: str) -> Dict[str, Any]:
     """
     Get school-specific financial advice via web search (Tavily RAG).
@@ -395,6 +552,67 @@ def _get_school_advice(user_id: Optional[int], query: str) -> Dict[str, Any]:
 
     except Exception as e:
         return {"error": f"Failed to get school advice: {str(e)}"}
+
+
+def _search_local_deals(user_id: Optional[int], query: str) -> Dict[str, Any]:
+    """
+    Lightweight local deal search via Tavily. No LLM rewrite or synthesis —
+    returns raw results for the agent to interpret.
+    """
+    if not user_id:
+        return {"error": "No user ID provided"}
+    if not query:
+        return {"error": "No query provided"}
+
+    try:
+        import os
+        from db_models import get_profile
+        from services.school_rag import SCHOOL_DISPLAY_NAMES
+
+        profile = get_profile(user_id)
+        school_slug = profile.get("school") if profile else None
+
+        if not school_slug:
+            return {"error": "No school found in user profile."}
+
+        school_display = SCHOOL_DISPLAY_NAMES.get(
+            school_slug, school_slug.replace("_", " ").title()
+        )
+
+        # Append school context if not already in query
+        if school_display.lower() not in query.lower():
+            query = f"{query} near {school_display}"
+
+        tavily_key = os.environ.get("TAVILY_API_KEY")
+        if not tavily_key:
+            return {"error": "TAVILY_API_KEY not configured"}
+
+        from tavily import TavilyClient
+        client = TavilyClient(api_key=tavily_key)
+        search_results = client.search(
+            query=query,
+            search_depth="basic",
+            max_results=5,
+            include_answer=True,
+        )
+
+        results = []
+        for r in search_results.get("results", []):
+            results.append({
+                "title": r.get("title", ""),
+                "snippet": r.get("content", ""),
+                "url": r.get("url", ""),
+            })
+
+        return {
+            "school": school_display,
+            "query": query,
+            "answer": search_results.get("answer", ""),
+            "results": results,
+        }
+
+    except Exception as e:
+        return {"error": f"Deal search failed: {str(e)}"}
 
 
 def _render_visual(visual_type: str, data: Dict[str, Any]) -> Dict[str, Any]:
@@ -436,6 +654,8 @@ TOOL_EXECUTORS: Dict[str, Callable] = {
     "get_savings_progress": lambda _: _get_user_savings_progress(get_tool_context()),
     "render_visual": lambda args: _render_visual(args.get("visual_type"), args.get("data", {})),
     "get_school_advice": lambda args: _get_school_advice(get_tool_context(), args.get("query", "")),
+    "search_local_deals": lambda args: _search_local_deals(get_tool_context(), args.get("query", "")),
+    "get_weekly_spending_status": lambda _: _get_weekly_spending_status(get_tool_context()),
 }
 
 
@@ -478,6 +698,8 @@ TOOL_TO_VISUAL_TYPE: Dict[str, Optional[str]] = {
     "get_spending_status": "burndownChart",
     "get_savings_progress": None,
     "get_school_advice": None,
+    "search_local_deals": None,
+    "get_weekly_spending_status": None,
 }
 
 

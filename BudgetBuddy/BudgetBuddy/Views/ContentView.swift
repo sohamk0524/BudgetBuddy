@@ -27,7 +27,7 @@ struct ContentView: View {
                 // Show Plaid Link after onboarding
                 PlaidLinkView(
                     showPlaidLink: $showPlaidLink,
-                    userId: authManager.authToken ?? 0,
+                    userId: authManager.authToken ?? "",
                     onComplete: {
                         hasCompletedPlaidFlow = true
                         showPlaidLink = false

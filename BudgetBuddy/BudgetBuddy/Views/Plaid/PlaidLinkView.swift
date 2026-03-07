@@ -11,7 +11,7 @@ struct PlaidLinkView: View {
     @State private var plaidManager = PlaidLinkManager.shared
     @Binding var showPlaidLink: Bool
 
-    let userId: Int
+    let userId: String
     let onComplete: () -> Void
     let onSkip: () -> Void
 
@@ -161,7 +161,7 @@ private struct SecurityBadge: View {
 // MARK: - Plaid Link Sheet
 
 struct PlaidLinkSheetView: UIViewControllerRepresentable {
-    let userId: Int
+    let userId: String
     let manager: PlaidLinkManager
 
     func makeUIViewController(context: Context) -> UIViewController {
@@ -185,7 +185,7 @@ struct PlaidLinkSheetView: UIViewControllerRepresentable {
 #Preview {
     PlaidLinkView(
         showPlaidLink: .constant(true),
-        userId: 1,
+        userId: "preview",
         onComplete: {},
         onSkip: {}
     )

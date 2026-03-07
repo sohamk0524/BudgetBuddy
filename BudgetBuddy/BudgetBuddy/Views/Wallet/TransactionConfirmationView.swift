@@ -17,10 +17,8 @@ struct TransactionConfirmationView: View {
     @State private var selectedCategory: String = ""
     @State private var store: String = ""
     @State private var date: Date = Date()
-    @State private var subCategory: String = "essential"
-    @State private var essentialRatio: Double = 1.0
 
-    private let categories = ["Coffee", "Food", "Groceries", "Transport", "Entertainment", "Shopping", "Gas", "Other"]
+    private let categories = ["Food", "Drink", "Transportation", "Entertainment", "Other"]
 
     var body: some View {
         NavigationStack {
@@ -102,62 +100,6 @@ struct TransactionConfirmationView: View {
                             .clipShape(RoundedRectangle(cornerRadius: 10))
                     }
 
-                    // Classification — Essential | Fun Money | Split
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Classification")
-                            .font(.roundedCaption)
-                            .foregroundStyle(Color.textSecondary)
-
-                        Picker("Classification", selection: $subCategory) {
-                            Text("Essential").tag("essential")
-                            Text("Fun Money").tag("discretionary")
-                            Text("Split").tag("mixed")
-                        }
-                        .pickerStyle(.segmented)
-                        .onChange(of: subCategory) {
-                            switch subCategory {
-                            case "essential": essentialRatio = 1.0
-                            case "discretionary": essentialRatio = 0.0
-                            default: break
-                            }
-                        }
-
-                        if subCategory == "mixed" {
-                            VStack(spacing: 8) {
-                                HStack {
-                                    Text("Essential")
-                                        .font(.roundedCaption)
-                                        .foregroundStyle(.green)
-                                    Spacer()
-                                    Text("\(Int(essentialRatio * 100))%")
-                                        .font(.roundedBody)
-                                        .fontWeight(.medium)
-                                        .foregroundStyle(Color.textPrimary)
-                                        .monospacedDigit()
-                                    Spacer()
-                                    Text("Fun Money")
-                                        .font(.roundedCaption)
-                                        .foregroundStyle(Color.danger)
-                                }
-
-                                Slider(value: $essentialRatio, in: 0...1, step: 0.05)
-                                    .tint(Color.accent)
-
-                                if let amount = Double(amountText), amount > 0 {
-                                    HStack {
-                                        Text("$\(amount * essentialRatio, specifier: "%.2f") essential")
-                                            .font(.roundedCaption)
-                                            .foregroundStyle(.green)
-                                        Spacer()
-                                        Text("$\(amount * (1 - essentialRatio), specifier: "%.2f") fun money")
-                                            .font(.roundedCaption)
-                                            .foregroundStyle(Color.danger)
-                                    }
-                                }
-                            }
-                        }
-                    }
-
                     // Date
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Date")
@@ -232,8 +174,6 @@ struct TransactionConfirmationView: View {
         }
         store = viewModel.transaction.store ?? ""
         date = viewModel.transaction.date
-        subCategory = viewModel.transaction.subCategory
-        essentialRatio = viewModel.transaction.essentialRatio
     }
 
     private func saveLocalStateToViewModel() {
@@ -241,8 +181,6 @@ struct TransactionConfirmationView: View {
         viewModel.transaction.category = selectedCategory.isEmpty ? "Other" : selectedCategory
         viewModel.transaction.store = store.isEmpty ? nil : store
         viewModel.transaction.date = date
-        viewModel.transaction.subCategory = subCategory
-        viewModel.transaction.essentialRatio = essentialRatio
     }
 
     private func confirmTransaction() {
