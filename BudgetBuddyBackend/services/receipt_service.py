@@ -59,4 +59,22 @@ Respond ONLY with valid JSON in exactly this format:
     elif "```" in response_text:
         response_text = response_text.split("```")[1].split("```")[0]
 
-    return json.loads(response_text.strip())
+    result = json.loads(response_text.strip())
+
+    # Normalise any unrecognised item classifications (e.g. legacy "essential"/"discretionary")
+    valid = {'food', 'drink', 'groceries', 'transportation', 'entertainment', 'other'}
+    for item in result.get('items', []):
+        cls = (item.get('classification') or '').lower()
+        if cls not in valid:
+            item['classification'] = _fallback_classification(cls)
+
+    return result
+
+
+def _fallback_classification(cls: str) -> str:
+    """Map legacy or unrecognised classification strings to a valid category."""
+    if cls == 'essential':
+        return 'groceries'
+    if cls == 'discretionary':
+        return 'food'
+    return 'other'

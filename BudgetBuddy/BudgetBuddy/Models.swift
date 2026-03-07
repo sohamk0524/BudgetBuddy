@@ -581,6 +581,12 @@ struct ReceiptAttachResponse: Codable {
     let enriched: Bool
 }
 
+struct AddReceiptItemsResponse: Codable {
+    let success: Bool
+    let itemCount: Int
+    let subCategory: String?
+}
+
 // MARK: - User Profile Models
 
 struct UserProfile: Codable {

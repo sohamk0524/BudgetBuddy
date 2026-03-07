@@ -56,7 +56,7 @@ class ReceiptScanViewModel {
         }
     }
 
-    func confirmAndAttach(date: String, merchant: String, category: String) async {
+    func confirmAndAttach(category: String, items: [EditableReceiptItem], date: String, merchant: String) async {
         guard let result = analysisResult,
               let userId = AuthManager.shared.authToken else {
             state = .error("Missing data")
@@ -65,16 +65,18 @@ class ReceiptScanViewModel {
 
         state = .attaching
 
-        // Build a result with user-edited merchant
+        // Build result with user-edited merchant and items
         let finalResult = ReceiptAnalysisResult(
             merchant: merchant,
             date: result.date,
             total: result.total,
-            items: result.items
+            items: items.map { $0.toReceiptLineItem() }
         )
 
         do {
-            let response = try await APIService.shared.attachReceipt(userId: userId, result: finalResult, category: category, date: date)
+            let response = try await APIService.shared.attachReceipt(
+                userId: userId, result: finalResult, category: category, date: date
+            )
             attachResponse = response
             state = .done
             NotificationCenter.default.post(name: .transactionAdded, object: nil)

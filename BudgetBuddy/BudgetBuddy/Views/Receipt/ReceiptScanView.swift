@@ -61,12 +61,13 @@ struct ReceiptScanView: View {
             analyzingView
         case .reviewed:
             if let result = viewModel.analysisResult {
-                ReceiptLineItemsView(result: result) { category, date, merchant in
+                ReceiptLineItemsView(result: result) { category, items, date, merchant in
                     Task {
                         await viewModel.confirmAndAttach(
+                            category: category,
+                            items: items,
                             date: date,
-                            merchant: merchant,
-                            category: category
+                            merchant: merchant
                         )
                     }
                 }
@@ -133,16 +134,7 @@ struct ReceiptScanView: View {
     }
 
     private var analyzingView: some View {
-        VStack(spacing: 20) {
-            Spacer()
-            ProgressView()
-                .scaleEffect(1.5)
-                .tint(Color.accent)
-            Text(viewModel.state == .attaching ? "Saving your receipt..." : "Reading your receipt...")
-                .font(.roundedHeadline)
-                .foregroundStyle(Color.textPrimary)
-            Spacer()
-        }
+        ReceiptLoadingView(isAttaching: viewModel.state == .attaching)
     }
 
     private var doneView: some View {
@@ -196,6 +188,134 @@ struct ReceiptScanView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 14))
                 .padding(.horizontal)
                 .padding(.bottom, 32)
+        }
+    }
+}
+
+// MARK: - Receipt Loading View
+
+private struct LoadingStep {
+    let icon: String
+    let label: String
+}
+
+struct ReceiptLoadingView: View {
+    let isAttaching: Bool
+
+    private let analyzeSteps: [LoadingStep] = [
+        LoadingStep(icon: "viewfinder",            label: "Scanning image"),
+        LoadingStep(icon: "mappin.and.ellipse",    label: "Reading merchant & date"),
+        LoadingStep(icon: "list.bullet.rectangle", label: "Extracting line items"),
+        LoadingStep(icon: "tag",                   label: "Categorizing expenses"),
+    ]
+    private let attachSteps: [LoadingStep] = [
+        LoadingStep(icon: "arrow.triangle.2.circlepath", label: "Matching to transactions"),
+        LoadingStep(icon: "tray.and.arrow.down",         label: "Saving receipt"),
+        LoadingStep(icon: "chart.pie",                   label: "Updating your budget"),
+    ]
+
+    @State private var currentStep = 0
+    @State private var dotCount = 0
+    @State private var iconScale: CGFloat = 0.7
+    @State private var iconOpacity: Double = 0
+
+    private var steps: [LoadingStep] { isAttaching ? attachSteps : analyzeSteps }
+
+    var body: some View {
+        VStack(spacing: 32) {
+            Spacer()
+
+            // Animated icon
+            ZStack {
+                Circle()
+                    .fill(Color.accent.opacity(0.12))
+                    .frame(width: 90, height: 90)
+                Image(systemName: steps[currentStep].icon)
+                    .font(.system(size: 34, weight: .medium))
+                    .foregroundStyle(Color.accent)
+                    .scaleEffect(iconScale)
+                    .opacity(iconOpacity)
+            }
+
+            // Step labels
+            VStack(spacing: 12) {
+                ForEach(Array(steps.enumerated()), id: \.offset) { index, step in
+                    HStack(spacing: 10) {
+                        ZStack {
+                            if index < currentStep {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundStyle(Color.accent)
+                                    .font(.system(size: 18))
+                            } else if index == currentStep {
+                                ProgressView()
+                                    .scaleEffect(0.75)
+                                    .tint(Color.accent)
+                                    .frame(width: 18, height: 18)
+                            } else {
+                                Circle()
+                                    .strokeBorder(Color.textSecondary.opacity(0.3), lineWidth: 1.5)
+                                    .frame(width: 18, height: 18)
+                            }
+                        }
+                        .frame(width: 20)
+
+                        Text(step.label)
+                            .font(.roundedBody)
+                            .foregroundStyle(
+                                index < currentStep  ? Color.textSecondary :
+                                index == currentStep ? Color.textPrimary :
+                                                       Color.textSecondary.opacity(0.5)
+                            )
+                            .animation(.easeInOut(duration: 0.3), value: currentStep)
+
+                        Spacer()
+                    }
+                }
+            }
+            .padding(.horizontal, 40)
+
+            Spacer()
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .onAppear { startAnimation() }
+        .onChange(of: isAttaching) { startAnimation() }
+    }
+
+    private func startAnimation() {
+        currentStep = 0
+        animateIconIn()
+        scheduleNextStep()
+    }
+
+    private func animateIconIn() {
+        iconScale = 0.7
+        iconOpacity = 0
+        withAnimation(.spring(duration: 0.4)) {
+            iconScale = 1.0
+            iconOpacity = 1.0
+        }
+    }
+
+    private func scheduleNextStep() {
+        let delay = isAttaching ? 1.4 : 1.6
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+            let next = currentStep + 1
+            if next < steps.count {
+                withAnimation(.easeInOut(duration: 0.25)) {
+                    currentStep = next
+                }
+                animateIconIn()
+                scheduleNextStep()
+            } else {
+                // Loop back from step before last so it doesn't look stuck
+                DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                    withAnimation(.easeInOut(duration: 0.25)) {
+                        currentStep = steps.count - 2
+                    }
+                    animateIconIn()
+                    scheduleNextStep()
+                }
+            }
         }
     }
 }

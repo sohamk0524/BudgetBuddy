@@ -364,6 +364,53 @@ def classify_single_transaction(transaction_id):
     })
 
 
+@expenses_bp.route("/transaction/<int:transaction_id>/receipt-items", methods=["PUT"])
+def add_transaction_receipt_items(transaction_id):
+    """
+    Append items to a transaction's receipt_items and recompute sub_category
+    from the dominant item category by spend.
+
+    JSON body: {"items": [{"name": str, "price": float, "classification": str}]}
+    """
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "Request body must be JSON"}), 400
+
+    new_items = data.get('items', [])
+    if not isinstance(new_items, list):
+        return jsonify({"error": "items must be an array"}), 400
+
+    client = get_client()
+    txn = client.get(client.key('Transaction', transaction_id))
+    if not txn:
+        txn = client.get(client.key('ManualTransaction', transaction_id))
+    if not txn:
+        return jsonify({"error": "Transaction not found"}), 404
+
+    existing_json = txn.get('receipt_items') or '[]'
+    try:
+        existing_items = json.loads(existing_json)
+    except (ValueError, TypeError):
+        existing_items = []
+
+    existing_items.extend(new_items)
+    txn['receipt_items'] = json.dumps(existing_items)
+
+    # Recompute dominant category from all items
+    totals = {}
+    for item in existing_items:
+        cat = (item.get('classification') or 'other').lower()
+        if cat not in VALID_CATEGORIES:
+            cat = 'other'
+        totals[cat] = totals.get(cat, 0) + float(item.get('price') or 0)
+    if totals:
+        txn['sub_category'] = max(totals, key=totals.get)
+
+    client.put(txn)
+    return jsonify({"success": True, "itemCount": len(existing_items),
+                    "subCategory": txn.get('sub_category')})
+
+
 @expenses_bp.route("/merchant/classifications/<user_id>", methods=["GET"])
 def get_merchant_classifications(user_id):
     """Get all merchant classifications for a user."""

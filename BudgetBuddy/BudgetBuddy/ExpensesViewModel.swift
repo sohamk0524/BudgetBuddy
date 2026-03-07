@@ -262,6 +262,18 @@ class ExpensesViewModel {
         return response
     }
 
+    func addItemsToTransaction(transactionId: Int, items: [EditableReceiptItem]) async throws {
+        let response = try await apiService.addReceiptItems(transactionId: transactionId, items: items)
+        if let newSubCategory = response.subCategory {
+            applyClassificationLocally(
+                transactionId: transactionId,
+                subCategory: newSubCategory,
+                essentialAmount: nil,
+                discretionaryAmount: nil
+            )
+        }
+    }
+
     func refresh() async {
         await fetchExpenses()
     }
