@@ -594,14 +594,14 @@ struct UserProfile: Codable {
 struct FinancialProfileInfo: Codable {
     let isStudent: Bool?
     let weeklySpendingLimit: Double?
-    let strictnessLevel: String?
+    let selectedSchool: String?
 }
 
 struct UserProfileUpdateRequest: Codable {
     var name: String?
     var isStudent: Bool?
     var weeklySpendingLimit: Double?
-    var strictnessLevel: String?
+    var selectedSchool: String? = nil
 }
 
 // MARK: - Top Expenses Models

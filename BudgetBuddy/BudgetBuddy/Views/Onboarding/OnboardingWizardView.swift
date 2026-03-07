@@ -16,7 +16,6 @@ struct OnboardingWizardView: View {
     @State private var isStudent: Bool = false
     @State private var selectedSchool: String = ""
     @State private var weeklySpendingLimit: String = ""
-    @State private var strictnessLevel: String = "moderate"
 
     var authManager = AuthManager.shared
 
@@ -77,18 +76,10 @@ struct OnboardingWizardView: View {
                         // Page 3: Weekly Spending Limit
                         WeeklySpendingLimitPage(weeklyLimit: $weeklySpendingLimit)
                             .tag(3)
-
-                        // Page 4: Strictness Level
-                        StrictnessLevelPage(selectedStrictness: $strictnessLevel)
-                            .tag(4)
                     } else {
                         // Page 2: Weekly Spending Limit
                         WeeklySpendingLimitPage(weeklyLimit: $weeklySpendingLimit)
                             .tag(2)
-
-                        // Page 3: Strictness Level
-                        StrictnessLevelPage(selectedStrictness: $strictnessLevel)
-                            .tag(3)
                     }
                 }
                 .tabViewStyle(.page(indexDisplayMode: .never))
@@ -177,7 +168,6 @@ struct OnboardingWizardView: View {
                 name: trimmedName,
                 isStudent: isStudent,
                 weeklySpendingLimit: limit,
-                strictnessLevel: strictnessLevel,
                 school: selectedSchool
             )
         }
@@ -354,52 +344,6 @@ struct WeeklySpendingLimitPage: View {
             .background(Color.surface)
             .clipShape(RoundedRectangle(cornerRadius: 16))
             .padding(.horizontal, 48)
-
-            Spacer()
-        }
-        .padding(.top, 24)
-    }
-}
-
-// MARK: - Strictness Level Page
-
-struct StrictnessLevelPage: View {
-    @Binding var selectedStrictness: String
-
-    private let options = [
-        ("relaxed", "Relaxed", "Guide me gently"),
-        ("moderate", "Moderate", "Keep me on track"),
-        ("strict", "Strict", "Don't let me overspend")
-    ]
-
-    var body: some View {
-        VStack(spacing: 24) {
-            Image(systemName: "slider.horizontal.3")
-                .font(.system(size: 56))
-                .foregroundStyle(Color.accent)
-
-            Text("How Strict Should We Be?")
-                .font(.roundedHeadline)
-                .foregroundStyle(Color.textPrimary)
-
-            Text("Choose how aggressively we should enforce your budget")
-                .font(.roundedBody)
-                .foregroundStyle(Color.textSecondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 24)
-
-            VStack(spacing: 12) {
-                ForEach(options, id: \.0) { value, title, subtitle in
-                    SelectableOptionCard(
-                        title: title,
-                        subtitle: subtitle,
-                        isSelected: selectedStrictness == value
-                    ) {
-                        selectedStrictness = value
-                    }
-                }
-            }
-            .padding(.horizontal, 24)
 
             Spacer()
         }
