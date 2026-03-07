@@ -660,6 +660,7 @@ actor APIService {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.timeoutInterval = 120
 
         let body: [String: Any] = [
             "userId": userId,
