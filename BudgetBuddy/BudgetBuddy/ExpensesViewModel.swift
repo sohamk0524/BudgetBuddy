@@ -7,6 +7,10 @@
 
 import Foundation
 
+extension Notification.Name {
+    static let expensesDidChange = Notification.Name("expensesDidChange")
+}
+
 enum ExpenseFilter: String, CaseIterable {
     case all = "All"
     case food = "Food"
@@ -162,6 +166,7 @@ class ExpensesViewModel {
                 offset: 0
             )
             allTransactions = response.transactions
+            NotificationCenter.default.post(name: .expensesDidChange, object: nil)
 
             // Update daily reminder based on today's activity
             if hasLoggedTransactionToday() {
@@ -205,6 +210,7 @@ class ExpensesViewModel {
                 let newInThisWeek = response.transactions.count - lastFetchedCount
                 lastFetchedCount = response.transactions.count
                 allTransactions = response.transactions
+                NotificationCenter.default.post(name: .expensesDidChange, object: nil)
 
                 // End of available data — show whatever was found and stop
                 if newInThisWeek <= 0 { break }
@@ -250,6 +256,8 @@ class ExpensesViewModel {
             essentialAmount: response.transaction.essentialAmount,
             discretionaryAmount: response.transaction.discretionaryAmount
         )
+
+        NotificationCenter.default.post(name: .expensesDidChange, object: nil)
 
         // If the backend bulk-applied to other transactions, refresh in the background
         if (response.autoApplied ?? 0) > 0 {
