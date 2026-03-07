@@ -12,6 +12,7 @@ struct ContentView: View {
     @State private var authManager = AuthManager.shared
     @State private var selectedTab = 0
     @State private var expensesViewModel = ExpensesViewModel()
+    @State private var insightsViewModel = InsightsViewModel()
     @State private var showPlaidLink = false
     @State private var hasCompletedPlaidFlow = false
 
@@ -68,21 +69,21 @@ struct ContentView: View {
                 }
                 .tag(1)
 
-            // Tab 3: Profile
+            // Tab 3: Insights
+            InsightsView(viewModel: insightsViewModel)
+                .tabItem {
+                    Label("Insights", systemImage: "chart.pie.fill")
+                }
+                .tag(2)
+
+            // Tab 4: Profile
             NavigationStack {
                 ProfileView()
             }
                 .tabItem {
                     Label("Profile", systemImage: "person.circle")
                 }
-                .tag(2)
-
-            // Tab 4: Plan (Spending Plan) — hidden for now
-            // PlanView(viewModel: planViewModel, walletViewModel: walletViewModel)
-            //     .tabItem {
-            //         Label("Plan", systemImage: "doc.text.fill")
-            //     }
-            //     .tag(3)
+                .tag(3)
         }
         .tint(Color.accent)
         .onAppear {
