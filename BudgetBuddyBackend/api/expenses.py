@@ -30,7 +30,7 @@ from services.classification_service import (
 
 expenses_bp = Blueprint('expenses', __name__)
 
-VALID_CATEGORIES = ('food', 'drink', 'transportation', 'entertainment', 'other')
+VALID_CATEGORIES = ('food', 'drink', 'groceries', 'transportation', 'entertainment', 'other')
 
 
 def _parse_receipt_items(raw):
@@ -112,6 +112,7 @@ def get_expenses(user_id):
     # Compute summary by category
     summary_totals = {cat: 0.0 for cat in VALID_CATEGORIES}
     summary_totals['unclassified'] = 0.0
+
     for t in filtered:
         t_sub = t.get('sub_category') or 'unclassified'
         t_amount = t.get('amount') or 0
@@ -209,6 +210,7 @@ def get_expenses(user_id):
         "summary": {
             "totalFood": round(summary_totals['food'], 2),
             "totalDrink": round(summary_totals['drink'], 2),
+            "totalGroceries": round(summary_totals['groceries'], 2),
             "totalTransportation": round(summary_totals['transportation'], 2),
             "totalEntertainment": round(summary_totals['entertainment'], 2),
             "totalOther": round(summary_totals['other'], 2),

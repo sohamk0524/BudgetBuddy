@@ -220,6 +220,7 @@ func categoryColor(for category: String) -> Color {
     switch category.lowercased() {
     case "food":            return .orange
     case "drink":           return .purple
+    case "groceries":       return .green
     case "transportation":  return .cyan
     case "entertainment":   return .pink
     case "other":           return .indigo
@@ -231,6 +232,7 @@ func categoryIcon(for category: String) -> String {
     switch category.lowercased() {
     case "food":            return "fork.knife"
     case "drink":           return "cup.and.saucer.fill"
+    case "groceries":       return "cart.fill"
     case "transportation":  return "car.fill"
     case "entertainment":   return "film.fill"
     case "other":           return "ellipsis.circle.fill"
@@ -247,6 +249,7 @@ struct ExpensesSummaryCard: View {
         [
             ("Food", summary.totalFood, .orange),
             ("Drink", summary.totalDrink, .purple),
+            ("Groceries", summary.totalGroceries, .green),
             ("Transportation", summary.totalTransportation, .cyan),
             ("Entertainment", summary.totalEntertainment, .pink),
             ("Other", summary.totalOther, .indigo),
@@ -353,7 +356,7 @@ struct ExpenseTransactionRow: View {
     @ViewBuilder
     private var categoryBadge: some View {
         let cat = transaction.subCategory.lowercased()
-        let known = ["food", "drink", "transportation", "entertainment", "other"]
+        let known = ["food", "drink", "groceries", "transportation", "entertainment", "other"]
         if known.contains(cat) {
             textBadge(transaction.subCategory.capitalized, color: categoryColor(for: cat))
         } else {
@@ -386,12 +389,12 @@ struct TransactionClassificationSheet: View {
     @State private var isSaving = false
     @Environment(\.dismiss) private var dismiss
 
-    private let categories = ["Food", "Drink", "Transportation", "Entertainment", "Other"]
+    private let categories = ["Food", "Drink", "Groceries", "Transportation", "Entertainment", "Other"]
 
     init(transaction: ExpenseTransaction, viewModel: ExpensesViewModel) {
         self.transaction = transaction
         self.viewModel = viewModel
-        let known = ["food", "drink", "transportation", "entertainment", "other"]
+        let known = ["food", "drink", "groceries", "transportation", "entertainment", "other"]
         let current = transaction.subCategory.lowercased()
         _selectedCategory = State(initialValue: known.contains(current) ? transaction.subCategory.capitalized : "")
     }

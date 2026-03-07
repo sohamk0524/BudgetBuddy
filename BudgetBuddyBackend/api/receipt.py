@@ -113,7 +113,7 @@ def attach_receipt():
     receipt_items_json = json.dumps(items)
 
     # Use the category directly as sub_category
-    valid_categories = ('food', 'drink', 'transportation', 'entertainment', 'other')
+    valid_categories = ('food', 'drink', 'groceries', 'transportation', 'entertainment', 'other')
     sub_category = category.lower() if category.lower() in valid_categories else 'other'
 
     # Try to find a matching Plaid transaction to enrich

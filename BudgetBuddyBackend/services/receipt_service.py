@@ -16,23 +16,21 @@ def analyze_receipt(image_data: bytes, media_type: str) -> dict:
         media_type: MIME type string, e.g. "image/jpeg"
 
     Returns:
-        Dict with keys: merchant, total, items, essentialTotal, discretionaryTotal
+        Dict with keys: merchant, date, total, items (each with classification)
     """
     client = anthropic.Anthropic()
     prompt = """Analyze this receipt image. Extract:
 1. Merchant name and total amount
 2. The date of the transaction (from the receipt header/footer) in YYYY-MM-DD format. If no date is visible, use null.
 3. Every line item with its price
-4. Classify each item: "essential" (food staples, household necessities, medicine) or "discretionary" (snacks, alcohol, cosmetics, entertainment, clothing, luxury items)
+4. Classify each item into exactly one of: "food" (prepared meals, restaurant food), "drink" (coffee, alcohol, beverages), "groceries" (raw ingredients, produce, packaged goods at a grocery/supermarket), "transportation", "entertainment", or "other"
 
 Respond ONLY with valid JSON in exactly this format:
 {
   "merchant": "string",
   "date": "YYYY-MM-DD" or null,
   "total": <float>,
-  "items": [{"name": "string", "price": <float>, "classification": "essential" or "discretionary"}],
-  "essentialTotal": <float>,
-  "discretionaryTotal": <float>
+  "items": [{"name": "string", "price": <float>, "classification": "food" or "drink" or "groceries" or "transportation" or "entertainment" or "other"}]
 }"""
 
     msg = client.messages.create(

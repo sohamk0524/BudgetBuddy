@@ -11,6 +11,7 @@ enum ExpenseFilter: String, CaseIterable {
     case all = "All"
     case food = "Food"
     case drink = "Drink"
+    case groceries = "Groceries"
     case transportation = "Transportation"
     case entertainment = "Entertainment"
     case other = "Other"
@@ -35,6 +36,7 @@ class ExpensesViewModel {
         case .all:             return allTransactions
         case .food:            return allTransactions.filter { $0.subCategory.lowercased() == "food" }
         case .drink:           return allTransactions.filter { $0.subCategory.lowercased() == "drink" }
+        case .groceries:       return allTransactions.filter { $0.subCategory.lowercased() == "groceries" }
         case .transportation:  return allTransactions.filter { $0.subCategory.lowercased() == "transportation" }
         case .entertainment:   return allTransactions.filter { $0.subCategory.lowercased() == "entertainment" }
         case .other:           return allTransactions.filter { $0.subCategory.lowercased() == "other" }
@@ -44,7 +46,7 @@ class ExpensesViewModel {
 
     /// Summary computed locally from the full list.
     var summary: ExpensesSummary {
-        let knownCategories = ["food", "drink", "transportation", "entertainment", "other"]
+        let knownCategories = ["food", "drink", "groceries", "transportation", "entertainment", "other"]
         var totals = [String: Double]()
         for cat in knownCategories {
             totals[cat] = allTransactions.filter { $0.subCategory.lowercased() == cat }.reduce(0) { $0 + $1.amount }
@@ -53,6 +55,7 @@ class ExpensesViewModel {
         return ExpensesSummary(
             totalFood: totals["food"] ?? 0,
             totalDrink: totals["drink"] ?? 0,
+            totalGroceries: totals["groceries"] ?? 0,
             totalTransportation: totals["transportation"] ?? 0,
             totalEntertainment: totals["entertainment"] ?? 0,
             totalOther: totals["other"] ?? 0,
@@ -275,7 +278,7 @@ class ExpensesViewModel {
 
     /// Returns true if a transaction has not been categorized yet.
     private func isUnclassified(_ txn: ExpenseTransaction) -> Bool {
-        let known = ["food", "drink", "transportation", "entertainment", "other"]
+        let known = ["food", "drink", "groceries", "transportation", "entertainment", "other"]
         return !known.contains(txn.subCategory.lowercased())
     }
 

@@ -445,12 +445,13 @@ struct ExpenseTransaction: Codable, Identifiable {
 struct ExpensesSummary {
     let totalFood: Double
     let totalDrink: Double
+    let totalGroceries: Double
     let totalTransportation: Double
     let totalEntertainment: Double
     let totalOther: Double
     let totalUnclassified: Double
 
-    var total: Double { totalFood + totalDrink + totalTransportation + totalEntertainment + totalOther + totalUnclassified }
+    var total: Double { totalFood + totalDrink + totalGroceries + totalTransportation + totalEntertainment + totalOther + totalUnclassified }
 }
 
 struct ExpensesResponse: Codable {
