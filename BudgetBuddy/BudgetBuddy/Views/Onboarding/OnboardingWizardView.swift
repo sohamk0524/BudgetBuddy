@@ -11,6 +11,7 @@ import SwiftUI
 struct OnboardingWizardView: View {
     @State private var currentPage = 0
     @FocusState private var isTextFieldFocused: Bool
+    @State private var showBiometricSetup = false
 
     // Question fields
     @State private var name: String = ""
@@ -115,7 +116,11 @@ struct OnboardingWizardView: View {
                                 currentPage += 1
                             }
                         } else {
-                            finishOnboarding()
+                            if authManager.isBiometricAvailable {
+                                showBiometricSetup = true
+                            } else {
+                                finishOnboarding()
+                            }
                         }
                     } label: {
                         if authManager.isLoading {
@@ -146,6 +151,12 @@ struct OnboardingWizardView: View {
                         .foregroundStyle(Color.danger)
                         .padding(.bottom, 16)
                 }
+            }
+        }
+        .sheet(isPresented: $showBiometricSetup) {
+            BiometricSetupSheet {
+                showBiometricSetup = false
+                finishOnboarding()
             }
         }
         .onChange(of: isStudent) {

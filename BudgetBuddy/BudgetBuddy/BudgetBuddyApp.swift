@@ -14,6 +14,7 @@ import FirebaseAuth
 @main
 struct BudgetBuddyApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+    @Environment(\.scenePhase) private var scenePhase
     @State private var pendingReceiptImage: UIImage?
     @State private var showReceiptFromExtension = false
     @State private var extensionReceiptViewModel = ReceiptScanViewModel()
@@ -25,6 +26,11 @@ struct BudgetBuddyApp: App {
         WindowGroup {
             ContentView()
                 .preferredColorScheme(.dark)
+                .onChange(of: scenePhase) { _, newPhase in
+                    if newPhase == .active && AuthManager.shared.isAuthenticated {
+                        AuthManager.shared.recordActivity()
+                    }
+                }
                 .task {
                     let granted = await NotificationManager.shared.requestPermission()
                     if granted {

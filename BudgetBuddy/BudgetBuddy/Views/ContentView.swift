@@ -44,7 +44,9 @@ struct ContentView: View {
             }
         }
         .task {
-            // Validate persisted session with the backend on launch
+            // Skip session restore when biometric prompt is showing —
+            // authenticateWithBiometrics() calls restoreSession() after a successful unlock.
+            guard authManager.authState != .biometricPrompt else { return }
             await authManager.restoreSession()
         }
         .onReceive(NotificationCenter.default.publisher(for: .onboardingCompleted)) { _ in

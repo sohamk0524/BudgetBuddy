@@ -36,6 +36,7 @@
 		E18C83CD2F54330900E66577 /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C839A2F54330700E66577 /* LoginView.swift */; };
 		E18C83CE2F54330900E66577 /* OTPView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C839B2F54330700E66577 /* OTPView.swift */; };
 		E18C83CF2F54330900E66577 /* EnterPhoneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C839C2F54330700E66577 /* EnterPhoneView.swift */; };
+		DEAAE3593FDC413F895C520F /* BiometricUnlockView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DBC54B57156481394404728 /* BiometricUnlockView.swift */; };
 		E18C83D02F54330900E66577 /* ExpensesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C839D2F54330700E66577 /* ExpensesView.swift */; };
 		E18C83D12F54330900E66577 /* PlanView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C839E2F54330700E66577 /* PlanView.swift */; };
 		E18C83D22F54330900E66577 /* QuickActionModalView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C83A02F54330700E66577 /* QuickActionModalView.swift */; };
@@ -114,6 +115,7 @@
 		E18C839A2F54330700E66577 /* LoginView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
 		E18C839B2F54330700E66577 /* OTPView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = OTPView.swift; sourceTree = "<group>"; };
 		E18C839C2F54330700E66577 /* EnterPhoneView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = EnterPhoneView.swift; sourceTree = "<group>"; };
+		2DBC54B57156481394404728 /* BiometricUnlockView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BiometricUnlockView.swift; sourceTree = "<group>"; };
 		E18C839D2F54330700E66577 /* ExpensesView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ExpensesView.swift; sourceTree = "<group>"; };
 		E18C839E2F54330700E66577 /* PlanView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PlanView.swift; sourceTree = "<group>"; };
 		E18C83A02F54330700E66577 /* QuickActionModalView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = QuickActionModalView.swift; sourceTree = "<group>"; };
@@ -297,6 +299,7 @@
 				E18C839A2F54330700E66577 /* LoginView.swift */,
 				E18C839B2F54330700E66577 /* OTPView.swift */,
 				E18C839C2F54330700E66577 /* EnterPhoneView.swift */,
+				2DBC54B57156481394404728 /* BiometricUnlockView.swift */,
 			);
 			path = Auth;
 			sourceTree = "<group>";
@@ -470,6 +473,7 @@
 				E19B249E2F5529F1005C18DA /* ReceiptScanView.swift in Sources */,
 				E18C83CF2F54330900E66577 /* EnterPhoneView.swift in Sources */,
 				E18C83CE2F54330900E66577 /* OTPView.swift in Sources */,
+				DEAAE3593FDC413F895C520F /* BiometricUnlockView.swift in Sources */,
 				E18C83E42F54330900E66577 /* ProfileViewModel.swift in Sources */,
 				E18C83E22F54330900E66577 /* ContentView.swift in Sources */,
 				E18C83CC2F54330900E66577 /* PlanQuestionFlowView.swift in Sources */,

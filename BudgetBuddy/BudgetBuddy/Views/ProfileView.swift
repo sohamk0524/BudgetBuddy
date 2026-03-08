@@ -25,6 +25,9 @@ struct ProfileView: View {
                 // MARK: - Notification Settings
                 notificationSettingsSection
 
+                // MARK: - Face ID
+                biometricSection
+
                 // MARK: - Linked Accounts
                 linkedAccountsSection
 
@@ -215,6 +218,36 @@ struct ProfileView: View {
             .frame(width: 160, alignment: .trailing)
         }
         .padding(.vertical, 4)
+    }
+
+    // MARK: - Biometric Section
+
+    private var biometricSection: some View {
+        HStack {
+            let type = AuthManager.shared.biometricType
+            let icon = type == "Face ID" ? "faceid" : "touchid"
+            Label(type, systemImage: icon)
+                .font(.roundedHeadline)
+                .foregroundStyle(Color.textPrimary)
+
+            Spacer()
+
+            Toggle("", isOn: Binding(
+                get: { AuthManager.shared.biometricEnabled },
+                set: { newValue in
+                    if newValue {
+                        Task { await AuthManager.shared.enableBiometrics() }
+                    } else {
+                        AuthManager.shared.disableBiometrics()
+                    }
+                }
+            ))
+            .tint(Color.accent)
+            .labelsHidden()
+        }
+        .padding()
+        .background(Color.surface)
+        .clipShape(RoundedRectangle(cornerRadius: 16))
     }
 
     // MARK: - Notification Settings Section
