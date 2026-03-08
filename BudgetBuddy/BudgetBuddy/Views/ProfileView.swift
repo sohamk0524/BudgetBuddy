@@ -158,6 +158,19 @@ struct ProfileView: View {
                         .labelsHidden()
                 }
 
+                if viewModel.isStudent {
+                    profileRow(label: "University", value: AppConfig.universityDisplayName(for: viewModel.school)) {
+                        Picker("University", selection: $viewModel.school) {
+                            Text("Select...").tag("")
+                            ForEach(AppConfig.universities, id: \.key) { university in
+                                Text(university.name).tag(university.key)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        .tint(Color.accent)
+                    }
+                }
+
                 profileRow(label: "Weekly Limit", value: String(format: "$%.0f", viewModel.weeklySpendingLimit)) {
                     TextField("Amount", value: $viewModel.weeklySpendingLimit, format: .number)
                         .keyboardType(.decimalPad)
