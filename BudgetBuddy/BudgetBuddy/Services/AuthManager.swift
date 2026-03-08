@@ -457,8 +457,25 @@ class AuthManager {
         verificationID = nil
         errorMessage = nil
         isLoading = false
-        UserDefaults.standard.removeObject(forKey: "lastActiveDate")
+        clearUserCache()
         PlaidLinkManager.shared.reset()
+    }
+
+    private func clearUserCache() {
+        let keys = [
+            // Auth
+            "lastActiveDate",
+            // Profile
+            "profile_name", "profile_phone", "profile_isStudent",
+            "profile_weeklyLimit", "profile_strictness", "profile_school",
+            // Expenses
+            "expenses_transactions", "expenses_weeksBack",
+            // Insights
+            "insights_transactions_7D", "insights_transactions_30D", "insights_transactions_90D",
+            // Spending plan
+            "userSavingsGoals",
+        ]
+        keys.forEach { UserDefaults.standard.removeObject(forKey: $0) }
     }
 
     // MARK: - Error Helpers
