@@ -61,24 +61,20 @@ final class InsightsViewModel {
         let amount: Double
     }
 
+    // MARK: - Cache Keys
+
+    private static func cacheKey(for range: DateRange) -> String {
+        "insights_transactions_\(range.rawValue)"
+    }
+
     // MARK: - State
 
     var isLoading = false
     var errorMessage: String?
     private var allTransactions: [ExpenseTransaction] = []
-    /// Set to true when expenses change externally; the view observes this to trigger a refresh.
-    var needsRefresh = false
 
     init() {
-        NotificationCenter.default.addObserver(
-            forName: .expensesDidChange,
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            Task { @MainActor [weak self] in
-                self?.needsRefresh = true
-            }
-        }
+        loadFromCache(for: .month)   // pre-populate default range instantly
     }
 
     var selectedDateRange: DateRange = .month
@@ -89,11 +85,10 @@ final class InsightsViewModel {
     // MARK: - Pie Chart Computed Data
 
     var pieData: [CategorySlice] {
-        let known = ["food", "drink", "transportation", "entertainment", "other"]
         var totals: [String: Double] = [:]
         for tx in allTransactions {
             let cat = tx.subCategory.lowercased()
-            guard known.contains(cat) else { continue }
+            guard !cat.isEmpty else { continue }
             totals[cat, default: 0] += abs(tx.amount)
         }
         return totals
@@ -143,7 +138,7 @@ final class InsightsViewModel {
         var buckets: [String: Double] = [:]
         for tx in allTransactions {
             let cat = tx.subCategory.lowercased()
-            guard ["food", "drink", "transportation", "entertainment", "other"].contains(cat) else { continue }
+            guard !cat.isEmpty else { continue }
             guard let dateStr = tx.date, let d = fmt.date(from: dateStr) else { continue }
             let key = fmt.string(from: d)
             buckets[key, default: 0] += abs(tx.amount)
@@ -172,7 +167,7 @@ final class InsightsViewModel {
         var weekBuckets: [Date: Double] = [:]
         for tx in allTransactions {
             let cat = tx.subCategory.lowercased()
-            guard ["food", "drink", "transportation", "entertainment", "other"].contains(cat) else { continue }
+            guard !cat.isEmpty else { continue }
             guard let dateStr = tx.date, let d = fmt.date(from: dateStr) else { continue }
             let comps = cal.dateComponents([.yearForWeekOfYear, .weekOfYear], from: d)
             let weekStart = cal.date(from: comps) ?? d
@@ -189,10 +184,27 @@ final class InsightsViewModel {
 
     // MARK: - Actions
 
+    // MARK: - Cache helpers
+
+    private func loadFromCache(for range: DateRange) {
+        let key = Self.cacheKey(for: range)
+        guard let data = UserDefaults.standard.data(forKey: key),
+              let decoded = try? JSONDecoder().decode([ExpenseTransaction].self, from: data) else { return }
+        allTransactions = decoded
+    }
+
+    private func saveToCache(for range: DateRange) {
+        let key = Self.cacheKey(for: range)
+        if let encoded = try? JSONEncoder().encode(allTransactions) {
+            UserDefaults.standard.set(encoded, forKey: key)
+        }
+    }
+
     func selectDateRange(_ range: DateRange) {
         selectedDateRange = range
         selectedPieCategory = nil
         selectedBarDate = nil
+        loadFromCache(for: range)   // swap in cached data instantly before network call
         Task { await fetchTransactions() }
     }
 
@@ -205,12 +217,17 @@ final class InsightsViewModel {
     }
 
     func fetchTransactions() async {
-        guard let userId = AuthManager.shared.authToken else { return }
+        guard let userId = AuthManager.shared.authToken else {
+            print("[Insights] ❌ No auth token, skipping fetch")
+            return
+        }
         isLoading = true
         errorMessage = nil
 
         let start = Self.isoFmt.string(from: Calendar.current.date(byAdding: .day, value: -selectedDateRange.days, to: Date())!)
         let end = Self.isoFmt.string(from: Date())
+
+        print("[Insights] 📡 Fetching: userId=\(userId) start=\(start) end=\(end) range=\(selectedDateRange.rawValue)")
 
         do {
             let response = try await APIService.shared.getExpenses(
@@ -220,9 +237,19 @@ final class InsightsViewModel {
                 limit: 1000
             )
             allTransactions = response.transactions
+            print("[Insights] ✅ Got \(response.transactions.count) transactions")
+            for tx in response.transactions.prefix(10) {
+                print("[Insights]   - \(tx.name) | $\(tx.amount) | cat=\(tx.subCategory) | date=\(tx.date ?? "nil") | src=\(tx.source ?? "nil")")
+            }
+            if response.transactions.count > 10 {
+                print("[Insights]   ... and \(response.transactions.count - 10) more")
+            }
+            let chartEligible = response.transactions.filter { !$0.subCategory.isEmpty }
+            print("[Insights] 📊 Chart-eligible (has category): \(chartEligible.count) of \(response.transactions.count)")
+            saveToCache(for: selectedDateRange)
         } catch {
             errorMessage = "Unable to load spending data"
-            print("InsightsViewModel: \(error)")
+            print("[Insights] ❌ Error: \(error)")
         }
         isLoading = false
     }

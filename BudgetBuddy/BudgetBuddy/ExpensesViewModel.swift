@@ -15,6 +15,7 @@ enum ExpenseFilter: String, CaseIterable {
     case all = "All"
     case food = "Food"
     case drink = "Drink"
+    case groceries = "Groceries"
     case transportation = "Transportation"
     case entertainment = "Entertainment"
     case other = "Other"
@@ -24,6 +25,13 @@ enum ExpenseFilter: String, CaseIterable {
 @Observable
 @MainActor
 class ExpensesViewModel {
+
+    // MARK: - UserDefaults Cache Keys
+
+    private enum CacheKey {
+        static let transactions = "expenses_transactions"
+        static let weeksBack = "expenses_weeksBack"
+    }
 
     // MARK: - State
 
@@ -39,6 +47,7 @@ class ExpensesViewModel {
         case .all:             return allTransactions
         case .food:            return allTransactions.filter { $0.subCategory.lowercased() == "food" }
         case .drink:           return allTransactions.filter { $0.subCategory.lowercased() == "drink" }
+        case .groceries:       return allTransactions.filter { $0.subCategory.lowercased() == "groceries" }
         case .transportation:  return allTransactions.filter { $0.subCategory.lowercased() == "transportation" }
         case .entertainment:   return allTransactions.filter { $0.subCategory.lowercased() == "entertainment" }
         case .other:           return allTransactions.filter { $0.subCategory.lowercased() == "other" }
@@ -48,7 +57,7 @@ class ExpensesViewModel {
 
     /// Summary computed locally from the full list.
     var summary: ExpensesSummary {
-        let knownCategories = ["food", "drink", "transportation", "entertainment", "other"]
+        let knownCategories = ["food", "drink", "groceries", "transportation", "entertainment", "other"]
         var totals = [String: Double]()
         for cat in knownCategories {
             totals[cat] = allTransactions.filter { $0.subCategory.lowercased() == cat }.reduce(0) { $0 + $1.amount }
@@ -57,6 +66,7 @@ class ExpensesViewModel {
         return ExpensesSummary(
             totalFood: totals["food"] ?? 0,
             totalDrink: totals["drink"] ?? 0,
+            totalGroceries: totals["groceries"] ?? 0,
             totalTransportation: totals["transportation"] ?? 0,
             totalEntertainment: totals["entertainment"] ?? 0,
             totalOther: totals["other"] ?? 0,
@@ -76,6 +86,31 @@ class ExpensesViewModel {
     // MARK: - Dependencies
 
     private let apiService = APIService.shared
+    private let defaults = UserDefaults.standard
+
+    // MARK: - Init
+
+    init() {
+        loadFromCache()
+    }
+
+    // MARK: - Cache
+
+    private func loadFromCache() {
+        if let data = defaults.data(forKey: CacheKey.transactions),
+           let decoded = try? JSONDecoder().decode([ExpenseTransaction].self, from: data) {
+            allTransactions = decoded
+        }
+        let cached = defaults.integer(forKey: CacheKey.weeksBack)
+        if cached > 0 { weeksBack = cached }
+    }
+
+    private func saveToCache() {
+        if let encoded = try? JSONEncoder().encode(allTransactions) {
+            defaults.set(encoded, forKey: CacheKey.transactions)
+        }
+        defaults.set(weeksBack, forKey: CacheKey.weeksBack)
+    }
 
     // MARK: - Week-based date helpers
 
@@ -166,6 +201,7 @@ class ExpensesViewModel {
                 offset: 0
             )
             allTransactions = response.transactions
+            saveToCache()
             NotificationCenter.default.post(name: .expensesDidChange, object: nil)
 
             // Update daily reminder based on today's activity
@@ -191,12 +227,14 @@ class ExpensesViewModel {
 
         isLoadingMore = true
 
-        let maxWeeksBack = 13   // ~3 months absolute cap
-        var totalNewFound = 0
-        var lastFetchedCount = allTransactions.count
+        let startCount = allTransactions.count
+        let maxNewItems = 10
+        let maxWeeksToAdd = 4
 
-        while weeksBack < maxWeeksBack {
+        var weeksAdded = 0
+        while weeksAdded < maxWeeksToAdd && canLoadMore {
             weeksBack += 1
+            weeksAdded += 1
 
             do {
                 let response = try await apiService.getExpenses(
@@ -207,21 +245,13 @@ class ExpensesViewModel {
                     limit: 500,
                     offset: 0
                 )
-                let newInThisWeek = response.transactions.count - lastFetchedCount
-                lastFetchedCount = response.transactions.count
                 allTransactions = response.transactions
+                saveToCache()
                 NotificationCenter.default.post(name: .expensesDidChange, object: nil)
 
-                // End of available data — show whatever was found and stop
-                if newInThisWeek <= 0 { break }
-
-                totalNewFound += newInThisWeek
-
-                // Accumulated enough new events
-                if totalNewFound >= 5 { break }
-
+                if allTransactions.count - startCount >= maxNewItems { break }
             } catch {
-                print("Failed to load previous week: \(error)")
+                print("Failed to load more history: \(error)")
                 weeksBack -= 1
                 break
             }
@@ -267,6 +297,24 @@ class ExpensesViewModel {
         return response
     }
 
+    func deleteTransaction(transactionId: Int) async throws {
+        try await apiService.deleteTransaction(transactionId: transactionId)
+        allTransactions.removeAll { $0.id == transactionId }
+        saveToCache()
+    }
+
+    func addItemsToTransaction(transactionId: Int, items: [EditableReceiptItem], replace: Bool = false) async throws {
+        let response = try await apiService.addReceiptItems(transactionId: transactionId, items: items, replace: replace)
+        if let newSubCategory = response.subCategory {
+            applyClassificationLocally(
+                transactionId: transactionId,
+                subCategory: newSubCategory,
+                essentialAmount: nil,
+                discretionaryAmount: nil
+            )
+        }
+    }
+
     func refresh() async {
         await fetchExpenses()
     }
@@ -281,9 +329,24 @@ class ExpensesViewModel {
         }
     }
 
+    /// Refresh immediately, then retry up to 3 more times (at 1s, 2s, 4s) until
+    /// the transaction count increases — handles Datastore eventual-consistency lag.
+    func refreshWithRetry() async {
+        let countBefore = allTransactions.count
+        await fetchExpenses()
+        if allTransactions.count > countBefore { return }
+
+        let delays: [UInt64] = [1_000_000_000, 2_000_000_000, 4_000_000_000]
+        for delay in delays {
+            try? await Task.sleep(nanoseconds: delay)
+            await fetchExpenses()
+            if allTransactions.count > countBefore { return }
+        }
+    }
+
     /// Returns true if a transaction has not been categorized yet.
     private func isUnclassified(_ txn: ExpenseTransaction) -> Bool {
-        let known = ["food", "drink", "transportation", "entertainment", "other"]
+        let known = ["food", "drink", "groceries", "transportation", "entertainment", "other"]
         return !known.contains(txn.subCategory.lowercased())
     }
 
@@ -315,5 +378,6 @@ class ExpensesViewModel {
             notes: old.notes,
             receiptItems: old.receiptItems
         )
+        saveToCache()
     }
 }

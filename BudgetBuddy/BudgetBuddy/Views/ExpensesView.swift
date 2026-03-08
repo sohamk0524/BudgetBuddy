@@ -141,7 +141,7 @@ struct ExpensesView: View {
                         transaction: transaction,
                         viewModel: viewModel
                     )
-                    .presentationDetents([.medium])
+                    .presentationDetents([.medium, .large])
                     .presentationDragIndicator(.visible)
                 }
             }
@@ -155,12 +155,13 @@ struct ExpensesView: View {
                 ReceiptScanView(viewModel: receiptViewModel) {
                     showReceiptScan = false
                     receiptViewModel.reset()
-                    Task { await viewModel.refresh() }
+                    Task { await viewModel.refreshWithRetry() }
                 }
             }
             .onChange(of: voiceViewModel.state) { _, newState in
                 if newState == .success {
-                    Task { await viewModel.refresh() }
+                    // Refresh with retries to handle Datastore propagation delay
+                    Task { await viewModel.refreshWithRetry() }
                 }
             }
         }
@@ -214,12 +215,21 @@ struct ExpensesView: View {
     }
 }
 
-// MARK: - Category Colors
+// MARK: - Category Helpers
+
+/// Maps legacy or unknown category strings to valid display categories.
+func normalizedItemCategory(_ raw: String) -> String {
+    switch raw.lowercased() {
+    case "food", "drink", "groceries", "transportation", "entertainment", "other": return raw.lowercased()
+    default: return "other"
+    }
+}
 
 func categoryColor(for category: String) -> Color {
     switch category.lowercased() {
     case "food":            return .orange
     case "drink":           return .purple
+    case "groceries":       return .green
     case "transportation":  return .cyan
     case "entertainment":   return .pink
     case "other":           return .indigo
@@ -231,6 +241,7 @@ func categoryIcon(for category: String) -> String {
     switch category.lowercased() {
     case "food":            return "fork.knife"
     case "drink":           return "cup.and.saucer.fill"
+    case "groceries":       return "cart.fill"
     case "transportation":  return "car.fill"
     case "entertainment":   return "film.fill"
     case "other":           return "ellipsis.circle.fill"
@@ -247,6 +258,7 @@ struct ExpensesSummaryCard: View {
         [
             ("Food", summary.totalFood, .orange),
             ("Drink", summary.totalDrink, .purple),
+            ("Groceries", summary.totalGroceries, .green),
             ("Transportation", summary.totalTransportation, .cyan),
             ("Entertainment", summary.totalEntertainment, .pink),
             ("Other", summary.totalOther, .indigo),
@@ -353,7 +365,7 @@ struct ExpenseTransactionRow: View {
     @ViewBuilder
     private var categoryBadge: some View {
         let cat = transaction.subCategory.lowercased()
-        let known = ["food", "drink", "transportation", "entertainment", "other"]
+        let known = ["food", "drink", "groceries", "transportation", "entertainment", "other"]
         if known.contains(cat) {
             textBadge(transaction.subCategory.capitalized, color: categoryColor(for: cat))
         } else {
@@ -384,16 +396,23 @@ struct TransactionClassificationSheet: View {
 
     @State private var selectedCategory: String
     @State private var isSaving = false
+    @State private var showDeleteTxnConfirm = false
+    @State private var localItems: [EditableReceiptItem]   // draft — synced to backend on Save
+    @State private var localItemsModified = false
     @Environment(\.dismiss) private var dismiss
 
-    private let categories = ["Food", "Drink", "Transportation", "Entertainment", "Other"]
+    private let categories = ["Food", "Drink", "Groceries", "Transportation", "Entertainment", "Other"]
 
     init(transaction: ExpenseTransaction, viewModel: ExpensesViewModel) {
         self.transaction = transaction
         self.viewModel = viewModel
-        let known = ["food", "drink", "transportation", "entertainment", "other"]
+        let known = ["food", "drink", "groceries", "transportation", "entertainment", "other"]
         let current = transaction.subCategory.lowercased()
         _selectedCategory = State(initialValue: known.contains(current) ? transaction.subCategory.capitalized : "")
+        _localItems = State(initialValue: (transaction.receiptItems ?? []).map {
+            EditableReceiptItem(name: $0.name, price: $0.price,
+                                category: normalizedItemCategory($0.category))
+        })
     }
 
     var body: some View {
@@ -403,6 +422,9 @@ struct TransactionClassificationSheet: View {
                     VStack(spacing: 16) {
                         headerCard
                         categorySection
+                        TransactionItemsSection(items: $localItems)
+                            .onChange(of: localItems) { _, _ in localItemsModified = true }
+                        deleteTransactionSection
                     }
                     .padding(.vertical, 16)
                 }
@@ -454,8 +476,9 @@ struct TransactionClassificationSheet: View {
                     .foregroundStyle(Color.textSecondary)
             }
 
-            // Voice / receipt notes
-            if let notes = transaction.notes, !notes.isEmpty {
+            // Voice notes (not shown for receipts — merchant name already displayed above)
+            if let notes = transaction.notes, !notes.isEmpty,
+               transaction.source != "receipt" {
                 Divider()
                 Text(notes)
                     .font(.roundedBody)
@@ -525,6 +548,34 @@ struct TransactionClassificationSheet: View {
         }
     }
 
+    // MARK: - Delete Transaction Section
+
+    private var deleteTransactionSection: some View {
+        Button {
+            showDeleteTxnConfirm = true
+        } label: {
+            Label("Delete Transaction", systemImage: "trash")
+                .font(.roundedBody)
+                .foregroundStyle(Color.danger)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+                .background(Color.surface)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+        }
+        .padding(.horizontal)
+        .confirmationDialog("Delete this transaction?", isPresented: $showDeleteTxnConfirm, titleVisibility: .visible) {
+            Button("Delete", role: .destructive) {
+                Task {
+                    try? await viewModel.deleteTransaction(transactionId: transaction.id)
+                    dismiss()
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This cannot be undone.")
+        }
+    }
+
     // MARK: - Save button
 
     private var saveButton: some View {
@@ -533,13 +584,21 @@ struct TransactionClassificationSheet: View {
             isSaving = true
             Task {
                 do {
+                    // Sync any item changes (edits, adds, deletes) first
+                    if localItemsModified {
+                        let payload = localItems.map {
+                            EditableReceiptItem(name: $0.name, price: $0.price, category: $0.category)
+                        }
+                        try await viewModel.addItemsToTransaction(
+                            transactionId: transaction.id, items: payload, replace: true)
+                    }
                     _ = try await viewModel.classifyTransactionForSheet(
                         transactionId: transaction.id,
                         subCategory: selectedCategory.lowercased()
                     )
                     dismiss()
                 } catch {
-                    print("Failed to classify: \(error)")
+                    print("Failed to save: \(error)")
                 }
                 isSaving = false
             }

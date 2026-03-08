@@ -223,6 +223,7 @@ def get_user_profile(user_id):
             "isStudent": profile.get('is_student'),
             "weeklySpendingLimit": profile.get('weekly_spending_limit'),
             "strictnessLevel": profile.get('strictness_level'),
+            "school": profile.get('school'),
         }
 
     plaid_items_data = []
@@ -278,6 +279,8 @@ def update_user_profile(user_id):
                 pass
         if "strictnessLevel" in data:
             profile_updates['strictness_level'] = data["strictnessLevel"]
+        if "school" in data:
+            profile_updates['school'] = data["school"]
         if profile_updates:
             upsert_profile(user_id, **profile_updates)
 
@@ -416,40 +419,60 @@ def parse_transaction():
         return jsonify({"error": "statement is required"}), 400
 
     from services.llm_service import Agent
+    from datetime import date as date_type
+    today = date_type.today().strftime("%Y-%m-%d")
 
     parse_agent = Agent(
         name="TransactionParser",
         instructions=(
             "You are a transaction parser. Extract transaction details from the user's spoken statement.\n"
-            "Return ONLY a JSON object with these fields:\n"
-            '  {"amount": <number or null>, "category": <string or null>, "store": <string or null>, "date": <ISO 8601 string or null>, "notes": <string or null>}\n'
+            "Group items by merchant/store — create one transaction object per merchant.\n"
+            f"Today's date is {today}.\n"
+            "Return ONLY a JSON object with this exact structure:\n"
+            '{"transactions": [\n'
+            '  {\n'
+            '    "store": <merchant name as string, or null>,\n'
+            '    "amount": <total amount for this store as a positive number>,\n'
+            '    "category": <one of: Food, Drink, Groceries, Transportation, Entertainment, Other>,\n'
+            '    "date": <YYYY-MM-DD string, use today if not mentioned>,\n'
+            '    "notes": <string or null>,\n'
+            '    "items": [\n'
+            '      {"name": <item name string>, "price": <item price as number>, "classification": <one of: food, drink, groceries, transportation, entertainment, other>}\n'
+            '    ]\n'
+            '  }\n'
+            ']}\n'
             "Rules:\n"
-            '- amount: the dollar amount spent, as a number (e.g. 10.50). Convert words like "ten" to 10.\n'
-            "- category: one of Coffee, Food, Groceries, Transport, Entertainment, Shopping, Gas, or Other.\n"
-            "- store: the merchant/store name if mentioned.\n"
-            '- date: if a date is mentioned, use ISO 8601. If "today" or not mentioned, use null.\n'
-            "- notes: any extra detail not captured above, or null.\n"
-            "Return ONLY the JSON object. No markdown, no explanation, no extra text."
+            "- Create one transaction per merchant/store. Multiple stores = multiple transaction objects.\n"
+            "- amount: total amount for that store as a positive number. Convert words like 'ten' to 10.\n"
+            "- category: choose based on dominant item type or store name (e.g. coffee shop -> Drink, restaurant -> Food, clothing store -> Other).\n"
+            "- items: list each item mentioned. If per-item prices are not stated, divide the store total evenly among items (round to 2 decimal places, put any remainder in the last item).\n"
+            "- classification: lowercase category for each item (food, drink, groceries, transportation, entertainment, or other).\n"
+            "- date: use the date mentioned, or today if not specified.\n"
+            "- Return ONLY the JSON object. No markdown code blocks, no explanation."
         ),
         tools=None,
     )
+
+    def _fallback():
+        return jsonify({"transactions": [{"amount": None, "category": None, "store": None, "date": today, "notes": None, "items": []}]})
 
     try:
         result = parse_agent.run(statement)
         raw = result.get("content", "")
 
-        # Extract JSON from response (find first { to last })
         start = raw.find("{")
         end = raw.rfind("}")
         if start != -1 and end != -1:
             parsed = json.loads(raw[start:end + 1])
-            return jsonify(parsed)
+            transactions = parsed.get("transactions", [])
+            if transactions:
+                return jsonify({"transactions": transactions})
 
-        return jsonify({"amount": None, "category": None, "store": None, "date": None, "notes": None})
+        return _fallback()
 
     except Exception as e:
         print(f"Parse transaction error: {e}")
-        return jsonify({"amount": None, "category": None, "store": None, "date": None, "notes": None})
+        return _fallback()
 
 
 @user_bp.route("/user/transactions", methods=["POST"])
@@ -471,11 +494,35 @@ def save_manual_transaction():
         return jsonify({"error": "amount must be greater than 0"}), 400
 
     # Determine classification — use category as sub_category for the new system
-    valid_categories = ('food', 'drink', 'transportation', 'entertainment', 'other')
+    valid_categories = ('food', 'drink', 'groceries', 'transportation', 'entertainment', 'other')
     category_value = data.get("category", "Other")
     sub_category = category_value.lower() if category_value.lower() in valid_categories else "unclassified"
 
     amt = float(amount)
+
+    # Optional receipt items — serialised as JSON string for storage
+    receipt_items_raw = data.get("receiptItems")
+    receipt_items_json = None
+    if receipt_items_raw and isinstance(receipt_items_raw, list):
+        def _item_cat(it):
+            # iOS sends "classification"; older saves used "category" — accept both
+            return it.get("classification") or it.get("category", "other")
+        receipt_items_json = json.dumps([
+            {"name": it.get("name", ""), "price": float(it.get("price", 0)),
+             "classification": _item_cat(it)}
+            for it in receipt_items_raw
+        ])
+        # Recompute sub_category from dominant item spend if items provided
+        totals: dict = {}
+        for it in receipt_items_raw:
+            cat = _item_cat(it).lower()
+            price = float(it.get("price", 0))
+            if price > 0:
+                totals[cat] = totals.get(cat, 0) + price
+        if totals:
+            dominant = max(totals, key=lambda k: totals[k])
+            if dominant in valid_categories:
+                sub_category = dominant
 
     entity = create_manual_transaction(
         user_id,
@@ -488,9 +535,65 @@ def save_manual_transaction():
         sub_category=sub_category,
         essential_amount=None,
         discretionary_amount=None,
+        receipt_items=receipt_items_json,
     )
 
     return jsonify({
         "success": True,
         "transactionId": str(entity.key.id),
     }), 201
+
+
+@user_bp.route("/user/transactions/<int:transaction_id>", methods=["PUT"])
+def update_manual_transaction_endpoint(transaction_id):
+    from db_models import update_manual_transaction
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "Request body must be JSON"}), 400
+
+    amount = data.get("amount")
+    if not amount or float(amount) <= 0:
+        return jsonify({"error": "amount must be greater than 0"}), 400
+
+    valid_categories = ('food', 'drink', 'groceries', 'transportation', 'entertainment', 'other')
+    category_value = data.get("category", "Other")
+    sub_category = category_value.lower() if category_value.lower() in valid_categories else "unclassified"
+    amt = float(amount)
+
+    receipt_items_raw = data.get("receiptItems")
+    receipt_items_json = None
+    if receipt_items_raw and isinstance(receipt_items_raw, list):
+        def _item_cat_put(it):
+            return it.get("classification") or it.get("category", "other")
+        receipt_items_json = json.dumps([
+            {"name": it.get("name", ""), "price": float(it.get("price", 0)),
+             "classification": _item_cat_put(it)}
+            for it in receipt_items_raw
+        ])
+        totals: dict = {}
+        for it in receipt_items_raw:
+            cat = _item_cat_put(it).lower()
+            price = float(it.get("price", 0))
+            if price > 0:
+                totals[cat] = totals.get(cat, 0) + price
+        if totals:
+            dominant = max(totals, key=lambda k: totals[k])
+            if dominant in valid_categories:
+                sub_category = dominant
+
+    entity = update_manual_transaction(
+        transaction_id,
+        amount=amt,
+        category=category_value,
+        store=data.get("store"),
+        date=data.get("date"),
+        notes=data.get("notes"),
+        source=data.get("source", "manual"),
+        sub_category=sub_category,
+        receipt_items=receipt_items_json,
+    )
+
+    if entity is None:
+        return jsonify({"error": "Transaction not found"}), 404
+
+    return jsonify({"success": True, "transactionId": str(transaction_id)})

@@ -266,17 +266,7 @@ struct StudentStatusPage: View {
 struct SchoolSelectionPage: View {
     @Binding var selectedSchool: String
 
-    private let options = [
-        ("uc_berkeley", "UC Berkeley"),
-        ("uc_davis", "UC Davis"),
-        ("uc_irvine", "UC Irvine"),
-        ("uc_los_angeles", "UC Los Angeles"),
-        ("uc_merced", "UC Merced"),
-        ("uc_riverside", "UC Riverside"),
-        ("uc_san_diego", "UC San Diego"),
-        ("uc_santa_barbara", "UC Santa Barbara"),
-        ("uc_santa_cruz", "UC Santa Cruz")
-    ]
+    private let options = AppConfig.universities
 
     var body: some View {
         VStack(spacing: 24) {
@@ -296,13 +286,13 @@ struct SchoolSelectionPage: View {
 
             ScrollView {
                 VStack(spacing: 12) {
-                    ForEach(options, id: \.0) { value, title in
+                    ForEach(options, id: \.key) { university in
                         SelectableOptionCard(
-                            title: title,
+                            title: university.name,
                             subtitle: "",
-                            isSelected: selectedSchool == value
+                            isSelected: selectedSchool == university.key
                         ) {
-                            selectedSchool = value
+                            selectedSchool = university.key
                         }
                     }
                 }

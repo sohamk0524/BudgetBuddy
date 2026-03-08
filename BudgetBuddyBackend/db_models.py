@@ -450,13 +450,15 @@ def create_manual_transaction(user_id: int, **kwargs) -> datastore.Entity:
     return entity
 
 
-def get_manual_transactions(user_id: int, limit: int = 50) -> List[datastore.Entity]:
+def get_manual_transactions(user_id: int, limit: int = 0) -> List[datastore.Entity]:
+    """Returns manual transactions for a user, sorted newest-first.
+    limit=0 means no limit (return all)."""
     client = get_client()
     query = client.query(kind='ManualTransaction')
     query.add_filter(filter=PropertyFilter('user_id', '=', user_id))
     results = list(query.fetch())
     results.sort(key=lambda e: e.get('created_at', datetime.min), reverse=True)
-    return results[:limit]
+    return results if limit == 0 else results[:limit]
 
 
 def update_manual_transaction(txn_id: int, **kwargs) -> Optional[datastore.Entity]:

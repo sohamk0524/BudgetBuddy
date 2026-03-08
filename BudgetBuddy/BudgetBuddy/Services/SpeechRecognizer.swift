@@ -21,12 +21,18 @@ class SpeechRecognizer {
     var audioLevel: Float = 0.0  // 0-1 for waveform visualization
     var error: SpeechError?
 
+    /// Called when speech has been silent for `silenceTimeout` seconds after receiving transcription.
+    var onSilenceDetected: (() -> Void)?
+    /// Seconds of silence after last transcription update before firing `onSilenceDetected`. Default 1.5s.
+    var silenceTimeout: TimeInterval = 1.5
+
     // MARK: - Private
 
     private let speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: "en-US"))
     private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
     private var recognitionTask: SFSpeechRecognitionTask?
     private let audioEngine = AVAudioEngine()
+    private var silenceWorkItem: DispatchWorkItem?
 
     // MARK: - Authorization
 
@@ -81,14 +87,28 @@ class SpeechRecognizer {
                 guard let self else { return }
 
                 if let result {
-                    self.transcribedText = result.bestTranscription.formattedString
+                    let newText = result.bestTranscription.formattedString
+                    let textChanged = newText != self.transcribedText
+                    self.transcribedText = newText
+
+                    // Reset silence timer whenever transcription updates with new content
+                    if textChanged && !newText.isEmpty {
+                        self.silenceWorkItem?.cancel()
+                        let work = DispatchWorkItem { [weak self] in
+                            self?.onSilenceDetected?()
+                        }
+                        self.silenceWorkItem = work
+                        DispatchQueue.main.asyncAfter(
+                            deadline: .now() + self.silenceTimeout,
+                            execute: work
+                        )
+                    }
                 }
 
                 if let error {
                     // Ignore cancellation errors
                     let nsError = error as NSError
                     if nsError.domain == "kAFAssistantErrorDomain" && nsError.code == 216 {
-                        // User cancelled — not a real error
                         return
                     }
                     self.error = .recognitionFailed(error.localizedDescription)
@@ -115,6 +135,8 @@ class SpeechRecognizer {
     }
 
     func stopRecording() {
+        silenceWorkItem?.cancel()
+        silenceWorkItem = nil
         audioEngine.stop()
         audioEngine.inputNode.removeTap(onBus: 0)
         recognitionRequest?.endAudio()

@@ -200,15 +200,6 @@ struct PlanView: View {
                 totalIncome: plan.totalIncome
             )
 
-            // Essential vs Discretionary Split
-            if let totalEssential = plan.totalEssential, let totalDiscretionary = plan.totalDiscretionary, totalEssential + totalDiscretionary > 0 {
-                EssentialDiscretionarySplitCard(
-                    totalEssential: totalEssential,
-                    totalDiscretionary: totalDiscretionary,
-                    categories: plan.categoryAllocations
-                )
-            }
-
             // Actual vs Planned
             ActualVsPlannedChart(
                 plannedCategories: plan.categoryAllocations,
@@ -298,97 +289,6 @@ struct PlanView: View {
                 }
                 return [(category.name, category.amount)]
             }
-    }
-}
-
-// MARK: - Essential vs Discretionary Split Card
-
-struct EssentialDiscretionarySplitCard: View {
-    let totalEssential: Double
-    let totalDiscretionary: Double
-    let categories: [BudgetCategory]
-
-    private var total: Double { totalEssential + totalDiscretionary }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Essential vs. Fun Money")
-                .font(.roundedHeadline)
-                .foregroundStyle(Color.textPrimary)
-
-            // Segment bar
-            if total > 0 {
-                GeometryReader { geometry in
-                    HStack(spacing: 2) {
-                        RoundedRectangle(cornerRadius: 4)
-                            .fill(Color.green)
-                            .frame(width: max(geometry.size.width * (totalEssential / total), 4))
-
-                        RoundedRectangle(cornerRadius: 4)
-                            .fill(Color.danger)
-                            .frame(width: max(geometry.size.width * (totalDiscretionary / total), 4))
-                    }
-                }
-                .frame(height: 12)
-                .clipShape(Capsule())
-            }
-
-            // Totals
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(spacing: 6) {
-                        Circle().fill(Color.green).frame(width: 8, height: 8)
-                        Text("Essential")
-                            .font(.roundedCaption)
-                            .foregroundStyle(Color.textSecondary)
-                    }
-                    Text("$\(totalEssential, specifier: "%.0f")")
-                        .font(.rounded(.title3, weight: .bold))
-                        .foregroundStyle(Color.textPrimary)
-                        .monospacedDigit()
-                }
-
-                Spacer()
-
-                VStack(alignment: .trailing, spacing: 4) {
-                    HStack(spacing: 6) {
-                        Text("Fun Money")
-                            .font(.roundedCaption)
-                            .foregroundStyle(Color.textSecondary)
-                        Circle().fill(Color.danger).frame(width: 8, height: 8)
-                    }
-                    Text("$\(totalDiscretionary, specifier: "%.0f")")
-                        .font(.rounded(.title3, weight: .bold))
-                        .foregroundStyle(Color.textPrimary)
-                        .monospacedDigit()
-                }
-            }
-
-            // Per-category breakdown
-            ForEach(categories.filter { ($0.essentialAmount ?? 0) > 0 || ($0.discretionaryAmount ?? 0) > 0 }) { category in
-                HStack {
-                    Text(category.name)
-                        .font(.roundedCaption)
-                        .foregroundStyle(Color.textSecondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-
-                    if let ea = category.essentialAmount, ea > 0 {
-                        Text("$\(ea, specifier: "%.0f")")
-                            .font(.roundedCaption)
-                            .foregroundStyle(.green)
-                            .monospacedDigit()
-                    }
-
-                    if let da = category.discretionaryAmount, da > 0 {
-                        Text("$\(da, specifier: "%.0f")")
-                            .font(.roundedCaption)
-                            .foregroundStyle(Color.danger)
-                            .monospacedDigit()
-                    }
-                }
-            }
-        }
-        .walletCard()
     }
 }
 

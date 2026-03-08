@@ -2,8 +2,9 @@
 //  VoiceTransactionViewModel.swift
 //  BudgetBuddy
 //
-//  State machine for the voice-to-transaction flow:
-//  idle → recording → parsing → confirming → saving → success
+//  State machine for the voice-to-transaction flow.
+//  Supports multi-transaction parsing: one transaction per merchant,
+//  reviewed sequentially with back-navigation and per-transaction discard.
 //
 
 import Foundation
@@ -36,11 +37,29 @@ class VoiceTransactionViewModel {
         }
     }
 
-    // MARK: - Published State
+    // MARK: - State
 
     var state: State = .idle
-    var transaction = VoiceTransaction()
+    var pendingTransactions: [VoiceTransaction] = []
+    var currentIndex: Int = 0
+    /// Parallel array tracking the backend ID of each saved transaction (nil = not yet saved).
+    var savedTransactionIds: [Int?] = []
     var transcribedText: String = ""
+
+    // MARK: - Computed helpers
+
+    /// The transaction currently being reviewed/edited.
+    var transaction: VoiceTransaction {
+        get { pendingTransactions.isEmpty ? VoiceTransaction() : pendingTransactions[currentIndex] }
+        set { if !pendingTransactions.isEmpty { pendingTransactions[currentIndex] = newValue } }
+    }
+
+    var totalCount: Int { max(pendingTransactions.count, 1) }
+    var showCounter: Bool { pendingTransactions.count > 1 }
+    var canGoBack: Bool { currentIndex > 0 }
+    var isLastTransaction: Bool {
+        pendingTransactions.isEmpty || currentIndex == pendingTransactions.count - 1
+    }
 
     // MARK: - Dependencies
 
@@ -51,7 +70,9 @@ class VoiceTransactionViewModel {
 
     func startRecording() {
         speechRecognizer.requestAuthorization()
-
+        speechRecognizer.onSilenceDetected = { [weak self] in
+            self?.stopRecording()
+        }
         do {
             try speechRecognizer.startRecording()
             state = .recording
@@ -70,47 +91,59 @@ class VoiceTransactionViewModel {
         }
 
         state = .parsing
-        Task {
-            await parseTranscription()
-        }
+        Task { await parseTranscription() }
     }
 
     // MARK: - Parsing
 
     private func parseTranscription() async {
         do {
-            let parsed = try await apiService.parseTransaction(statement: transcribedText)
-            applyParsedResponse(parsed)
+            let group = try await apiService.parseTransaction(statement: transcribedText)
+            applyParsedGroup(group)
             state = .confirming
         } catch {
-            // On parse failure, still allow manual entry
             print("Parse failed: \(error)")
+            pendingTransactions = [VoiceTransaction()]
+            savedTransactionIds = [nil]
+            currentIndex = 0
             state = .confirming
         }
     }
 
-    private func applyParsedResponse(_ parsed: ParsedTransactionResponse) {
-        transaction.amount = parsed.amount
-        transaction.category = parsed.category
-        transaction.store = parsed.store
-        transaction.notes = parsed.notes
+    private func applyParsedGroup(_ group: ParsedTransactionGroupResponse) {
+        let source = group.transactions.isEmpty
+            ? [ParsedTransactionWithItems(amount: nil, category: nil, store: nil, date: nil, notes: nil, items: nil)]
+            : group.transactions
 
-        if let dateString = parsed.date, !dateString.isEmpty {
-            let formatter = ISO8601DateFormatter()
-            formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-            if let date = formatter.date(from: dateString) {
-                transaction.date = date
-            } else {
-                // Try without fractional seconds
-                formatter.formatOptions = [.withInternetDateTime]
-                if let date = formatter.date(from: dateString) {
-                    transaction.date = date
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+
+        pendingTransactions = source.map { parsed in
+            var txn = VoiceTransaction()
+            txn.amount = parsed.amount
+            txn.category = parsed.category
+            txn.store = parsed.store
+            txn.notes = parsed.notes
+
+            if let dateStr = parsed.date, !dateStr.isEmpty,
+               let date = dateFormatter.date(from: dateStr) {
+                txn.date = date
+            }
+
+            if let items = parsed.items {
+                txn.items = items.map {
+                    EditableReceiptItem(name: $0.name, price: $0.price, category: $0.classification)
                 }
             }
+
+            return txn
         }
+
+        savedTransactionIds = Array(repeating: nil, count: pendingTransactions.count)
+        currentIndex = 0
     }
 
-    // MARK: - Saving
+    // MARK: - Saving / Confirming
 
     func saveTransaction() async {
         guard let userId = AuthManager.shared.authToken else {
@@ -118,7 +151,8 @@ class VoiceTransactionViewModel {
             return
         }
 
-        guard let amount = transaction.amount, amount > 0 else {
+        let txn = transaction
+        guard let amount = txn.amount, amount > 0 else {
             state = .error("Please enter a valid amount")
             return
         }
@@ -129,21 +163,43 @@ class VoiceTransactionViewModel {
         formatter.dateFormat = "yyyy-MM-dd"
         let source = transcribedText.isEmpty ? "manual" : "voice"
 
+        let itemDicts: [[String: String]]? = txn.items.isEmpty ? nil : txn.items.map {
+            ["name": $0.name, "price": String(format: "%.2f", $0.price), "classification": $0.category]
+        }
+
         let request = SaveTransactionRequest(
             userId: userId,
             amount: amount,
-            category: transaction.category ?? "Other",
-            store: transaction.store,
-            date: formatter.string(from: transaction.date),
-            notes: transaction.notes,
-            source: source
+            category: txn.category ?? "Other",
+            store: txn.store,
+            date: formatter.string(from: txn.date),
+            notes: txn.notes,
+            source: source,
+            receiptItems: itemDicts
         )
 
         do {
-            let response = try await apiService.saveManualTransaction(request: request)
+            let response: SaveTransactionResponse
+            if let existingId = savedTransactionIds[currentIndex] {
+                // Already saved — update it
+                response = try await apiService.updateManualTransaction(
+                    transactionId: existingId, request: request)
+            } else {
+                // New save
+                response = try await apiService.saveManualTransaction(request: request)
+                if let idStr = response.transactionId, let id = Int(idStr) {
+                    savedTransactionIds[currentIndex] = id
+                }
+            }
+
             if response.success {
-                state = .success
                 NotificationCenter.default.post(name: .transactionAdded, object: nil)
+                if isLastTransaction {
+                    state = .success
+                } else {
+                    currentIndex += 1
+                    state = .confirming
+                }
             } else {
                 state = .error("Failed to save transaction")
             }
@@ -152,10 +208,41 @@ class VoiceTransactionViewModel {
         }
     }
 
+    // MARK: - Back navigation
+
+    func goBack() {
+        guard canGoBack else { return }
+        currentIndex -= 1
+        state = .confirming
+    }
+
+    // MARK: - Discard current transaction
+
+    func discardCurrentTransaction() async {
+        if let savedId = savedTransactionIds[currentIndex] {
+            try? await apiService.deleteTransaction(transactionId: savedId)
+        }
+
+        pendingTransactions.remove(at: currentIndex)
+        savedTransactionIds.remove(at: currentIndex)
+
+        if pendingTransactions.isEmpty {
+            reset()
+            return
+        }
+
+        if currentIndex >= pendingTransactions.count {
+            currentIndex = pendingTransactions.count - 1
+        }
+        state = .confirming
+    }
+
     // MARK: - Manual Entry
 
     func startManualEntry() {
-        transaction = VoiceTransaction()
+        pendingTransactions = [VoiceTransaction()]
+        savedTransactionIds = [nil]
+        currentIndex = 0
         transcribedText = ""
         state = .confirming
     }
@@ -164,7 +251,9 @@ class VoiceTransactionViewModel {
 
     func reset() {
         state = .idle
-        transaction = VoiceTransaction()
+        pendingTransactions = []
+        savedTransactionIds = []
+        currentIndex = 0
         transcribedText = ""
     }
 }
