@@ -107,6 +107,7 @@ struct EnterPhoneView: View {
                             .font(.roundedBody)
                             .foregroundStyle(Color.textPrimary)
                             .keyboardType(.phonePad)
+                            .textContentType(.telephoneNumber)
                             .focused($phoneFieldFocused)
                             .padding()
                             .background(Color.surface)
