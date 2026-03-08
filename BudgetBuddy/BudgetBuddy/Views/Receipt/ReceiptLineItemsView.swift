@@ -10,7 +10,7 @@ import SwiftUI
 
 // MARK: - Editable item model
 
-struct EditableReceiptItem: Identifiable {
+struct EditableReceiptItem: Identifiable, Codable, Equatable {
     let id: UUID
     var name: String
     var price: Double
@@ -33,6 +33,8 @@ struct EditableReceiptItem: Identifiable {
     func toReceiptLineItem() -> ReceiptLineItem {
         ReceiptLineItem(name: name, price: price, category: category)
     }
+
+    var isDiscount: Bool { price < 0 }
 }
 
 // MARK: - Main View
@@ -44,17 +46,10 @@ struct ReceiptLineItemsView: View {
 
     @State private var editableMerchant: String
     @State private var editableDate: Date
-    @State private var items: [EditableReceiptItem]
+    @State private var allItems: [EditableReceiptItem]   // positive = regular, negative = discounts
+    @State private var editableTotal: Double
+    @State private var totalIsAutoComputed: Bool
     @State private var selectedCategory: String
-
-    // Inline item category expansion
-    @State private var expandedItemId: UUID?
-
-    // Add item form
-    @State private var showAddItemForm = false
-    @State private var newItemName = ""
-    @State private var newItemPrice = ""
-    @State private var newItemCategory = "food"
 
     private let allCategories = ["food", "drink", "groceries", "transportation", "entertainment", "other"]
 
@@ -65,14 +60,26 @@ struct ReceiptLineItemsView: View {
         _editableMerchant = State(initialValue: result.merchant)
         let parsed = result.date.flatMap { DateFormatter.receiptISODate.date(from: $0) } ?? Date()
         _editableDate = State(initialValue: parsed)
-        let editableItems = result.items.map { EditableReceiptItem(from: $0) }
-        _items = State(initialValue: editableItems)
-        // Pre-select dominant category from items
+
+        let nonZero = result.items.map { EditableReceiptItem(from: $0) }.filter { $0.price != 0 }
+        _allItems = State(initialValue: nonZero)
+        _editableTotal = State(initialValue: result.total)
+        _totalIsAutoComputed = State(initialValue: true)
+
+        // Pre-select dominant category from positive-price items
         var totals = [String: Double]()
-        for item in editableItems { totals[item.category, default: 0] += item.price }
+        for item in nonZero where item.price > 0 { totals[item.category, default: 0] += item.price }
         let dominant = totals.max(by: { $0.value < $1.value })?.key ?? "food"
         _selectedCategory = State(initialValue: dominant)
     }
+
+    // MARK: - Computed helpers
+
+    private var itemsSum: Double {
+        allItems.reduce(0) { $0 + $1.price }
+    }
+
+    private var taxAmount: Double { max(0, editableTotal - itemsSum) }
 
     // MARK: - Body
 
@@ -82,7 +89,7 @@ struct ReceiptLineItemsView: View {
                 VStack(spacing: 12) {
                     headerCard
                     categoryPicker
-                    itemsSection
+                    TransactionItemsSection(items: $allItems, editable: true)
                 }
                 .padding(.vertical, 12)
             }
@@ -90,6 +97,9 @@ struct ReceiptLineItemsView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.appBackground)
+        .onChange(of: itemsSum) { _, _ in
+            if totalIsAutoComputed { editableTotal = itemsSum }
+        }
     }
 
     // MARK: - Header Card (3 separate rows)
@@ -102,29 +112,54 @@ struct ReceiptLineItemsView: View {
                     .font(.roundedCaption)
                     .foregroundStyle(Color.textSecondary)
                     .frame(width: 52, alignment: .leading)
+                Spacer()
                 TextField("Store name", text: $editableMerchant)
                     .font(.roundedBody)
                     .foregroundStyle(Color.textPrimary)
+                    .multilineTextAlignment(.trailing)
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 13)
 
             Divider().padding(.horizontal, 16)
 
-            // Total row
+            // Total row (auto-computed or user-overridden)
             HStack {
                 Text("Total")
                     .font(.roundedCaption)
                     .foregroundStyle(Color.textSecondary)
                     .frame(width: 52, alignment: .leading)
                 Spacer()
-                Text("$\(result.total, specifier: "%.2f")")
+                TextField("0.00", value: Binding(
+                    get: { editableTotal },
+                    set: { editableTotal = $0; totalIsAutoComputed = false }
+                ), format: .number.precision(.fractionLength(2)))
                     .font(.rounded(.title3, weight: .bold))
                     .foregroundStyle(Color.accent)
+                    .multilineTextAlignment(.trailing)
+                    .keyboardType(.decimalPad)
                     .monospacedDigit()
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 13)
+
+            // Tax row — shown when total > itemsSum
+            if taxAmount > 0.005 {
+                Divider().padding(.horizontal, 16)
+                HStack {
+                    Text("Tax / Fees")
+                        .font(.roundedCaption)
+                        .foregroundStyle(Color.textSecondary)
+                        .frame(width: 52, alignment: .leading)
+                    Spacer()
+                    Text("$\(taxAmount, specifier: "%.2f")")
+                        .font(.roundedBody)
+                        .foregroundStyle(Color.textSecondary)
+                        .monospacedDigit()
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 13)
+            }
 
             Divider().padding(.horizontal, 16)
 
@@ -182,197 +217,12 @@ struct ReceiptLineItemsView: View {
         .padding(.vertical, 4)
     }
 
-    // MARK: - Items Section
-
-    private var itemsSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            // Header row + Add Item toggle
-            HStack {
-                Text("Items")
-                    .font(.roundedCaption)
-                    .foregroundStyle(Color.textSecondary)
-                Spacer()
-                Button {
-                    withAnimation(.spring(duration: 0.25)) {
-                        showAddItemForm.toggle()
-                        if showAddItemForm {
-                            newItemName = ""
-                            newItemPrice = ""
-                            newItemCategory = "food"
-                            expandedItemId = nil
-                        }
-                    }
-                } label: {
-                    Label(showAddItemForm ? "Cancel" : "Add Item",
-                          systemImage: showAddItemForm ? "xmark" : "plus")
-                        .font(.roundedCaption)
-                        .foregroundStyle(Color.accent)
-                }
-            }
-            .padding(.horizontal)
-
-            // Add item form appears DIRECTLY below the header row
-            if showAddItemForm {
-                addItemForm
-            }
-
-            // Item rows
-            ForEach($items) { $item in
-                itemRow(item: $item)
-            }
-        }
-    }
-
-    // MARK: - Item Row (with inline category expansion)
-
-    private func itemRow(item: Binding<EditableReceiptItem>) -> some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 10) {
-                TextField("Item name", text: item.name)
-                    .font(.roundedBody)
-                    .foregroundStyle(Color.textPrimary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-
-                TextField("0.00", value: item.price,
-                          format: .number.precision(.fractionLength(2)))
-                    .font(.roundedBody.monospacedDigit())
-                    .foregroundStyle(Color.textPrimary)
-                    .multilineTextAlignment(.trailing)
-                    .keyboardType(.decimalPad)
-                    .frame(width: 60)
-
-                // Tappable badge — expands inline picker below
-                Button {
-                    withAnimation(.spring(duration: 0.2)) {
-                        expandedItemId = expandedItemId == item.wrappedValue.id
-                            ? nil : item.wrappedValue.id
-                    }
-                } label: {
-                    HStack(spacing: 3) {
-                        Text(item.wrappedValue.category.capitalized)
-                            .font(.system(size: 10, weight: .semibold, design: .rounded))
-                        Image(systemName: "chevron.down")
-                            .font(.system(size: 8, weight: .bold))
-                            .rotationEffect(.degrees(
-                                expandedItemId == item.wrappedValue.id ? 180 : 0))
-                    }
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(categoryColor(for: item.wrappedValue.category))
-                    .clipShape(Capsule())
-                }
-                .buttonStyle(.plain)
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
-
-            // Inline category chips expand right below this row
-            if expandedItemId == item.wrappedValue.id {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 6) {
-                        ForEach(allCategories, id: \.self) { cat in
-                            Button {
-                                item.wrappedValue.category = cat
-                                withAnimation { expandedItemId = nil }
-                            } label: {
-                                Text(cat.capitalized)
-                                    .font(.system(size: 11, weight: .semibold, design: .rounded))
-                                    .foregroundStyle(
-                                        item.wrappedValue.category == cat ? .white : Color.textSecondary)
-                                    .padding(.horizontal, 12)
-                                    .padding(.vertical, 6)
-                                    .background(
-                                        item.wrappedValue.category == cat
-                                            ? categoryColor(for: cat)
-                                            : Color.appBackground)
-                                    .clipShape(Capsule())
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                    .padding(.horizontal, 14)
-                    .padding(.bottom, 8)
-                }
-                .transition(.opacity.combined(with: .move(edge: .top)))
-            }
-        }
-        .background(Color.surface)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .padding(.horizontal)
-        .animation(.spring(duration: 0.2), value: expandedItemId)
-    }
-
-    // MARK: - Add Item Form
-
-    private var addItemForm: some View {
-        VStack(spacing: 10) {
-            HStack(spacing: 10) {
-                TextField("Item name", text: $newItemName)
-                    .font(.roundedBody)
-                    .foregroundStyle(Color.textPrimary)
-                    .frame(maxWidth: .infinity)
-                TextField("0.00", text: $newItemPrice)
-                    .font(.roundedBody.monospacedDigit())
-                    .foregroundStyle(Color.textPrimary)
-                    .multilineTextAlignment(.trailing)
-                    .keyboardType(.decimalPad)
-                    .frame(width: 60)
-            }
-
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 6) {
-                    ForEach(allCategories, id: \.self) { cat in
-                        Button { newItemCategory = cat } label: {
-                            Text(cat.capitalized)
-                                .font(.system(size: 11, weight: .semibold, design: .rounded))
-                                .foregroundStyle(newItemCategory == cat ? .white : Color.textSecondary)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 6)
-                                .background(newItemCategory == cat
-                                    ? categoryColor(for: cat) : Color.appBackground)
-                                .clipShape(Capsule())
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-            }
-
-            Button {
-                let price = Double(newItemPrice) ?? 0
-                guard !newItemName.trimmingCharacters(in: .whitespaces).isEmpty else { return }
-                withAnimation {
-                    items.append(EditableReceiptItem(
-                        name: newItemName, price: price, category: newItemCategory))
-                    newItemName = ""
-                    newItemPrice = ""
-                    showAddItemForm = false
-                }
-            } label: {
-                Text("Add Item")
-                    .font(.roundedBody).fontWeight(.semibold)
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 10)
-                    .background(newItemName.trimmingCharacters(in: .whitespaces).isEmpty
-                        ? Color.accent.opacity(0.4) : Color.accent)
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
-            }
-            .disabled(newItemName.trimmingCharacters(in: .whitespaces).isEmpty)
-        }
-        .padding(14)
-        .background(Color.surface)
-        .clipShape(RoundedRectangle(cornerRadius: 14))
-        .padding(.horizontal)
-        .transition(.opacity.combined(with: .move(edge: .top)))
-    }
-
     // MARK: - Confirm Button
 
     private var confirmButton: some View {
         Button {
             let dateStr = DateFormatter.receiptISODate.string(from: editableDate)
-            onConfirm(selectedCategory, items, dateStr, editableMerchant)
+            onConfirm(selectedCategory, allItems, dateStr, editableMerchant)
         } label: {
             Text("Confirm & Save")
                 .font(.roundedHeadline).fontWeight(.semibold)

@@ -140,7 +140,7 @@ def attach_receipt():
         amount=round(total, 2),
         date=date_str,
         store=merchant,
-        notes=f"Receipt: {merchant}",
+        notes=None,
         sub_category=sub_category,
         essential_amount=None,
         discretionary_amount=None,

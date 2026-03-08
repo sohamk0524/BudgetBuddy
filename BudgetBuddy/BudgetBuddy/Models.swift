@@ -551,7 +551,7 @@ struct ReceiptLineItem: Codable, Identifiable {
     let id = UUID()
     let name: String
     let price: Double
-    let category: String  // "food", "drink", "transportation", "entertainment", "other"
+    var category: String  // "food", "drink", "transportation", "entertainment", "other"
 
     enum CodingKeys: String, CodingKey {
         case name, price
@@ -678,15 +678,17 @@ struct RecommendationsResponse: Codable {
 struct VoiceTransaction: Codable, Identifiable {
     let id: UUID
     var amount: Double?
-    var category: String?  // "Food", "Drink", "Transportation", "Entertainment", "Other"
+    var category: String?  // "Food", "Drink", "Groceries", "Transportation", "Entertainment", "Other"
     var store: String?
     var date: Date
     var notes: String?
+    var items: [EditableReceiptItem]
 
     init(id: UUID = UUID(), amount: Double? = nil, category: String? = nil,
-         store: String? = nil, date: Date = Date(), notes: String? = nil) {
+         store: String? = nil, date: Date = Date(), notes: String? = nil,
+         items: [EditableReceiptItem] = []) {
         self.id = id; self.amount = amount; self.category = category
-        self.store = store; self.date = date; self.notes = notes
+        self.store = store; self.date = date; self.notes = notes; self.items = items
     }
 }
 
@@ -701,11 +703,12 @@ struct ParsedTransactionResponse: Codable {
 struct SaveTransactionRequest: Codable {
     let userId: String
     let amount: Double
-    let category: String  // "Food", "Drink", "Transportation", "Entertainment", "Other"
+    let category: String  // "Food", "Drink", "Groceries", "Transportation", "Entertainment", "Other"
     let store: String?
     let date: String   // ISO 8601
     let notes: String?
     let source: String?  // "manual" or "voice"
+    let receiptItems: [[String: String]]?  // [{name, price, category}]
 }
 
 struct SaveTransactionResponse: Codable {

@@ -380,6 +380,8 @@ def add_transaction_receipt_items(transaction_id):
     if not isinstance(new_items, list):
         return jsonify({"error": "items must be an array"}), 400
 
+    replace = bool(data.get('replace', False))
+
     client = get_client()
     txn = client.get(client.key('Transaction', transaction_id))
     if not txn:
@@ -387,13 +389,16 @@ def add_transaction_receipt_items(transaction_id):
     if not txn:
         return jsonify({"error": "Transaction not found"}), 404
 
-    existing_json = txn.get('receipt_items') or '[]'
-    try:
-        existing_items = json.loads(existing_json)
-    except (ValueError, TypeError):
-        existing_items = []
+    if replace:
+        existing_items = new_items
+    else:
+        existing_json = txn.get('receipt_items') or '[]'
+        try:
+            existing_items = json.loads(existing_json)
+        except (ValueError, TypeError):
+            existing_items = []
+        existing_items.extend(new_items)
 
-    existing_items.extend(new_items)
     txn['receipt_items'] = json.dumps(existing_items)
 
     # Recompute dominant category from all items
@@ -409,6 +414,23 @@ def add_transaction_receipt_items(transaction_id):
     client.put(txn)
     return jsonify({"success": True, "itemCount": len(existing_items),
                     "subCategory": txn.get('sub_category')})
+
+
+@expenses_bp.route("/transaction/<int:transaction_id>", methods=["DELETE"])
+def delete_transaction(transaction_id):
+    """Delete a transaction (Plaid or manual) by ID."""
+    client = get_client()
+    key = client.key('Transaction', transaction_id)
+    txn = client.get(key)
+    if txn:
+        client.delete(key)
+        return jsonify({"success": True})
+    key = client.key('ManualTransaction', transaction_id)
+    txn = client.get(key)
+    if txn:
+        client.delete(key)
+        return jsonify({"success": True})
+    return jsonify({"error": "Transaction not found"}), 404
 
 
 @expenses_bp.route("/merchant/classifications/<user_id>", methods=["GET"])

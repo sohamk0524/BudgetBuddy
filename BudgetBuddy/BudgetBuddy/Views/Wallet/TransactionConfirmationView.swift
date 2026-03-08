@@ -17,8 +17,10 @@ struct TransactionConfirmationView: View {
     @State private var selectedCategory: String = ""
     @State private var store: String = ""
     @State private var date: Date = Date()
+    @State private var items: [EditableReceiptItem] = []
+    private let categories = ["Food", "Drink", "Groceries", "Transportation", "Entertainment", "Other"]
 
-    private let categories = ["Food", "Drink", "Transportation", "Entertainment", "Other"]
+    private var itemsTotal: Double { items.reduce(0) { $0 + $1.price } }
 
     var body: some View {
         NavigationStack {
@@ -76,10 +78,12 @@ struct TransactionConfirmationView: View {
                                     } label: {
                                         Text(category)
                                             .font(.roundedCaption)
-                                            .foregroundStyle(selectedCategory == category ? Color.appBackground : Color.textPrimary)
+                                            .foregroundStyle(selectedCategory == category ? .white : Color.textPrimary)
                                             .padding(.horizontal, 16)
                                             .padding(.vertical, 8)
-                                            .background(selectedCategory == category ? Color.accent : Color.surface)
+                                            .background(selectedCategory == category
+                                                ? categoryColor(for: category)
+                                                : Color.surface)
                                             .clipShape(Capsule())
                                     }
                                 }
@@ -110,6 +114,16 @@ struct TransactionConfirmationView: View {
                             .labelsHidden()
                             .tint(Color.accent)
                     }
+
+                    // Items
+                    TransactionItemsSection(items: $items, onAdd: { item in
+                        let newTotal = itemsTotal
+                        if let current = Double(amountText), newTotal > current {
+                            amountText = String(format: "%.2f", newTotal)
+                        } else if amountText.isEmpty || Double(amountText) == nil {
+                            amountText = String(format: "%.2f", newTotal)
+                        }
+                    })
 
                     // Confirm button
                     Button {
@@ -174,6 +188,7 @@ struct TransactionConfirmationView: View {
         }
         store = viewModel.transaction.store ?? ""
         date = viewModel.transaction.date
+        items = viewModel.transaction.items
     }
 
     private func saveLocalStateToViewModel() {
@@ -181,6 +196,7 @@ struct TransactionConfirmationView: View {
         viewModel.transaction.category = selectedCategory.isEmpty ? "Other" : selectedCategory
         viewModel.transaction.store = store.isEmpty ? nil : store
         viewModel.transaction.date = date
+        viewModel.transaction.items = items
     }
 
     private func confirmTransaction() {

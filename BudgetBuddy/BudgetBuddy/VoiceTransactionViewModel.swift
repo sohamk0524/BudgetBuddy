@@ -129,6 +129,11 @@ class VoiceTransactionViewModel {
         formatter.dateFormat = "yyyy-MM-dd"
         let source = transcribedText.isEmpty ? "manual" : "voice"
 
+        // Serialize items to [{name, price, category}] dictionaries
+        let itemDicts: [[String: String]]? = transaction.items.isEmpty ? nil : transaction.items.map {
+            ["name": $0.name, "price": String(format: "%.2f", $0.price), "category": $0.category]
+        }
+
         let request = SaveTransactionRequest(
             userId: userId,
             amount: amount,
@@ -136,7 +141,8 @@ class VoiceTransactionViewModel {
             store: transaction.store,
             date: formatter.string(from: transaction.date),
             notes: transaction.notes,
-            source: source
+            source: source,
+            receiptItems: itemDicts
         )
 
         do {

@@ -32,9 +32,12 @@ class ReceiptScanViewModel {
     var capturedImage: UIImage?
     var analysisResult: ReceiptAnalysisResult?
     var attachResponse: ReceiptAttachResponse?
+    /// Set to true when backend analysis returns; loading view observes this to fast-drain remaining steps.
+    var analysisIsComplete = false
 
     func analyzeImage(_ image: UIImage) async {
         capturedImage = image
+        analysisIsComplete = false
         state = .analyzing
 
         guard let userId = AuthManager.shared.authToken else {
@@ -50,10 +53,16 @@ class ReceiptScanViewModel {
         do {
             let result = try await APIService.shared.analyzeReceipt(imageData: imageData, userId: userId)
             analysisResult = result
-            state = .reviewed
+            analysisIsComplete = true   // signal loading view to fast-drain, then it calls finishAnalysis()
         } catch {
             state = .error("Failed to analyze receipt: \(error.localizedDescription)")
         }
+    }
+
+    /// Called by ReceiptLoadingView once all animation steps have completed.
+    func finishAnalysis() {
+        guard analysisResult != nil else { return }
+        state = .reviewed
     }
 
     func confirmAndAttach(category: String, items: [EditableReceiptItem], date: String, merchant: String) async {

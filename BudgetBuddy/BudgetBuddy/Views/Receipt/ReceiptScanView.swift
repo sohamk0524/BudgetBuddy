@@ -133,8 +133,26 @@ struct ReceiptScanView: View {
         }
     }
 
+    @ViewBuilder
     private var analyzingView: some View {
-        ReceiptLoadingView(isAttaching: viewModel.state == .attaching)
+        if viewModel.state == .attaching {
+            // Simple spinner — attaching is just a quick DB write
+            VStack(spacing: 20) {
+                Spacer()
+                ProgressView()
+                    .scaleEffect(1.5)
+                    .tint(Color.accent)
+                Text("Saving your receipt...")
+                    .font(.roundedHeadline)
+                    .foregroundStyle(Color.textPrimary)
+                Spacer()
+            }
+        } else {
+            ReceiptLoadingView(
+                isBackendDone: viewModel.analysisIsComplete,
+                onAllStepsDone: { viewModel.finishAnalysis() }
+            )
+        }
     }
 
     private var doneView: some View {
@@ -200,26 +218,23 @@ private struct LoadingStep {
 }
 
 struct ReceiptLoadingView: View {
-    let isAttaching: Bool
+    /// Set to true when the backend API call has returned successfully.
+    let isBackendDone: Bool
+    /// Called once all steps have been checked off, so the parent can transition.
+    let onAllStepsDone: () -> Void
 
-    private let analyzeSteps: [LoadingStep] = [
+    private let steps: [LoadingStep] = [
         LoadingStep(icon: "viewfinder",            label: "Scanning image"),
         LoadingStep(icon: "mappin.and.ellipse",    label: "Reading merchant & date"),
         LoadingStep(icon: "list.bullet.rectangle", label: "Extracting line items"),
         LoadingStep(icon: "tag",                   label: "Categorizing expenses"),
     ]
-    private let attachSteps: [LoadingStep] = [
-        LoadingStep(icon: "arrow.triangle.2.circlepath", label: "Matching to transactions"),
-        LoadingStep(icon: "tray.and.arrow.down",         label: "Saving receipt"),
-        LoadingStep(icon: "chart.pie",                   label: "Updating your budget"),
-    ]
 
     @State private var currentStep = 0
-    @State private var dotCount = 0
     @State private var iconScale: CGFloat = 0.7
     @State private var iconOpacity: Double = 0
-
-    private var steps: [LoadingStep] { isAttaching ? attachSteps : analyzeSteps }
+    @State private var isFastDraining = false
+    @State private var hasFiredTransition = false
 
     var body: some View {
         VStack(spacing: 32) {
@@ -230,7 +245,8 @@ struct ReceiptLoadingView: View {
                 Circle()
                     .fill(Color.accent.opacity(0.12))
                     .frame(width: 90, height: 90)
-                Image(systemName: steps[currentStep].icon)
+                let safeIcon = currentStep < steps.count ? steps[currentStep].icon : "checkmark.circle.fill"
+                Image(systemName: safeIcon)
                     .font(.system(size: 34, weight: .medium))
                     .foregroundStyle(Color.accent)
                     .scaleEffect(iconScale)
@@ -278,44 +294,61 @@ struct ReceiptLoadingView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear { startAnimation() }
-        .onChange(of: isAttaching) { startAnimation() }
+        .onChange(of: isBackendDone) { _, done in
+            if done && !isFastDraining { beginFastDrain() }
+        }
     }
+
+    // MARK: - Animation helpers
 
     private func startAnimation() {
         currentStep = 0
         animateIconIn()
-        scheduleNextStep()
+        scheduleNextStep(delay: 1.6)
     }
 
     private func animateIconIn() {
-        iconScale = 0.7
-        iconOpacity = 0
-        withAnimation(.spring(duration: 0.4)) {
-            iconScale = 1.0
-            iconOpacity = 1.0
+        iconScale = 0.7; iconOpacity = 0
+        withAnimation(.spring(duration: 0.4)) { iconScale = 1.0; iconOpacity = 1.0 }
+    }
+
+    /// Normal cadence — slow steps while waiting for backend.
+    private func scheduleNextStep(delay: Double) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+            guard !isFastDraining else { return }
+            let next = currentStep + 1
+            if next < steps.count {
+                withAnimation(.easeInOut(duration: 0.25)) { currentStep = next }
+                animateIconIn()
+                scheduleNextStep(delay: 1.6)
+            } else {
+                // Stay on last step until backend finishes
+                scheduleNextStep(delay: 1.6)
+            }
         }
     }
 
-    private func scheduleNextStep() {
-        let delay = isAttaching ? 1.4 : 1.6
-        DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
-            let next = currentStep + 1
-            if next < steps.count {
-                withAnimation(.easeInOut(duration: 0.25)) {
-                    currentStep = next
-                }
-                animateIconIn()
-                scheduleNextStep()
-            } else {
-                // Loop back from step before last so it doesn't look stuck
-                DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
-                    withAnimation(.easeInOut(duration: 0.25)) {
-                        currentStep = steps.count - 2
-                    }
-                    animateIconIn()
-                    scheduleNextStep()
-                }
+    /// Backend done — fast-forward remaining unchecked steps at 0.5 s each, then transition.
+    private func beginFastDrain() {
+        isFastDraining = true
+        drainStep()
+    }
+
+    private func drainStep() {
+        let next = currentStep + 1
+        guard next <= steps.count else {
+            // currentStep is already past the last step — fire transition once
+            if !hasFiredTransition {
+                hasFiredTransition = true
+                onAllStepsDone()
             }
+            return
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            withAnimation(.easeInOut(duration: 0.2)) { currentStep = next }
+            // Only animate the icon when still within bounds
+            if next < steps.count { animateIconIn() }
+            drainStep()
         }
     }
 }

@@ -214,7 +214,15 @@ struct ExpensesView: View {
     }
 }
 
-// MARK: - Category Colors
+// MARK: - Category Helpers
+
+/// Maps legacy or unknown category strings to valid display categories.
+func normalizedItemCategory(_ raw: String) -> String {
+    switch raw.lowercased() {
+    case "food", "drink", "groceries", "transportation", "entertainment", "other": return raw.lowercased()
+    default: return "other"
+    }
+}
 
 func categoryColor(for category: String) -> Color {
     switch category.lowercased() {
@@ -387,15 +395,12 @@ struct TransactionClassificationSheet: View {
 
     @State private var selectedCategory: String
     @State private var isSaving = false
-    @State private var showAddItemForm = false
-    @State private var newItemName = ""
-    @State private var newItemPrice = ""
-    @State private var newItemCategory = "food"
-    @State private var isAddingItems = false
+    @State private var showDeleteTxnConfirm = false
+    @State private var localItems: [EditableReceiptItem]   // draft — synced to backend on Save
+    @State private var localItemsModified = false
     @Environment(\.dismiss) private var dismiss
 
     private let categories = ["Food", "Drink", "Groceries", "Transportation", "Entertainment", "Other"]
-    private let allItemCategories = ["food", "drink", "groceries", "transportation", "entertainment", "other"]
 
     init(transaction: ExpenseTransaction, viewModel: ExpensesViewModel) {
         self.transaction = transaction
@@ -403,6 +408,10 @@ struct TransactionClassificationSheet: View {
         let known = ["food", "drink", "groceries", "transportation", "entertainment", "other"]
         let current = transaction.subCategory.lowercased()
         _selectedCategory = State(initialValue: known.contains(current) ? transaction.subCategory.capitalized : "")
+        _localItems = State(initialValue: (transaction.receiptItems ?? []).map {
+            EditableReceiptItem(name: $0.name, price: $0.price,
+                                category: normalizedItemCategory($0.category))
+        })
     }
 
     var body: some View {
@@ -412,7 +421,9 @@ struct TransactionClassificationSheet: View {
                     VStack(spacing: 16) {
                         headerCard
                         categorySection
-                        receiptItemsSection(items: transaction.receiptItems ?? [])
+                        TransactionItemsSection(items: $localItems)
+                            .onChange(of: localItems) { _, _ in localItemsModified = true }
+                        deleteTransactionSection
                     }
                     .padding(.vertical, 16)
                 }
@@ -429,141 +440,6 @@ struct TransactionClassificationSheet: View {
                 }
             }
         }
-    }
-
-    // MARK: - Receipt Items Section
-
-    private func receiptItemsSection(items: [ReceiptLineItem]) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Text("Items")
-                    .font(.roundedCaption)
-                    .foregroundStyle(Color.textSecondary)
-                Spacer()
-                Button {
-                    withAnimation(.spring(duration: 0.25)) {
-                        showAddItemForm.toggle()
-                        if showAddItemForm {
-                            newItemName = ""
-                            newItemPrice = ""
-                            newItemCategory = "food"
-                        }
-                    }
-                } label: {
-                    Label(showAddItemForm ? "Cancel" : "Add Item",
-                          systemImage: showAddItemForm ? "xmark" : "plus")
-                        .font(.roundedCaption)
-                        .foregroundStyle(Color.accent)
-                }
-            }
-            .padding(.horizontal)
-
-            if showAddItemForm {
-                addItemForm
-            }
-
-            if !items.isEmpty {
-                VStack(spacing: 6) {
-                    ForEach(Array(items.enumerated()), id: \.offset) { _, item in
-                        HStack(spacing: 10) {
-                            Text(item.name)
-                                .font(.roundedBody)
-                                .foregroundStyle(Color.textPrimary)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                            Text("$\(item.price, specifier: "%.2f")")
-                                .font(.roundedBody)
-                                .foregroundStyle(Color.textPrimary)
-                                .monospacedDigit()
-                            Text(item.category.capitalized)
-                                .font(.system(size: 10, weight: .semibold, design: .rounded))
-                                .foregroundStyle(.white)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 3)
-                                .background(categoryColor(for: item.category))
-                                .clipShape(Capsule())
-                        }
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 9)
-                        .background(Color.surface)
-                        .clipShape(RoundedRectangle(cornerRadius: 10))
-                        .padding(.horizontal)
-                    }
-                }
-            }
-        }
-    }
-
-    // MARK: - Add Item Form
-
-    private var addItemForm: some View {
-        VStack(spacing: 10) {
-            HStack(spacing: 10) {
-                TextField("Item name", text: $newItemName)
-                    .font(.roundedBody)
-                    .foregroundStyle(Color.textPrimary)
-                    .frame(maxWidth: .infinity)
-                TextField("0.00", text: $newItemPrice)
-                    .font(.roundedBody)
-                    .foregroundStyle(Color.textPrimary)
-                    .monospacedDigit()
-                    .multilineTextAlignment(.trailing)
-                    .keyboardType(.decimalPad)
-                    .frame(width: 60)
-            }
-
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 6) {
-                    ForEach(allItemCategories, id: \.self) { cat in
-                        Button { newItemCategory = cat } label: {
-                            Text(cat.capitalized)
-                                .font(.system(size: 11, weight: .semibold, design: .rounded))
-                                .foregroundStyle(newItemCategory == cat ? .white : Color.textSecondary)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 6)
-                                .background(newItemCategory == cat ? categoryColor(for: cat) : Color.surface)
-                                .clipShape(Capsule())
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-            }
-
-            Button {
-                let price = Double(newItemPrice) ?? 0
-                guard !newItemName.trimmingCharacters(in: .whitespaces).isEmpty else { return }
-                let newItem = EditableReceiptItem(name: newItemName, price: price, category: newItemCategory)
-                isAddingItems = true
-                Task {
-                    do {
-                        try await viewModel.addItemsToTransaction(
-                            transactionId: transaction.id, items: [newItem]
-                        )
-                        await viewModel.refresh()
-                    } catch {
-                        print("Failed to add item: \(error)")
-                    }
-                    isAddingItems = false
-                    showAddItemForm = false
-                }
-            } label: {
-                HStack(spacing: 6) {
-                    if isAddingItems { ProgressView().scaleEffect(0.7).tint(.white) }
-                    Text(isAddingItems ? "Saving..." : "Add Item")
-                        .font(.roundedBody).fontWeight(.semibold)
-                }
-                .foregroundStyle(.white)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 10)
-                .background(newItemName.trimmingCharacters(in: .whitespaces).isEmpty
-                    ? Color.accent.opacity(0.4) : Color.accent)
-                .clipShape(RoundedRectangle(cornerRadius: 10))
-            }
-            .disabled(newItemName.trimmingCharacters(in: .whitespaces).isEmpty || isAddingItems)
-        }
-        .padding(14)
-        .background(Color.surface)
-        .clipShape(RoundedRectangle(cornerRadius: 14))
-        .padding(.horizontal)
     }
 
     // MARK: - Header card
@@ -599,8 +475,9 @@ struct TransactionClassificationSheet: View {
                     .foregroundStyle(Color.textSecondary)
             }
 
-            // Voice / receipt notes
-            if let notes = transaction.notes, !notes.isEmpty {
+            // Voice notes (not shown for receipts — merchant name already displayed above)
+            if let notes = transaction.notes, !notes.isEmpty,
+               transaction.source != "receipt" {
                 Divider()
                 Text(notes)
                     .font(.roundedBody)
@@ -670,6 +547,34 @@ struct TransactionClassificationSheet: View {
         }
     }
 
+    // MARK: - Delete Transaction Section
+
+    private var deleteTransactionSection: some View {
+        Button {
+            showDeleteTxnConfirm = true
+        } label: {
+            Label("Delete Transaction", systemImage: "trash")
+                .font(.roundedBody)
+                .foregroundStyle(Color.danger)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+                .background(Color.surface)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+        }
+        .padding(.horizontal)
+        .confirmationDialog("Delete this transaction?", isPresented: $showDeleteTxnConfirm, titleVisibility: .visible) {
+            Button("Delete", role: .destructive) {
+                Task {
+                    try? await viewModel.deleteTransaction(transactionId: transaction.id)
+                    dismiss()
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This cannot be undone.")
+        }
+    }
+
     // MARK: - Save button
 
     private var saveButton: some View {
@@ -678,13 +583,21 @@ struct TransactionClassificationSheet: View {
             isSaving = true
             Task {
                 do {
+                    // Sync any item changes (edits, adds, deletes) first
+                    if localItemsModified {
+                        let payload = localItems.map {
+                            EditableReceiptItem(name: $0.name, price: $0.price, category: $0.category)
+                        }
+                        try await viewModel.addItemsToTransaction(
+                            transactionId: transaction.id, items: payload, replace: true)
+                    }
                     _ = try await viewModel.classifyTransactionForSheet(
                         transactionId: transaction.id,
                         subCategory: selectedCategory.lowercased()
                     )
                     dismiss()
                 } catch {
-                    print("Failed to classify: \(error)")
+                    print("Failed to save: \(error)")
                 }
                 isSaving = false
             }

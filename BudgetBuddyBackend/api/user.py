@@ -471,11 +471,32 @@ def save_manual_transaction():
         return jsonify({"error": "amount must be greater than 0"}), 400
 
     # Determine classification — use category as sub_category for the new system
-    valid_categories = ('food', 'drink', 'transportation', 'entertainment', 'other')
+    valid_categories = ('food', 'drink', 'groceries', 'transportation', 'entertainment', 'other')
     category_value = data.get("category", "Other")
     sub_category = category_value.lower() if category_value.lower() in valid_categories else "unclassified"
 
     amt = float(amount)
+
+    # Optional receipt items — serialised as JSON string for storage
+    receipt_items_raw = data.get("receiptItems")
+    receipt_items_json = None
+    if receipt_items_raw and isinstance(receipt_items_raw, list):
+        receipt_items_json = json.dumps([
+            {"name": it.get("name", ""), "price": float(it.get("price", 0)),
+             "category": it.get("category", "other")}
+            for it in receipt_items_raw
+        ])
+        # Recompute sub_category from dominant item spend if items provided
+        totals: dict = {}
+        for it in receipt_items_raw:
+            cat = it.get("category", "other").lower()
+            price = float(it.get("price", 0))
+            if price > 0:
+                totals[cat] = totals.get(cat, 0) + price
+        if totals:
+            dominant = max(totals, key=lambda k: totals[k])
+            if dominant in valid_categories:
+                sub_category = dominant
 
     entity = create_manual_transaction(
         user_id,
@@ -488,6 +509,7 @@ def save_manual_transaction():
         sub_category=sub_category,
         essential_amount=None,
         discretionary_amount=None,
+        receipt_items=receipt_items_json,
     )
 
     return jsonify({

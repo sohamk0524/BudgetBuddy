@@ -626,7 +626,7 @@ actor APIService {
     }
 
     /// Appends items to a transaction's receipt_items and recomputes its sub-category
-    func addReceiptItems(transactionId: Int, items: [EditableReceiptItem]) async throws -> AddReceiptItemsResponse {
+    func addReceiptItems(transactionId: Int, items: [EditableReceiptItem], replace: Bool = false) async throws -> AddReceiptItemsResponse {
         let url = baseURL.appendingPathComponent("transaction/\(transactionId)/receipt-items")
 
         var request = URLRequest(url: url)
@@ -636,7 +636,7 @@ actor APIService {
         let itemPayload = items.map {
             ["name": $0.name, "price": $0.price, "classification": $0.category] as [String: Any]
         }
-        let body: [String: Any] = ["items": itemPayload]
+        let body: [String: Any] = ["items": itemPayload, "replace": replace]
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
         let (data, response) = try await URLSession.shared.data(for: request)
@@ -644,6 +644,17 @@ actor APIService {
             throw APIError.invalidResponse
         }
         return try JSONDecoder().decode(AddReceiptItemsResponse.self, from: data)
+    }
+
+    /// Deletes a transaction by ID
+    func deleteTransaction(transactionId: Int) async throws {
+        let url = baseURL.appendingPathComponent("transaction/\(transactionId)")
+        var request = URLRequest(url: url)
+        request.httpMethod = "DELETE"
+        let (_, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            throw APIError.invalidResponse
+        }
     }
 
     /// Gets smart nudges

@@ -20,10 +20,14 @@ def analyze_receipt(image_data: bytes, media_type: str) -> dict:
     """
     client = anthropic.Anthropic()
     prompt = """Analyze this receipt image. Extract:
-1. Merchant name and total amount
+1. Merchant name and the final total charged (after tax and discounts).
 2. The date of the transaction (from the receipt header/footer) in YYYY-MM-DD format. If no date is visible, use null.
-3. Every line item with its price
-4. Classify each item into exactly one of: "food" (prepared meals, restaurant food), "drink" (coffee, alcohol, beverages), "groceries" (raw ingredients, produce, packaged goods at a grocery/supermarket), "transportation", "entertainment", or "other"
+3. Every line item with its price. Rules:
+   - Include regular items with their positive prices.
+   - Include discounts, coupons, or promotions as NEGATIVE prices (e.g. "Member Discount" → -2.50).
+   - Include tax, service charges, or fees as separate positive-price items (e.g. {"name": "Tax", "price": 6.50, "classification": "other"}).
+   - OMIT any items with a $0.00 price.
+4. Classify each item into exactly one of: "food" (prepared meals, restaurant food), "drink" (coffee, alcohol, beverages), "groceries" (raw ingredients, produce, packaged goods at a grocery/supermarket), "transportation", "entertainment", or "other". Discounts and taxes use "other".
 
 Respond ONLY with valid JSON in exactly this format:
 {
