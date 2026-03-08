@@ -14,7 +14,7 @@ struct OnboardingWizardView: View {
 
     // Question fields
     @State private var name: String = ""
-    @State private var isStudent: Bool = false
+    @State private var isStudent: Bool = true
     @State private var selectedSchool: String = ""
     @State private var weeklySpendingLimit: String = ""
 
@@ -22,7 +22,7 @@ struct OnboardingWizardView: View {
 
     /// Total pages changes based on whether the school page is shown.
     private var totalPages: Int {
-        isStudent ? 5 : 4
+        isStudent ? 4 : 3
     }
 
     private var canFinish: Bool {

@@ -27,7 +27,7 @@ class ProfileViewModel {
 
     var name: String = ""
     var phoneNumber: String = ""
-    var isStudent: Bool = false
+    var isStudent: Bool = true
     var weeklySpendingLimit: Double = 0
     var strictnessLevel: String = ""
     var school: String = ""

@@ -179,18 +179,7 @@ struct ProfileView: View {
                         .foregroundStyle(Color.accent)
                 }
 
-                if viewModel.isStudent {
-                    profileRow(label: "University", value: AppConfig.universityDisplayName(for: viewModel.school)) {
-                        Picker("University", selection: $viewModel.school) {
-                            Text("Select...").tag("")
-                            ForEach(AppConfig.universities, id: \.key) { university in
-                                Text(university.name).tag(university.key)
-                            }
-                        }
-                        .pickerStyle(.menu)
-                        .tint(Color.accent)
-                    }
-                }
+
             }
         }
         .padding()
@@ -264,12 +253,14 @@ struct ProfileView: View {
                     Text("No bank accounts linked")
                         .font(.roundedBody)
                         .foregroundStyle(Color.textSecondary)
+                        .multilineTextAlignment(.center)
 
                     Text("Connect your bank to see real-time transactions and spending insights")
                         .font(.roundedCaption)
                         .foregroundStyle(Color.textSecondary)
                         .multilineTextAlignment(.center)
                 }
+                .frame(maxWidth: .infinity)
                 .padding(.vertical, 8)
             } else {
                 ForEach(viewModel.plaidItems) { item in
@@ -323,8 +314,6 @@ struct ProfileView: View {
         .background(Color.surface)
         .clipShape(RoundedRectangle(cornerRadius: 16))
     }
-
-    // MARK: - Formatters
 
 }
 
