@@ -70,7 +70,7 @@ struct ContentView: View {
                 .tag(1)
 
             // Tab 3: Insights
-            InsightsView(viewModel: insightsViewModel)
+            InsightsView(viewModel: insightsViewModel, selectedTab: $selectedTab)
                 .tabItem {
                     Label("Insights", systemImage: "chart.pie.fill")
                 }
