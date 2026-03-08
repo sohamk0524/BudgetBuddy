@@ -385,8 +385,8 @@ actor APIService {
         }
     }
 
-    /// Parses a spoken transaction statement into structured fields via a dedicated LLM endpoint
-    func parseTransaction(statement: String) async throws -> ParsedTransactionResponse {
+    /// Parses a spoken transaction statement into grouped transactions via LLM
+    func parseTransaction(statement: String) async throws -> ParsedTransactionGroupResponse {
         let url = baseURL.appendingPathComponent("user/parse-transaction")
         var urlRequest = URLRequest(url: url)
         urlRequest.httpMethod = "POST"
@@ -398,7 +398,7 @@ actor APIService {
         let (data, response) = try await URLSession.shared.data(for: urlRequest)
         guard let httpResponse = response as? HTTPURLResponse else { throw APIError.invalidResponse }
         guard httpResponse.statusCode == 200 else { throw APIError.serverError(statusCode: httpResponse.statusCode) }
-        return try JSONDecoder().decode(ParsedTransactionResponse.self, from: data)
+        return try JSONDecoder().decode(ParsedTransactionGroupResponse.self, from: data)
     }
 
     /// Saves a manually-entered (voice) transaction
@@ -412,6 +412,20 @@ actor APIService {
         let (data, response) = try await URLSession.shared.data(for: urlRequest)
         guard let httpResponse = response as? HTTPURLResponse else { throw APIError.invalidResponse }
         guard httpResponse.statusCode == 201 else { throw APIError.serverError(statusCode: httpResponse.statusCode) }
+        return try JSONDecoder().decode(SaveTransactionResponse.self, from: data)
+    }
+
+    /// Updates an existing manual transaction (for back-navigation re-edits)
+    func updateManualTransaction(transactionId: Int, request: SaveTransactionRequest) async throws -> SaveTransactionResponse {
+        let url = baseURL.appendingPathComponent("user/transactions/\(transactionId)")
+        var urlRequest = URLRequest(url: url)
+        urlRequest.httpMethod = "PUT"
+        urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        urlRequest.httpBody = try JSONEncoder().encode(request)
+
+        let (data, response) = try await URLSession.shared.data(for: urlRequest)
+        guard let httpResponse = response as? HTTPURLResponse else { throw APIError.invalidResponse }
+        guard httpResponse.statusCode == 200 else { throw APIError.serverError(statusCode: httpResponse.statusCode) }
         return try JSONDecoder().decode(SaveTransactionResponse.self, from: data)
     }
 
@@ -623,6 +637,38 @@ actor APIService {
             throw APIError.invalidResponse
         }
         return try JSONDecoder().decode(ReceiptAttachResponse.self, from: data)
+    }
+
+    /// Appends items to a transaction's receipt_items and recomputes its sub-category
+    func addReceiptItems(transactionId: Int, items: [EditableReceiptItem], replace: Bool = false) async throws -> AddReceiptItemsResponse {
+        let url = baseURL.appendingPathComponent("transaction/\(transactionId)/receipt-items")
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "PUT"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        let itemPayload = items.map {
+            ["name": $0.name, "price": $0.price, "classification": $0.category] as [String: Any]
+        }
+        let body: [String: Any] = ["items": itemPayload, "replace": replace]
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            throw APIError.invalidResponse
+        }
+        return try JSONDecoder().decode(AddReceiptItemsResponse.self, from: data)
+    }
+
+    /// Deletes a transaction by ID
+    func deleteTransaction(transactionId: Int) async throws {
+        let url = baseURL.appendingPathComponent("transaction/\(transactionId)")
+        var request = URLRequest(url: url)
+        request.httpMethod = "DELETE"
+        let (_, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            throw APIError.invalidResponse
+        }
     }
 
     /// Gets smart nudges

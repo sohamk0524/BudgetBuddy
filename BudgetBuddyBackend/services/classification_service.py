@@ -12,14 +12,14 @@ from typing import Optional, Tuple, List, Dict, Any
 # merchant, auto-apply to remaining unclassified transactions from that merchant.
 CONFIDENCE_THRESHOLD = 3
 
-VALID_CATEGORIES = ('food', 'drink', 'transportation', 'entertainment', 'other')
+VALID_CATEGORIES = ('food', 'drink', 'groceries', 'transportation', 'entertainment', 'other')
 
 # Pre-seeded defaults by Plaid detailed category (personal_finance_category.detailed)
 # Maps Plaid categories to our 5 categories.
 # See: https://plaid.com/documents/transactions-personal-finance-category-taxonomy.csv
 PRE_SEEDED_DEFAULTS = {
     # Food & Drink → food or drink
-    "FOOD_AND_DRINK_GROCERIES": ("food", 0.0),
+    "FOOD_AND_DRINK_GROCERIES": ("groceries", 0.0),
     "FOOD_AND_DRINK_RESTAURANTS": ("food", 0.0),
     "FOOD_AND_DRINK_FAST_FOOD": ("food", 0.0),
     "FOOD_AND_DRINK_VENDING_MACHINES": ("food", 0.0),
@@ -217,10 +217,11 @@ def classify_new_transactions(transactions: list, user_id: int) -> None:
 # LLM Inference for Unknown Merchants
 # =============================================================================
 
-LLM_CLASSIFICATION_PROMPT = """You are a financial transaction classifier. Given a merchant name and optional category hints, classify it into one of these categories: food, drink, transportation, entertainment, or other.
+LLM_CLASSIFICATION_PROMPT = """You are a financial transaction classifier. Given a merchant name and optional category hints, classify it into one of these categories: food, drink, groceries, transportation, entertainment, or other.
 
 Definitions:
-- **food**: Groceries, restaurants, fast food, food delivery
+- **groceries**: Supermarkets, grocery stores, wholesale clubs (Walmart, Costco, Trader Joe's, Whole Foods, Safeway, Kroger, etc.)
+- **food**: Restaurants, fast food, food delivery (not grocery stores)
 - **drink**: Coffee shops, bars, alcohol stores, beverage shops
 - **transportation**: Gas, parking, public transit, ride sharing, car expenses
 - **entertainment**: Movies, music, games, concerts, events, streaming services
@@ -344,10 +345,11 @@ def llm_classify_merchants_batch(
 
         user_context = _get_user_classification_context(user_id)
 
-        system_prompt = f"""You are a financial transaction classifier. Classify each merchant into one of these categories: food, drink, transportation, entertainment, or other.
+        system_prompt = f"""You are a financial transaction classifier. Classify each merchant into one of these categories: food, drink, groceries, transportation, entertainment, or other.
 
 Definitions:
-- **food**: Groceries, restaurants, fast food, food delivery
+- **groceries**: Supermarkets, grocery stores, wholesale clubs (Walmart, Costco, Trader Joe's, Whole Foods, Safeway, Kroger, etc.)
+- **food**: Restaurants, fast food, food delivery (not grocery stores)
 - **drink**: Coffee shops, bars, alcohol stores, beverage shops
 - **transportation**: Gas, parking, public transit, ride sharing, car expenses
 - **entertainment**: Movies, music, games, concerts, events, streaming services
@@ -356,7 +358,7 @@ Definitions:
 {user_context}
 
 Respond with ONLY a JSON array:
-[{{"name": "merchant", "classification": "food|drink|transportation|entertainment|other", "essential_ratio": 0.0}}]"""
+[{{"name": "merchant", "classification": "food|drink|groceries|transportation|entertainment|other", "essential_ratio": 0.0}}]"""
 
         agent = Agent(
             name="BatchMerchantClassifier",

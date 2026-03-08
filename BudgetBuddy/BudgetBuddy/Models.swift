@@ -445,12 +445,13 @@ struct ExpenseTransaction: Codable, Identifiable {
 struct ExpensesSummary {
     let totalFood: Double
     let totalDrink: Double
+    let totalGroceries: Double
     let totalTransportation: Double
     let totalEntertainment: Double
     let totalOther: Double
     let totalUnclassified: Double
 
-    var total: Double { totalFood + totalDrink + totalTransportation + totalEntertainment + totalOther + totalUnclassified }
+    var total: Double { totalFood + totalDrink + totalGroceries + totalTransportation + totalEntertainment + totalOther + totalUnclassified }
 }
 
 struct ExpensesResponse: Codable {
@@ -550,7 +551,7 @@ struct ReceiptLineItem: Codable, Identifiable {
     let id = UUID()
     let name: String
     let price: Double
-    let category: String  // "food", "drink", "transportation", "entertainment", "other"
+    var category: String  // "food", "drink", "transportation", "entertainment", "other"
 
     enum CodingKeys: String, CodingKey {
         case name, price
@@ -578,6 +579,12 @@ struct ReceiptAttachResponse: Codable {
     let transactionId: Int
     let source: String   // "plaid" | "manual"
     let enriched: Bool
+}
+
+struct AddReceiptItemsResponse: Codable {
+    let success: Bool
+    let itemCount: Int
+    let subCategory: String?
 }
 
 // MARK: - User Profile Models
@@ -673,15 +680,17 @@ struct RecommendationsResponse: Codable {
 struct VoiceTransaction: Codable, Identifiable {
     let id: UUID
     var amount: Double?
-    var category: String?  // "Food", "Drink", "Transportation", "Entertainment", "Other"
+    var category: String?  // "Food", "Drink", "Groceries", "Transportation", "Entertainment", "Other"
     var store: String?
     var date: Date
     var notes: String?
+    var items: [EditableReceiptItem]
 
     init(id: UUID = UUID(), amount: Double? = nil, category: String? = nil,
-         store: String? = nil, date: Date = Date(), notes: String? = nil) {
+         store: String? = nil, date: Date = Date(), notes: String? = nil,
+         items: [EditableReceiptItem] = []) {
         self.id = id; self.amount = amount; self.category = category
-        self.store = store; self.date = date; self.notes = notes
+        self.store = store; self.date = date; self.notes = notes; self.items = items
     }
 }
 
@@ -693,14 +702,35 @@ struct ParsedTransactionResponse: Codable {
     let notes: String?
 }
 
+// Multi-transaction parse response (new grouped format)
+struct ParsedTransactionGroupResponse: Codable {
+    let transactions: [ParsedTransactionWithItems]
+}
+
+struct ParsedTransactionWithItems: Codable {
+    let amount: Double?
+    let category: String?
+    let store: String?
+    let date: String?
+    let notes: String?
+    let items: [ParsedItem]?
+}
+
+struct ParsedItem: Codable {
+    let name: String
+    let price: Double
+    let classification: String
+}
+
 struct SaveTransactionRequest: Codable {
     let userId: String
     let amount: Double
-    let category: String  // "Food", "Drink", "Transportation", "Entertainment", "Other"
+    let category: String  // "Food", "Drink", "Groceries", "Transportation", "Entertainment", "Other"
     let store: String?
     let date: String   // ISO 8601
     let notes: String?
     let source: String?  // "manual" or "voice"
+    let receiptItems: [[String: String]]?  // [{name, price, category}]
 }
 
 struct SaveTransactionResponse: Codable {
