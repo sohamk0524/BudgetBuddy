@@ -4,12 +4,14 @@ Onboarding Blueprint — saves user profile from the 4-Question Protocol.
 
 from flask import Blueprint, jsonify, request
 
+from middleware.auth import require_auth
 from db_models import get_user, update_user, get_profile, upsert_profile
 
 onboarding_bp = Blueprint('onboarding', __name__)
 
 
 @onboarding_bp.route("/onboarding", methods=["POST"])
+@require_auth
 def onboarding():
     data = request.get_json()
     if not data:

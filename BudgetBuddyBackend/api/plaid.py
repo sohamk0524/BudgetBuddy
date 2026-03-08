@@ -6,6 +6,8 @@ from datetime import datetime
 
 from flask import Blueprint, jsonify, request
 
+from middleware.auth import require_auth
+from middleware.webhook import verify_plaid_webhook
 from db_models import (
     get_user,
     get_plaid_items,
@@ -40,6 +42,7 @@ def _parse_date(date_str):
 
 
 @plaid_bp.route("/plaid/link-token", methods=["POST"])
+@require_auth
 def create_plaid_link_token():
     data = request.get_json()
     if not data:
@@ -67,6 +70,7 @@ def create_plaid_link_token():
 
 
 @plaid_bp.route("/plaid/exchange-token", methods=["POST"])
+@require_auth
 def exchange_plaid_token():
     data = request.get_json()
     if not data:
@@ -165,6 +169,7 @@ def exchange_plaid_token():
 
 
 @plaid_bp.route("/plaid/accounts/<user_id>", methods=["GET"])
+@require_auth
 def get_plaid_accounts(user_id):
     user = get_user(user_id)
     if not user:
@@ -201,6 +206,7 @@ def get_plaid_accounts(user_id):
 
 
 @plaid_bp.route("/plaid/transactions/<user_id>", methods=["GET"])
+@require_auth
 def get_plaid_transactions(user_id):
     user = get_user(user_id)
     if not user:
@@ -255,6 +261,7 @@ def get_plaid_transactions(user_id):
 
 
 @plaid_bp.route("/plaid/sync/<user_id>", methods=["POST"])
+@require_auth
 def sync_plaid_transactions(user_id):
     user = get_user(user_id)
     if not user:
@@ -350,6 +357,7 @@ def sync_plaid_transactions(user_id):
 
 
 @plaid_bp.route("/plaid/unlink/<user_id>/<item_id>", methods=["DELETE"])
+@require_auth
 def unlink_plaid_item(user_id, item_id):
     user = get_user(user_id)
     if not user:
@@ -370,6 +378,7 @@ def unlink_plaid_item(user_id, item_id):
 
 
 @plaid_bp.route("/plaid/webhook", methods=["POST"])
+@verify_plaid_webhook
 def plaid_webhook():
     """
     Handle Plaid webhook events.

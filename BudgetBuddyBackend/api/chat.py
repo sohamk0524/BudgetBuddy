@@ -7,6 +7,7 @@ from datetime import datetime
 
 from flask import Blueprint, jsonify, request
 
+from middleware.auth import require_auth
 from db_models import get_user, get_statement, upsert_statement, delete_statement_for_user
 from services.orchestrator import process_message
 from services.statement_analyzer import analyze_statement
@@ -16,6 +17,7 @@ chat_bp = Blueprint('chat', __name__)
 
 
 @chat_bp.route("/chat", methods=["POST"])
+@require_auth
 def chat():
     data = request.get_json()
     if not data:
@@ -32,6 +34,7 @@ def chat():
 
 
 @chat_bp.route("/upload-statement", methods=["POST", "OPTIONS"])
+@require_auth
 def upload_statement():
     if request.method == "OPTIONS":
         return "", 200

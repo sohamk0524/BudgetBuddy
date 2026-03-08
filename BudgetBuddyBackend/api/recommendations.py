@@ -4,6 +4,7 @@ Recommendations Blueprint — cached AI-generated financial recommendations.
 
 from flask import Blueprint, jsonify, request
 
+from middleware.auth import require_auth
 from db_models import get_user
 from services.recommendations_generator import get_cached_or_generate, generate_recommendations
 
@@ -11,6 +12,7 @@ recommendations_bp = Blueprint('recommendations', __name__)
 
 
 @recommendations_bp.route("/recommendations/<user_id>", methods=["GET"])
+@require_auth
 def get_recommendations(user_id):
     """Return cached recommendations if fresh, otherwise generate new ones."""
     user = get_user(user_id)
@@ -22,6 +24,7 @@ def get_recommendations(user_id):
 
 
 @recommendations_bp.route("/recommendations/generate", methods=["POST"])
+@require_auth
 def generate_fresh_recommendations():
     """Force-generate fresh recommendations."""
     data = request.get_json()

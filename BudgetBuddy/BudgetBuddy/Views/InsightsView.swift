@@ -12,6 +12,7 @@ import Charts
 @MainActor
 struct InsightsView: View {
     @Bindable var viewModel: InsightsViewModel
+    @Binding var selectedTab: Int
 
     var body: some View {
         NavigationStack {
@@ -44,14 +45,8 @@ struct InsightsView: View {
             .navigationBarTitleDisplayMode(.large)
             .toolbarColorScheme(.dark, for: .navigationBar)
             .refreshable { await viewModel.fetchTransactions() }
-            .task {
-                if viewModel.pieData.isEmpty {
-                    await viewModel.fetchTransactions()
-                }
-            }
-            .onChange(of: viewModel.needsRefresh) { _, needsRefresh in
-                if needsRefresh {
-                    viewModel.needsRefresh = false
+            .onChange(of: selectedTab) { _, newTab in
+                if newTab == 2 {
                     Task { await viewModel.fetchTransactions() }
                 }
             }
@@ -450,5 +445,5 @@ struct InsightsView: View {
 }
 
 #Preview {
-    InsightsView(viewModel: InsightsViewModel())
+    InsightsView(viewModel: InsightsViewModel(), selectedTab: .constant(2))
 }

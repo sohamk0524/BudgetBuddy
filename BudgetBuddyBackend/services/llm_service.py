@@ -30,6 +30,7 @@ class Agent:
     tools: Optional[List[Dict[str, Any]]] = None
     tool_executor: Optional[Callable[[str, Dict], Any]] = None
     max_iterations: int = 5
+    response_format: Optional[Dict[str, Any]] = None
 
     def run(self, user_message: str) -> Dict[str, Any]:
         """
@@ -65,6 +66,8 @@ class Agent:
             if self.tools:
                 kwargs["tools"] = self.tools
                 kwargs["tool_choice"] = "auto"
+            if self.response_format:
+                kwargs["response_format"] = self.response_format
 
             print(f"[{self.name}] Iteration {iteration + 1}/{self.max_iterations} — calling LLM...")
             response = litellm.completion(**kwargs)
@@ -117,7 +120,10 @@ class Agent:
 
         # Max iterations reached — get final response without tools
         print(f"[{self.name}] Max iterations reached, getting final response without tools")
-        response = litellm.completion(model=self.model, messages=conversation)
+        final_kwargs = {"model": self.model, "messages": conversation}
+        if self.response_format:
+            final_kwargs["response_format"] = self.response_format
+        response = litellm.completion(**final_kwargs)
         return {
             "content": response.choices[0].message.content or "",
             "tool_results": all_tool_results
