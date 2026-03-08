@@ -14,6 +14,7 @@ struct EnterPhoneView: View {
     @State private var selectedCountry: Country = .us
     @State private var showTerms = false
     @State private var showPrivacy = false
+    @FocusState private var phoneFieldFocused: Bool
 
     var authManager = AuthManager.shared
 
@@ -24,16 +25,23 @@ struct EnterPhoneView: View {
     }
 
     private var isValidPhone: Bool {
-        // For US, need 10 digits
         if selectedCountry == .us {
-            return digitsOnly.count == 10
+            return nationalDigits.count == 10
         }
-        // For other countries, at least 8 digits
-        return digitsOnly.count >= 8
+        return nationalDigits.count >= 8
+    }
+
+    private var nationalDigits: String {
+        var d = digitsOnly
+        let code = selectedCountry.dialCode
+        if d.hasPrefix(code) && d.count == 10 + code.count {
+            d = String(d.dropFirst(code.count))
+        }
+        return d
     }
 
     private var e164Number: String {
-        "+\(selectedCountry.dialCode)\(digitsOnly)"
+        "+\(selectedCountry.dialCode)\(nationalDigits)"
     }
 
     var body: some View {
@@ -99,12 +107,17 @@ struct EnterPhoneView: View {
                             .font(.roundedBody)
                             .foregroundStyle(Color.textPrimary)
                             .keyboardType(.phonePad)
-                            .textContentType(.telephoneNumber)
+                            .focused($phoneFieldFocused)
                             .padding()
                             .background(Color.surface)
                             .clipShape(RoundedRectangle(cornerRadius: 12))
                             .onChange(of: phoneNumber) { _, newValue in
                                 phoneNumber = formatPhoneNumber(newValue)
+                            }
+                            .onChange(of: phoneFieldFocused) { _, focused in
+                                if !focused {
+                                    phoneNumber = formatPhoneNumber(phoneNumber)
+                                }
                             }
                     }
                 }
