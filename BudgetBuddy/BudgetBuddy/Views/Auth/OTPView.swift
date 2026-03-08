@@ -154,6 +154,7 @@ struct OTPView: View {
 
         // Auto-submit when all fields are filled
         if isComplete && !authManager.isLoading {
+            focusedField = nil  // dismiss keyboard
             Task {
                 await authManager.verifyCode(phoneNumber: phoneNumber, code: otpCode)
             }

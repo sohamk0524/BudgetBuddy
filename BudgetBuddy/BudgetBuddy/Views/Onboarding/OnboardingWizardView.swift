@@ -107,6 +107,7 @@ struct OnboardingWizardView: View {
 
                     // Next / Finish Button
                     Button {
+                        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
                         if currentPage < totalPages - 1 {
                             withAnimation {
                                 currentPage += 1
