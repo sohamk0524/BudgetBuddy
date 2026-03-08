@@ -1,6 +1,6 @@
 """
 Smart expense classification service for BudgetBuddy.
-Classifies transactions as essential, discretionary, or mixed
+Classifies transactions into categories: food, drink, transportation, entertainment, other
 using pre-seeded defaults, merchant history, user overrides, and LLM inference.
 """
 
@@ -12,106 +12,82 @@ from typing import Optional, Tuple, List, Dict, Any
 # merchant, auto-apply to remaining unclassified transactions from that merchant.
 CONFIDENCE_THRESHOLD = 3
 
+VALID_CATEGORIES = ('food', 'drink', 'transportation', 'entertainment', 'other')
+
 # Pre-seeded defaults by Plaid detailed category (personal_finance_category.detailed)
-# Only unambiguous essentials — everything else stays unclassified until user teaches.
+# Maps Plaid categories to our 5 categories.
 # See: https://plaid.com/documents/transactions-personal-finance-category-taxonomy.csv
 PRE_SEEDED_DEFAULTS = {
-    # Rent & Utilities
-    "RENT_AND_UTILITIES_RENT": ("essential", 1.0),
-    "RENT_AND_UTILITIES_GAS_AND_ELECTRICITY": ("essential", 1.0),
-    "RENT_AND_UTILITIES_WATER": ("essential", 1.0),
-    "RENT_AND_UTILITIES_SEWAGE_AND_WASTE_MANAGEMENT": ("essential", 1.0),
-    "RENT_AND_UTILITIES_INTERNET_AND_CABLE": ("essential", 1.0),
-    "RENT_AND_UTILITIES_TELEPHONE": ("essential", 1.0),
-    "RENT_AND_UTILITIES_OTHER_UTILITIES": ("essential", 1.0),
-    # Loan Payments
-    "LOAN_PAYMENTS_MORTGAGE_PAYMENT": ("essential", 1.0),
-    "LOAN_PAYMENTS_STUDENT_LOAN_PAYMENT": ("essential", 1.0),
-    "LOAN_PAYMENTS_CAR_PAYMENT": ("essential", 1.0),
-    "LOAN_PAYMENTS_CREDIT_CARD_PAYMENT": ("essential", 1.0),
-    "LOAN_PAYMENTS_PERSONAL_LOAN_PAYMENT": ("essential", 1.0),
-    "LOAN_PAYMENTS_OTHER_PAYMENT": ("essential", 1.0),
-    # Medical
-    "MEDICAL_DENTAL_CARE": ("essential", 1.0),
-    "MEDICAL_EYE_CARE": ("essential", 1.0),
-    "MEDICAL_NURSING_CARE": ("essential", 1.0),
-    "MEDICAL_PHARMACIES_AND_SUPPLEMENTS": ("essential", 1.0),
-    "MEDICAL_PRIMARY_CARE": ("essential", 1.0),
-    "MEDICAL_OTHER_MEDICAL": ("essential", 1.0),
-    # General Services (essential subset)
-    "GENERAL_SERVICES_INSURANCE": ("essential", 1.0),
-    "GENERAL_SERVICES_EDUCATION": ("essential", 1.0),
-    "GENERAL_SERVICES_CHILDCARE": ("essential", 1.0),
+    # Food & Drink → food or drink
+    "FOOD_AND_DRINK_GROCERIES": ("food", 0.0),
+    "FOOD_AND_DRINK_RESTAURANTS": ("food", 0.0),
+    "FOOD_AND_DRINK_FAST_FOOD": ("food", 0.0),
+    "FOOD_AND_DRINK_VENDING_MACHINES": ("food", 0.0),
+    "FOOD_AND_DRINK_COFFEE": ("drink", 0.0),
+    "FOOD_AND_DRINK_BEER_WINE_AND_LIQUOR": ("drink", 0.0),
+    # Entertainment
+    "ENTERTAINMENT_CASINOS_AND_GAMBLING": ("entertainment", 0.0),
+    "ENTERTAINMENT_CONCERTS_AND_EVENTS": ("entertainment", 0.0),
+    "ENTERTAINMENT_MOVIES_AND_MUSIC": ("entertainment", 0.0),
+    "ENTERTAINMENT_SPORTING_EVENTS": ("entertainment", 0.0),
+    "ENTERTAINMENT_TV_AND_MOVIES": ("entertainment", 0.0),
+    "ENTERTAINMENT_VIDEO_GAMES": ("entertainment", 0.0),
+    "ENTERTAINMENT_OTHER_ENTERTAINMENT": ("entertainment", 0.0),
+    # Transportation
+    "TRANSPORTATION_GAS": ("transportation", 0.0),
+    "TRANSPORTATION_PARKING": ("transportation", 0.0),
+    "TRANSPORTATION_PUBLIC_TRANSIT": ("transportation", 0.0),
+    "TRANSPORTATION_TAXIS_AND_RIDE_SHARING": ("transportation", 0.0),
+    # Everything else → other
+    "RENT_AND_UTILITIES_RENT": ("other", 0.0),
+    "RENT_AND_UTILITIES_GAS_AND_ELECTRICITY": ("other", 0.0),
+    "RENT_AND_UTILITIES_WATER": ("other", 0.0),
+    "RENT_AND_UTILITIES_SEWAGE_AND_WASTE_MANAGEMENT": ("other", 0.0),
+    "RENT_AND_UTILITIES_INTERNET_AND_CABLE": ("other", 0.0),
+    "RENT_AND_UTILITIES_TELEPHONE": ("other", 0.0),
+    "RENT_AND_UTILITIES_OTHER_UTILITIES": ("other", 0.0),
+    "LOAN_PAYMENTS_MORTGAGE_PAYMENT": ("other", 0.0),
+    "LOAN_PAYMENTS_STUDENT_LOAN_PAYMENT": ("other", 0.0),
+    "LOAN_PAYMENTS_CAR_PAYMENT": ("other", 0.0),
+    "LOAN_PAYMENTS_CREDIT_CARD_PAYMENT": ("other", 0.0),
+    "LOAN_PAYMENTS_PERSONAL_LOAN_PAYMENT": ("other", 0.0),
+    "LOAN_PAYMENTS_OTHER_PAYMENT": ("other", 0.0),
+    "MEDICAL_DENTAL_CARE": ("other", 0.0),
+    "MEDICAL_EYE_CARE": ("other", 0.0),
+    "MEDICAL_NURSING_CARE": ("other", 0.0),
+    "MEDICAL_PHARMACIES_AND_SUPPLEMENTS": ("other", 0.0),
+    "MEDICAL_PRIMARY_CARE": ("other", 0.0),
+    "MEDICAL_OTHER_MEDICAL": ("other", 0.0),
+    "GENERAL_SERVICES_INSURANCE": ("other", 0.0),
+    "GENERAL_SERVICES_EDUCATION": ("other", 0.0),
+    "GENERAL_SERVICES_CHILDCARE": ("other", 0.0),
+    "TRAVEL_FLIGHTS": ("other", 0.0),
+    "TRAVEL_LODGING": ("other", 0.0),
+    "TRAVEL_RENTAL_CARS": ("other", 0.0),
+    "GENERAL_MERCHANDISE_DISCOUNT_STORES": ("other", 0.0),
+    "GENERAL_MERCHANDISE_ONLINE_MARKETPLACES": ("other", 0.0),
+    "GENERAL_MERCHANDISE_SUPERSTORES": ("other", 0.0),
+    "GOVERNMENT_AND_NON_PROFIT_TAX_PAYMENT": ("other", 0.0),
+    "PERSONAL_CARE_HAIR_AND_BEAUTY": ("other", 0.0),
+    "PERSONAL_CARE_GYMS_AND_FITNESS_CENTERS": ("other", 0.0),
+    "PERSONAL_CARE_LAUNDRY_AND_DRY_CLEANING": ("other", 0.0),
 }
 
 # Fallback defaults by Plaid primary category (personal_finance_category.primary)
-# Only unambiguous essentials
 PRIMARY_CATEGORY_DEFAULTS = {
-    "RENT_AND_UTILITIES": ("essential", 1.0),
-    "LOAN_PAYMENTS": ("essential", 1.0),
-    "MEDICAL": ("essential", 1.0),
+    "FOOD_AND_DRINK": ("food", 0.0),
+    "ENTERTAINMENT": ("entertainment", 0.0),
+    "TRANSPORTATION": ("transportation", 0.0),
+    "RENT_AND_UTILITIES": ("other", 0.0),
+    "LOAN_PAYMENTS": ("other", 0.0),
+    "MEDICAL": ("other", 0.0),
+    "TRAVEL": ("other", 0.0),
+    "GENERAL_MERCHANDISE": ("other", 0.0),
+    "PERSONAL_CARE": ("other", 0.0),
 }
 
-# Expanded defaults for discretionary/mixed categories by Plaid detailed category
-DISCRETIONARY_DEFAULTS = {
-    # Entertainment — all discretionary
-    "ENTERTAINMENT_CASINOS_AND_GAMBLING": ("discretionary", 0.0),
-    "ENTERTAINMENT_CONCERTS_AND_EVENTS": ("discretionary", 0.0),
-    "ENTERTAINMENT_MOVIES_AND_MUSIC": ("discretionary", 0.0),
-    "ENTERTAINMENT_SPORTING_EVENTS": ("discretionary", 0.0),
-    "ENTERTAINMENT_TV_AND_MOVIES": ("discretionary", 0.0),
-    "ENTERTAINMENT_VIDEO_GAMES": ("discretionary", 0.0),
-    "ENTERTAINMENT_OTHER_ENTERTAINMENT": ("discretionary", 0.0),
-    # Food & Drink
-    "FOOD_AND_DRINK_BEER_WINE_AND_LIQUOR": ("discretionary", 0.0),
-    "FOOD_AND_DRINK_COFFEE": ("discretionary", 0.0),
-    "FOOD_AND_DRINK_FAST_FOOD": ("discretionary", 0.0),
-    "FOOD_AND_DRINK_RESTAURANTS": ("discretionary", 0.0),
-    "FOOD_AND_DRINK_VENDING_MACHINES": ("discretionary", 0.0),
-    "FOOD_AND_DRINK_GROCERIES": ("mixed", 0.8),  # 80% essential by default
-    # Personal Care
-    "PERSONAL_CARE_HAIR_AND_BEAUTY": ("discretionary", 0.0),
-    "PERSONAL_CARE_GYMS_AND_FITNESS_CENTERS": ("discretionary", 0.0),
-    "PERSONAL_CARE_LAUNDRY_AND_DRY_CLEANING": ("essential", 1.0),
-    # Transportation
-    "TRANSPORTATION_GAS": ("essential", 1.0),
-    "TRANSPORTATION_PARKING": ("mixed", 0.5),
-    "TRANSPORTATION_PUBLIC_TRANSIT": ("essential", 1.0),
-    "TRANSPORTATION_TAXIS_AND_RIDE_SHARING": ("mixed", 0.5),
-    # Travel
-    "TRAVEL_FLIGHTS": ("discretionary", 0.0),
-    "TRAVEL_LODGING": ("discretionary", 0.0),
-    "TRAVEL_RENTAL_CARS": ("discretionary", 0.0),
-    # General Merchandise (mixed)
-    "GENERAL_MERCHANDISE_DISCOUNT_STORES": ("mixed", 0.5),
-    "GENERAL_MERCHANDISE_ONLINE_MARKETPLACES": ("mixed", 0.4),
-    "GENERAL_MERCHANDISE_SUPERSTORES": ("mixed", 0.6),
-    # Government
-    "GOVERNMENT_AND_NON_PROFIT_TAX_PAYMENT": ("essential", 1.0),
-}
-
-# Fallback defaults by Plaid primary category for discretionary/mixed
-PRIMARY_DISCRETIONARY_DEFAULTS = {
-    "ENTERTAINMENT": ("discretionary", 0.0),
-    "FOOD_AND_DRINK": ("mixed", 0.6),
-    "PERSONAL_CARE": ("discretionary", 0.0),
-    "TRAVEL": ("discretionary", 0.0),
-    "GENERAL_MERCHANDISE": ("mixed", 0.5),
-    "TRANSPORTATION": ("mixed", 0.7),
-}
-
-# Categories that are obviously discretionary — used for challenge prompt when user marks as essential
-OBVIOUSLY_DISCRETIONARY_CATEGORIES = {
-    "FOOD_AND_DRINK_COFFEE",
-    "FOOD_AND_DRINK_BEER_WINE_AND_LIQUOR",
-    "ENTERTAINMENT_MOVIES_AND_MUSIC",
-    "ENTERTAINMENT_CONCERTS_AND_EVENTS",
-    "ENTERTAINMENT_TV_AND_MOVIES",
-    "ENTERTAINMENT_VIDEO_GAMES",
-    "ENTERTAINMENT_CASINOS_AND_GAMBLING",
-    "FOOD_AND_DRINK_FAST_FOOD",
-    "ENTERTAINMENT_SPORTING_EVENTS",
-}
+# Not used in new system but kept for import compatibility
+OBVIOUSLY_DISCRETIONARY_CATEGORIES = set()
 
 
 def normalize_merchant_name(name: Optional[str]) -> str:
@@ -147,7 +123,7 @@ def classify_transaction(transaction, user_id: int, use_llm: bool = False) -> No
             _save_transaction(transaction)
             return
 
-    # 2. Check pre-seeded defaults by detailed category (essential)
+    # 2. Check pre-seeded defaults by detailed category
     detailed = transaction.get('category_detailed')
     if detailed and detailed in PRE_SEEDED_DEFAULTS:
         classification, ratio = PRE_SEEDED_DEFAULTS[detailed]
@@ -155,24 +131,10 @@ def classify_transaction(transaction, user_id: int, use_llm: bool = False) -> No
         _save_transaction(transaction)
         return
 
-    # 2b. Check discretionary/mixed defaults by detailed category
-    if detailed and detailed in DISCRETIONARY_DEFAULTS:
-        classification, ratio = DISCRETIONARY_DEFAULTS[detailed]
-        _apply_classification(transaction, classification, ratio)
-        _save_transaction(transaction)
-        return
-
-    # 3. Check pre-seeded defaults by primary category (essential)
+    # 3. Check pre-seeded defaults by primary category
     primary = transaction.get('category_primary')
     if primary and primary in PRIMARY_CATEGORY_DEFAULTS:
         classification, ratio = PRIMARY_CATEGORY_DEFAULTS[primary]
-        _apply_classification(transaction, classification, ratio)
-        _save_transaction(transaction)
-        return
-
-    # 3b. Check discretionary/mixed defaults by primary category
-    if primary and primary in PRIMARY_DISCRETIONARY_DEFAULTS:
-        classification, ratio = PRIMARY_DISCRETIONARY_DEFAULTS[primary]
         _apply_classification(transaction, classification, ratio)
         _save_transaction(transaction)
         return
@@ -200,12 +162,11 @@ def _save_transaction(transaction) -> None:
     get_client().put(transaction)
 
 
-def _apply_classification(transaction, classification: str, essential_ratio: float) -> None:
-    """Apply classification and compute split amounts on a Datastore transaction entity."""
+def _apply_classification(transaction, classification: str, essential_ratio: float = 0.0) -> None:
+    """Apply classification on a Datastore transaction entity."""
     transaction['sub_category'] = classification
-    amount = abs(transaction.get('amount') or 0.0)
-    transaction['essential_amount'] = round(amount * essential_ratio, 2)
-    transaction['discretionary_amount'] = round(amount * (1.0 - essential_ratio), 2)
+    transaction['essential_amount'] = None
+    transaction['discretionary_amount'] = None
 
 
 def retroactively_reclassify(user_id: int, merchant_name: str, classification: str, essential_ratio: float) -> int:
@@ -256,19 +217,19 @@ def classify_new_transactions(transactions: list, user_id: int) -> None:
 # LLM Inference for Unknown Merchants
 # =============================================================================
 
-LLM_CLASSIFICATION_PROMPT = """You are a financial transaction classifier. Given a merchant name and optional category hints, classify it as essential, discretionary, or mixed spending.
+LLM_CLASSIFICATION_PROMPT = """You are a financial transaction classifier. Given a merchant name and optional category hints, classify it into one of these categories: food, drink, transportation, entertainment, or other.
 
 Definitions:
-- **essential**: Necessary spending (groceries, rent, utilities, insurance, medical, gas, transit, basic household supplies)
-- **discretionary**: Optional/luxury spending (coffee shops, restaurants, entertainment, shopping, travel, alcohol, hobbies)
-- **mixed**: Merchants that typically sell both essential and discretionary items (Target, Walmart, Costco, Amazon, drug stores with cosmetics)
-
-For mixed merchants, estimate the essential_ratio (0.0 to 1.0) — the fraction of a typical purchase that is essential spending.
+- **food**: Groceries, restaurants, fast food, food delivery
+- **drink**: Coffee shops, bars, alcohol stores, beverage shops
+- **transportation**: Gas, parking, public transit, ride sharing, car expenses
+- **entertainment**: Movies, music, games, concerts, events, streaming services
+- **other**: Everything else (rent, utilities, medical, insurance, shopping, personal care, travel, etc.)
 
 {user_context}
 
 Respond with ONLY valid JSON in this exact format:
-{{"classification": "essential" or "discretionary" or "mixed", "essential_ratio": <float 0.0-1.0>, "reasoning": "<brief explanation>"}}"""
+{{"classification": "food" or "drink" or "transportation" or "entertainment" or "other", "essential_ratio": 0.0, "reasoning": "<brief explanation>"}}"""
 
 
 def _get_user_classification_context(user_id: int) -> str:
@@ -279,17 +240,16 @@ def _get_user_classification_context(user_id: int) -> str:
     if not classifications:
         return ""
 
-    essential = [mc['merchant_name'] for mc in classifications if mc.get('classification') == 'essential']
-    discretionary = [mc['merchant_name'] for mc in classifications if mc.get('classification') == 'discretionary']
-    mixed = [mc['merchant_name'] for mc in classifications if mc.get('classification') == 'mixed']
+    by_cat = {}
+    for mc in classifications:
+        cat = mc.get('classification', 'other')
+        if cat not in by_cat:
+            by_cat[cat] = []
+        by_cat[cat].append(mc['merchant_name'])
 
     lines = ["This user has classified the following merchants:"]
-    if essential:
-        lines.append(f"  Essential: {', '.join(essential[:8])}")
-    if discretionary:
-        lines.append(f"  Discretionary: {', '.join(discretionary[:8])}")
-    if mixed:
-        lines.append(f"  Mixed: {', '.join(mixed[:8])}")
+    for cat, merchants in by_cat.items():
+        lines.append(f"  {cat.capitalize()}: {', '.join(merchants[:8])}")
 
     return "\n".join(lines)
 
@@ -335,7 +295,7 @@ def llm_classify_merchant(
         classification = data.get("classification", "").lower()
         essential_ratio = float(data.get("essential_ratio", 0.5))
 
-        if classification not in ('essential', 'discretionary', 'mixed'):
+        if classification not in VALID_CATEGORIES:
             return None
 
         essential_ratio = max(0.0, min(1.0, essential_ratio))
@@ -384,19 +344,19 @@ def llm_classify_merchants_batch(
 
         user_context = _get_user_classification_context(user_id)
 
-        system_prompt = f"""You are a financial transaction classifier. Classify each merchant as essential, discretionary, or mixed spending.
+        system_prompt = f"""You are a financial transaction classifier. Classify each merchant into one of these categories: food, drink, transportation, entertainment, or other.
 
 Definitions:
-- **essential**: Necessary spending (groceries, rent, utilities, insurance, medical, gas, transit)
-- **discretionary**: Optional spending (coffee shops, restaurants, entertainment, shopping, travel)
-- **mixed**: Both essential and discretionary items (Target, Walmart, Costco, Amazon)
-
-For mixed merchants, estimate essential_ratio (0.0-1.0).
+- **food**: Groceries, restaurants, fast food, food delivery
+- **drink**: Coffee shops, bars, alcohol stores, beverage shops
+- **transportation**: Gas, parking, public transit, ride sharing, car expenses
+- **entertainment**: Movies, music, games, concerts, events, streaming services
+- **other**: Everything else (rent, utilities, medical, insurance, shopping, personal care, travel, etc.)
 
 {user_context}
 
 Respond with ONLY a JSON array:
-[{{"name": "merchant", "classification": "essential|discretionary|mixed", "essential_ratio": 0.0-1.0}}]"""
+[{{"name": "merchant", "classification": "food|drink|transportation|entertainment|other", "essential_ratio": 0.0}}]"""
 
         agent = Agent(
             name="BatchMerchantClassifier",
@@ -430,7 +390,7 @@ Respond with ONLY a JSON array:
         validated = []
         for item in results:
             classification = item.get("classification", "").lower()
-            if classification in ('essential', 'discretionary', 'mixed'):
+            if classification in VALID_CATEGORIES:
                 validated.append({
                     "name": item.get("name", ""),
                     "classification": classification,

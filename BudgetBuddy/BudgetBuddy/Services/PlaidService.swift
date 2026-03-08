@@ -43,7 +43,7 @@ actor PlaidService {
     // MARK: - Link Token
 
     /// Create a link token to initialize Plaid Link
-    func createLinkToken(userId: Int) async throws -> PlaidLinkTokenResponse {
+    func createLinkToken(userId: String) async throws -> PlaidLinkTokenResponse {
         let url = baseURL.appendingPathComponent("plaid/link-token")
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -73,7 +73,7 @@ actor PlaidService {
 
     /// Exchange a public token for an access token and fetch initial data
     func exchangePublicToken(
-        userId: Int,
+        userId: String,
         publicToken: String,
         institutionId: String?,
         institutionName: String?
@@ -116,7 +116,7 @@ actor PlaidService {
     // MARK: - Accounts
 
     /// Get all linked accounts for a user
-    func getLinkedAccounts(userId: Int) async throws -> PlaidAccountsResponse {
+    func getLinkedAccounts(userId: String) async throws -> PlaidAccountsResponse {
         let url = baseURL.appendingPathComponent("plaid/accounts/\(userId)")
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
@@ -142,7 +142,7 @@ actor PlaidService {
 
     /// Get transactions for a user with optional filtering
     func getTransactions(
-        userId: Int,
+        userId: String,
         startDate: Date? = nil,
         endDate: Date? = nil,
         limit: Int = 100,
@@ -190,7 +190,7 @@ actor PlaidService {
     // MARK: - Sync
 
     /// Sync new transactions for a user
-    func syncTransactions(userId: Int) async throws -> PlaidSyncResponse {
+    func syncTransactions(userId: String) async throws -> PlaidSyncResponse {
         let url = baseURL.appendingPathComponent("plaid/sync/\(userId)")
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -215,7 +215,7 @@ actor PlaidService {
     // MARK: - Unlink
 
     /// Unlink a bank account
-    func unlinkItem(userId: Int, itemId: String) async throws {
+    func unlinkItem(userId: String, itemId: String) async throws {
         let url = baseURL.appendingPathComponent("plaid/unlink/\(userId)/\(itemId)")
         var request = URLRequest(url: url)
         request.httpMethod = "DELETE"

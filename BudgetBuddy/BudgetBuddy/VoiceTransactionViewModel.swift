@@ -136,8 +136,6 @@ class VoiceTransactionViewModel {
             store: transaction.store,
             date: formatter.string(from: transaction.date),
             notes: transaction.notes,
-            subCategory: transaction.subCategory,
-            essentialRatio: transaction.essentialRatio,
             source: source
         )
 
@@ -145,6 +143,7 @@ class VoiceTransactionViewModel {
             let response = try await apiService.saveManualTransaction(request: request)
             if response.success {
                 state = .success
+                NotificationCenter.default.post(name: .transactionAdded, object: nil)
             } else {
                 state = .error("Failed to save transaction")
             }

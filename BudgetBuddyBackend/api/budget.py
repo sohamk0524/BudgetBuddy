@@ -24,19 +24,19 @@ def generate_spending_plan():
     if not user_id:
         return jsonify({"error": "userId is required"}), 400
 
-    user = get_user(int(user_id))
+    user = get_user(user_id)
     if not user:
         return jsonify({"error": "User not found"}), 404
 
-    result = generate_plan(int(user_id), deep_dive_data)
+    result = generate_plan(user_id, deep_dive_data)
 
     if result.get("plan"):
-        save_plan_to_db(int(user_id), result["plan"])
+        save_plan_to_db(user_id, result["plan"])
 
     return jsonify(result)
 
 
-@budget_bp.route("/get-plan/<int:user_id>", methods=["GET"])
+@budget_bp.route("/get-plan/<user_id>", methods=["GET"])
 def get_user_plan(user_id):
     user = get_user(user_id)
     if not user:

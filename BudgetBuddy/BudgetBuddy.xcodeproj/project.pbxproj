@@ -7,8 +7,11 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		E18C83742F54305B00E66577 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = E18C83732F54305B00E66577 /* Assets.xcassets */; };
-		E18C83772F54305B00E66577 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = E18C83762F54305B00E66577 /* Preview Assets.xcassets */; };
+		A3E3160D2F5A12D9005BF54C /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = A3E3160C2F5A12D9005BF54C /* FirebaseAuth */; };
+		A3E3160F2F5A12D9005BF54C /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = A3E3160E2F5A12D9005BF54C /* FirebaseCore */; };
+		A3E316112F5A14B3005BF54C /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = A3E316102F5A14B2005BF54C /* GoogleService-Info.plist */; };
+		ACDFE3102F5CCE0E00EDF3AE /* InsightsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ACDFE30F2F5CCE0E00EDF3AE /* InsightsView.swift */; };
+		ACDFE3122F5CCE1800EDF3AE /* InsightsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = ACDFE3112F5CCE1800EDF3AE /* InsightsViewModel.swift */; };
 		E18C83B82F54330900E66577 /* RecommendationsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C837D2F5432FF00E66577 /* RecommendationsViewModel.swift */; };
 		E18C83B92F54330900E66577 /* ChatBubbleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C837F2F54330000E66577 /* ChatBubbleView.swift */; };
 		E18C83BA2F54330900E66577 /* BurndownChartView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C83802F54330000E66577 /* BurndownChartView.swift */; };
@@ -57,7 +60,6 @@
 		E18C83E52F54330900E66577 /* ChatViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C83B62F54330800E66577 /* ChatViewModel.swift */; };
 		E18C83E62F54330900E66577 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = E18C83B72F54330800E66577 /* Models.swift */; };
 		E18C83E92F54339700E66577 /* PhoneNumberKit in Frameworks */ = {isa = PBXBuildFile; productRef = E18C83E82F54339700E66577 /* PhoneNumberKit */; };
-		E18C83EB2F54339700E66577 /* PhoneNumberKit-Dynamic in Frameworks */ = {isa = PBXBuildFile; productRef = E18C83EA2F54339700E66577 /* PhoneNumberKit-Dynamic */; };
 		E18C83ED2F54339700E66577 /* PhoneNumberKit-Static in Frameworks */ = {isa = PBXBuildFile; productRef = E18C83EC2F54339700E66577 /* PhoneNumberKit-Static */; };
 		E18C83F02F5433AD00E66577 /* LinkKit in Frameworks */ = {isa = PBXBuildFile; productRef = E18C83EF2F5433AD00E66577 /* LinkKit */; };
 		E19B24992F55295B005C18DA /* ReceiptScanViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = E19B24982F55295A005C18DA /* ReceiptScanViewModel.swift */; };
@@ -67,9 +69,24 @@
 		E1AB00042F56A10000E66577 /* NotificationSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1AB00032F56A10000E66577 /* NotificationSettingsView.swift */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXCopyFilesBuildPhase section */
+		A366DCFA2F575DC80031D968 /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+			);
+			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
+		A3E316102F5A14B2005BF54C /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
+		ACDFE30F2F5CCE0E00EDF3AE /* InsightsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InsightsView.swift; sourceTree = "<group>"; };
+		ACDFE3112F5CCE1800EDF3AE /* InsightsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InsightsViewModel.swift; sourceTree = "<group>"; };
 		E18C836C2F54305800E66577 /* BudgetBuddy.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BudgetBuddy.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		E18C83732F54305B00E66577 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		E18C83762F54305B00E66577 /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
 		E18C837D2F5432FF00E66577 /* RecommendationsViewModel.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = RecommendationsViewModel.swift; sourceTree = "<group>"; };
 		E18C837F2F54330000E66577 /* ChatBubbleView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ChatBubbleView.swift; sourceTree = "<group>"; };
@@ -132,19 +149,28 @@
 			buildActionMask = 2147483647;
 			files = (
 				E18C83E92F54339700E66577 /* PhoneNumberKit in Frameworks */,
+				A3E3160F2F5A12D9005BF54C /* FirebaseCore in Frameworks */,
 				E18C83F02F5433AD00E66577 /* LinkKit in Frameworks */,
-				E18C83EB2F54339700E66577 /* PhoneNumberKit-Dynamic in Frameworks */,
 				E18C83ED2F54339700E66577 /* PhoneNumberKit-Static in Frameworks */,
+				A3E3160D2F5A12D9005BF54C /* FirebaseAuth in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		A366DCF62F575DC30031D968 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 		E18C83632F54305800E66577 = {
 			isa = PBXGroup;
 			children = (
 				E18C836E2F54305800E66577 /* BudgetBuddy */,
+				A366DCF62F575DC30031D968 /* Frameworks */,
 				E18C836D2F54305800E66577 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -160,6 +186,7 @@
 		E18C836E2F54305800E66577 /* BudgetBuddy */ = {
 			isa = PBXGroup;
 			children = (
+				A3E316102F5A14B2005BF54C /* GoogleService-Info.plist */,
 				E19B24982F55295A005C18DA /* ReceiptScanViewModel.swift */,
 				E18C83842F54330100E66577 /* APIService.swift */,
 				E18C83852F54330200E66577 /* AppConfig.swift */,
@@ -179,8 +206,8 @@
 				E18C838B2F54330400E66577 /* SpendingPlanViewModel.swift */,
 				E18C83942F54330700E66577 /* Views */,
 				E18C838D2F54330500E66577 /* VoiceTransactionViewModel.swift */,
+				ACDFE3112F5CCE1800EDF3AE /* InsightsViewModel.swift */,
 				E18C838E2F54330600E66577 /* WalletViewModel.swift */,
-				E18C83732F54305B00E66577 /* Assets.xcassets */,
 				E18C83752F54305B00E66577 /* Preview Content */,
 			);
 			path = BudgetBuddy;
@@ -234,6 +261,7 @@
 		E18C83942F54330700E66577 /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				ACDFE30F2F5CCE0E00EDF3AE /* InsightsView.swift */,
 				E19B249A2F5529F1005C18DA /* Receipt */,
 				E18C83952F54330700E66577 /* ProfileView.swift */,
 				E18C83962F54330700E66577 /* RecommendationsView.swift */,
@@ -333,6 +361,7 @@
 				E18C83682F54305800E66577 /* Sources */,
 				E18C83692F54305800E66577 /* Frameworks */,
 				E18C836A2F54305800E66577 /* Resources */,
+				A366DCFA2F575DC80031D968 /* Embed Frameworks */,
 			);
 			buildRules = (
 			);
@@ -341,9 +370,10 @@
 			name = BudgetBuddy;
 			packageProductDependencies = (
 				E18C83E82F54339700E66577 /* PhoneNumberKit */,
-				E18C83EA2F54339700E66577 /* PhoneNumberKit-Dynamic */,
 				E18C83EC2F54339700E66577 /* PhoneNumberKit-Static */,
 				E18C83EF2F5433AD00E66577 /* LinkKit */,
+				A3E3160C2F5A12D9005BF54C /* FirebaseAuth */,
+				A3E3160E2F5A12D9005BF54C /* FirebaseCore */,
 			);
 			productName = BudgetBuddy;
 			productReference = E18C836C2F54305800E66577 /* BudgetBuddy.app */;
@@ -357,7 +387,7 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
 				LastSwiftUpdateCheck = 1520;
-				LastUpgradeCheck = 1520;
+				LastUpgradeCheck = 2620;
 				TargetAttributes = {
 					E18C836B2F54305800E66577 = {
 						CreatedOnToolsVersion = 15.2;
@@ -377,6 +407,7 @@
 			packageReferences = (
 				E18C83E72F54339700E66577 /* XCRemoteSwiftPackageReference "PhoneNumberKit" */,
 				E18C83EE2F5433AD00E66577 /* XCRemoteSwiftPackageReference "plaid-link-ios" */,
+				A3E3160B2F5A12D9005BF54C /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
 			);
 			productRefGroup = E18C836D2F54305800E66577 /* Products */;
 			projectDirPath = "";
@@ -393,9 +424,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				E18C83C12F54330900E66577 /* Preview Assets.xcassets in Resources */,
-				E18C83772F54305B00E66577 /* Preview Assets.xcassets in Resources */,
 				E18C83BF2F54330900E66577 /* Assets.xcassets in Resources */,
-				E18C83742F54305B00E66577 /* Assets.xcassets in Resources */,
+				A3E316112F5A14B3005BF54C /* GoogleService-Info.plist in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -445,6 +475,7 @@
 				E18C83D02F54330900E66577 /* ExpensesView.swift in Sources */,
 				E18C83E12F54330900E66577 /* WalletView.swift in Sources */,
 				E18C83C62F54330900E66577 /* SpeechRecognizer.swift in Sources */,
+				ACDFE3102F5CCE0E00EDF3AE /* InsightsView.swift in Sources */,
 				E18C83C42F54330900E66577 /* VoiceTransactionViewModel.swift in Sources */,
 				E18C83CD2F54330900E66577 /* LoginView.swift in Sources */,
 				E18C83DF2F54330900E66577 /* PlaidLinkView.swift in Sources */,
@@ -456,6 +487,7 @@
 				E19B249D2F5529F1005C18DA /* ReceiptLineItemsView.swift in Sources */,
 				E1AB00022F56A10000E66577 /* NotificationManager.swift in Sources */,
 				E1AB00042F56A10000E66577 /* NotificationSettingsView.swift in Sources */,
+				ACDFE3122F5CCE1800EDF3AE /* InsightsViewModel.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -497,6 +529,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = NQWLF9RT3X;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -520,6 +553,7 @@
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 			};
@@ -560,6 +594,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = NQWLF9RT3X;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -576,6 +611,7 @@
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				VALIDATE_PRODUCT = YES;
 			};
@@ -587,11 +623,15 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = BudgetBuddy/BudgetBuddy.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"BudgetBuddy/Preview Content\"";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = BudgetBuddy/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = BudgetBuddies;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.finance";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -602,7 +642,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = sample.BudgetBuddy;
+				PRODUCT_BUNDLE_IDENTIFIER = sample.BudgetBud;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
@@ -617,11 +657,15 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = BudgetBuddy/BudgetBuddy.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"BudgetBuddy/Preview Content\"";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = BudgetBuddy/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = BudgetBuddies;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.finance";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -632,7 +676,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = sample.BudgetBuddy;
+				PRODUCT_BUNDLE_IDENTIFIER = sample.BudgetBud;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
@@ -664,6 +708,14 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		A3E3160B2F5A12D9005BF54C /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/firebase/firebase-ios-sdk";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 12.10.0;
+			};
+		};
 		E18C83E72F54339700E66577 /* XCRemoteSwiftPackageReference "PhoneNumberKit" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/marmelroy/PhoneNumberKit";
@@ -683,15 +735,20 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		A3E3160C2F5A12D9005BF54C /* FirebaseAuth */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A3E3160B2F5A12D9005BF54C /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAuth;
+		};
+		A3E3160E2F5A12D9005BF54C /* FirebaseCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A3E3160B2F5A12D9005BF54C /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseCore;
+		};
 		E18C83E82F54339700E66577 /* PhoneNumberKit */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = E18C83E72F54339700E66577 /* XCRemoteSwiftPackageReference "PhoneNumberKit" */;
 			productName = PhoneNumberKit;
-		};
-		E18C83EA2F54339700E66577 /* PhoneNumberKit-Dynamic */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = E18C83E72F54339700E66577 /* XCRemoteSwiftPackageReference "PhoneNumberKit" */;
-			productName = "PhoneNumberKit-Dynamic";
 		};
 		E18C83EC2F54339700E66577 /* PhoneNumberKit-Static */ = {
 			isa = XCSwiftPackageProductDependency;

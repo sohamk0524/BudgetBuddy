@@ -88,10 +88,6 @@ def get_financial_summary():
     user_id = request.args.get("userId")
     if not user_id:
         return jsonify({"error": "userId is required"}), 400
-    try:
-        user_id = int(user_id)
-    except ValueError:
-        return jsonify({"error": "Invalid userId"}), 400
 
     user = get_user(user_id)
     if not user:
@@ -200,10 +196,6 @@ def delete_statement():
     user_id = request.args.get("userId")
     if not user_id:
         return jsonify({"error": "userId is required"}), 400
-    try:
-        user_id = int(user_id)
-    except ValueError:
-        return jsonify({"error": "Invalid userId"}), 400
 
     statement = get_statement(user_id)
     if statement:
@@ -218,7 +210,7 @@ def delete_statement():
     return "", 204
 
 
-@user_bp.route("/user/profile/<int:user_id>", methods=["GET"])
+@user_bp.route("/user/profile/<user_id>", methods=["GET"])
 def get_user_profile(user_id):
     user = get_user(user_id)
     if not user:
@@ -261,7 +253,7 @@ def get_user_profile(user_id):
     })
 
 
-@user_bp.route("/user/profile/<int:user_id>", methods=["PUT"])
+@user_bp.route("/user/profile/<user_id>", methods=["PUT"])
 def update_user_profile(user_id):
     user = get_user(user_id)
     if not user:
@@ -292,7 +284,7 @@ def update_user_profile(user_id):
     return jsonify({"status": "success"})
 
 
-@user_bp.route("/user/top-expenses/<int:user_id>", methods=["GET"])
+@user_bp.route("/user/top-expenses/<user_id>", methods=["GET"])
 def get_top_expenses(user_id):
     user = get_user(user_id)
     if not user:
@@ -369,7 +361,7 @@ def get_top_expenses(user_id):
     })
 
 
-@user_bp.route("/user/category-preferences/<int:user_id>", methods=["GET"])
+@user_bp.route("/user/category-preferences/<user_id>", methods=["GET"])
 def get_category_preferences(user_id):
     user = get_user(user_id)
     if not user:
@@ -388,7 +380,7 @@ def get_category_preferences(user_id):
     })
 
 
-@user_bp.route("/user/category-preferences/<int:user_id>", methods=["PUT"])
+@user_bp.route("/user/category-preferences/<user_id>", methods=["PUT"])
 def update_category_preferences(user_id):
     user = get_user(user_id)
     if not user:
@@ -402,7 +394,7 @@ def update_category_preferences(user_id):
     return jsonify({"status": "success"})
 
 
-@user_bp.route("/user/nudges/<int:user_id>", methods=["GET"])
+@user_bp.route("/user/nudges/<user_id>", methods=["GET"])
 def get_nudges(user_id):
     user = get_user(user_id)
     if not user:
@@ -469,10 +461,6 @@ def save_manual_transaction():
     user_id = data.get("userId")
     if not user_id:
         return jsonify({"error": "userId is required"}), 400
-    try:
-        user_id = int(user_id)
-    except (ValueError, TypeError):
-        return jsonify({"error": "Invalid userId"}), 400
 
     user = get_user(user_id)
     if not user:
@@ -482,35 +470,24 @@ def save_manual_transaction():
     if not amount or float(amount) <= 0:
         return jsonify({"error": "amount must be greater than 0"}), 400
 
-    # Determine classification
-    sub_category = data.get("subCategory", "unclassified")
-    if sub_category not in ("essential", "discretionary", "mixed", "unclassified"):
-        sub_category = "unclassified"
+    # Determine classification — use category as sub_category for the new system
+    valid_categories = ('food', 'drink', 'transportation', 'entertainment', 'other')
+    category_value = data.get("category", "Other")
+    sub_category = category_value.lower() if category_value.lower() in valid_categories else "unclassified"
 
-    essential_ratio = data.get("essentialRatio")
     amt = float(amount)
-    if essential_ratio is None:
-        if sub_category == "essential":
-            essential_ratio = 1.0
-        elif sub_category == "discretionary":
-            essential_ratio = 0.0
-        else:
-            essential_ratio = 0.5
-
-    essential_amount = round(amt * essential_ratio, 2) if sub_category != "unclassified" else None
-    discretionary_amount = round(amt * (1.0 - essential_ratio), 2) if sub_category != "unclassified" else None
 
     entity = create_manual_transaction(
         user_id,
         amount=amt,
-        category=data.get("category", "Other"),
+        category=category_value,
         store=data.get("store"),
         date=data.get("date"),
         notes=data.get("notes"),
         source=data.get("source", "manual"),
         sub_category=sub_category,
-        essential_amount=essential_amount,
-        discretionary_amount=discretionary_amount,
+        essential_amount=None,
+        discretionary_amount=None,
     )
 
     return jsonify({
