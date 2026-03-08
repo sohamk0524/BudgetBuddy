@@ -200,6 +200,22 @@ def _get_school_food_tip(user_id: int, analysis: Dict[str, Any]) -> Optional[Dic
             school_slug, school_slug.replace("_", " ").title()
         )
 
+        # Try local curated deals first (no API call needed)
+        from services.local_deals import match_deals
+        local_matches = match_deals(school_slug, cuisine_types)
+        if local_matches:
+            deal = local_matches[0]
+            tip = f"{deal['name']} — {deal.get('deal', '')}"
+            if len(tip) > 90:
+                tip = tip[:87].rsplit(" ", 1)[0] + "..."
+            result = {"tip": tip}
+            if deal.get("url"):
+                result["url"] = deal["url"]
+            if deal.get("schedule"):
+                result["schedule"] = deal["schedule"]
+            print(f"[food_tip] Local deal match: {tip}")
+            return result
+
         cuisine_phrase = " and ".join(cuisine_types)
         search_query = f"cheap {cuisine_phrase} restaurants near {school_display} campus student discounts"
         print(f"[food_tip] Search query: {search_query}")
@@ -323,5 +339,7 @@ def food_spending_template(user_id: int) -> Optional[Dict[str, Any]]:
         if school_tip_result.get("url"):
             rec["link"] = school_tip_result["url"]
             rec["linkTitle"] = "See Restaurant"
+        if school_tip_result.get("schedule"):
+            rec["timeHorizon"] = school_tip_result["schedule"]
 
     return rec

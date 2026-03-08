@@ -170,11 +170,6 @@ struct RecommendationCardView: View {
                         .font(.roundedHeadline)
                         .foregroundStyle(Color.textPrimary)
 
-                    Text(item.description)
-                        .font(.roundedCaption)
-                        .foregroundStyle(Color.textSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
-
                     if let savings = item.potentialSavings, savings > 0 {
                         Text("Save ~$\(Int(savings))")
                             .font(.system(.caption2, design: .rounded, weight: .semibold))
