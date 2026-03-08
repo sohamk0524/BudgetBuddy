@@ -6,6 +6,7 @@ import json
 
 from flask import Blueprint, jsonify, request
 
+from middleware.auth import require_auth
 from db_models import (
     get_user,
     get_plaid_items,
@@ -67,6 +68,7 @@ def _get_account_ids_and_map(user_id):
 
 
 @expenses_bp.route("/expenses/<user_id>", methods=["GET"])
+@require_auth
 def get_expenses(user_id):
     """
     Get expenses with sub-category classification data.
@@ -233,6 +235,7 @@ def get_expenses(user_id):
 
 
 @expenses_bp.route("/merchant/classify", methods=["POST"])
+@require_auth
 def classify_merchant():
     """
     User classifies a merchant. Upserts MerchantClassification
@@ -269,6 +272,7 @@ def classify_merchant():
 
 
 @expenses_bp.route("/transaction/<int:transaction_id>/classify", methods=["PUT"])
+@require_auth
 def classify_single_transaction(transaction_id):
     """
     User adjusts classification of a single transaction.
@@ -445,6 +449,7 @@ def delete_transaction(transaction_id):
 
 
 @expenses_bp.route("/merchant/classifications/<user_id>", methods=["GET"])
+@require_auth
 def get_merchant_classifications(user_id):
     """Get all merchant classifications for a user."""
     user = get_user(user_id)
@@ -467,6 +472,7 @@ def get_merchant_classifications(user_id):
 
 
 @expenses_bp.route("/expenses/unclassified/<user_id>", methods=["GET"])
+@require_auth
 def get_unclassified_transactions(user_id):
     """Get individual unclassified transactions sorted by merchant impact, round-robin."""
     user = get_user(user_id)
@@ -594,6 +600,7 @@ def get_unclassified_transactions(user_id):
 
 
 @expenses_bp.route("/expenses/auto-classify/<user_id>", methods=["POST"])
+@require_auth
 def auto_classify_with_llm(user_id):
     """
     Trigger LLM-based batch classification for unclassified merchants.
@@ -668,6 +675,7 @@ def auto_classify_with_llm(user_id):
 
 
 @expenses_bp.route("/device/register", methods=["POST"])
+@require_auth
 def register_device_token():
     """Register a device token for push notifications."""
     data = request.get_json()
@@ -690,6 +698,7 @@ def register_device_token():
 
 
 @expenses_bp.route("/device/unregister", methods=["POST"])
+@require_auth
 def unregister_device_token():
     """Unregister a device token (e.g., on logout)."""
     data = request.get_json()

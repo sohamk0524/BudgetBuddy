@@ -4,6 +4,7 @@ School Blueprint — School-specific RAG advice endpoint.
 
 from flask import Blueprint, jsonify, request
 
+from middleware.auth import require_auth
 from db_models import get_profile
 from services.school_rag import get_school_advice
 
@@ -11,6 +12,7 @@ school_bp = Blueprint('school', __name__)
 
 
 @school_bp.route("/api/school-advice", methods=["POST"])
+@require_auth
 def school_advice():
     """
     Get AI-synthesized, school-specific financial advice via web search (RAG).

@@ -664,6 +664,17 @@ struct RecommendationItem: Codable, Identifiable {
     let potentialSavings: Double?
     let priority: Int?
     let icon: String?
+
+    // Detail fields — presence determines expandability
+    let steps: [String]?
+    let spendingContext: String?
+    let timeHorizon: String?
+    let link: String?
+    let linkTitle: String?
+
+    var isExpandable: Bool {
+        steps != nil || spendingContext != nil || timeHorizon != nil || link != nil
+    }
 }
 
 struct RecommendationsResponse: Codable {

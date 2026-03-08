@@ -11,6 +11,7 @@ import SwiftUI
 struct ProfileView: View {
     @State private var viewModel = ProfileViewModel()
     @State private var showPlaidLink = false
+    @State private var showDeleteConfirmation = false
 
     var body: some View {
         ScrollView {
@@ -45,6 +46,30 @@ struct ProfileView: View {
                     .padding()
                     .background(Color.surface)
                     .clipShape(RoundedRectangle(cornerRadius: 12))
+                }
+
+                // MARK: - Delete Account
+                Button {
+                    showDeleteConfirmation = true
+                } label: {
+                    HStack {
+                        Image(systemName: "trash")
+                        Text("Delete Account")
+                    }
+                    .font(.roundedHeadline)
+                    .foregroundStyle(Color.danger)
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(Color.danger.opacity(0.1))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                }
+                .alert("Delete Account", isPresented: $showDeleteConfirmation) {
+                    Button("Cancel", role: .cancel) { }
+                    Button("Delete", role: .destructive) {
+                        Task { await AuthManager.shared.deleteAccount() }
+                    }
+                } message: {
+                    Text("This will permanently delete your account, all linked bank connections, and all transaction data. This action cannot be undone.")
                 }
             }
             .padding()

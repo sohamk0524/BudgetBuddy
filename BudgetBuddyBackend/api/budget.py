@@ -6,6 +6,7 @@ import json
 
 from flask import Blueprint, jsonify, request
 
+from middleware.auth import require_auth
 from db_models import get_user, get_latest_plan
 from services.plan_generator import generate_plan, save_plan_to_db
 
@@ -13,6 +14,7 @@ budget_bp = Blueprint('budget', __name__)
 
 
 @budget_bp.route("/generate-plan", methods=["POST"])
+@require_auth
 def generate_spending_plan():
     data = request.get_json()
     if not data:
@@ -37,6 +39,7 @@ def generate_spending_plan():
 
 
 @budget_bp.route("/get-plan/<user_id>", methods=["GET"])
+@require_auth
 def get_user_plan(user_id):
     user = get_user(user_id)
     if not user:

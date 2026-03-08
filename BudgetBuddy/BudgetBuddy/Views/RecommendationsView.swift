@@ -150,44 +150,105 @@ struct RecommendationsView: View {
 
 struct RecommendationCardView: View {
     let item: RecommendationItem
+    @State private var isExpanded = false
 
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            // Icon
-            ZStack {
-                Circle()
-                    .fill(Color.accent.opacity(0.15))
-                    .frame(width: 40, height: 40)
-                Image(systemName: item.icon ?? "lightbulb")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(Color.accent)
-            }
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(item.title)
-                    .font(.roundedHeadline)
-                    .foregroundStyle(Color.textPrimary)
-
-                Text(item.description)
-                    .font(.roundedCaption)
-                    .foregroundStyle(Color.textSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                if let savings = item.potentialSavings, savings > 0 {
-                    Text("Save ~$\(Int(savings))")
-                        .font(.system(.caption2, design: .rounded, weight: .semibold))
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .top, spacing: 12) {
+                // Icon
+                ZStack {
+                    Circle()
+                        .fill(Color.accent.opacity(0.15))
+                        .frame(width: 40, height: 40)
+                    Image(systemName: item.icon ?? "lightbulb")
+                        .font(.system(size: 16, weight: .semibold))
                         .foregroundStyle(Color.accent)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(Color.accent.opacity(0.12))
-                        .clipShape(Capsule())
-                        .padding(.top, 2)
+                }
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(item.title)
+                        .font(.roundedHeadline)
+                        .foregroundStyle(Color.textPrimary)
+
+                    if let context = item.spendingContext {
+                        Text(context)
+                            .font(.roundedBody)
+                            .foregroundStyle(Color.textSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+
+                    if let savings = item.potentialSavings, savings > 0 {
+                        Text("Save ~$\(Int(savings))")
+                            .font(.system(.caption, design: .rounded, weight: .semibold))
+                            .foregroundStyle(Color.accent)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 4)
+                            .background(Color.accent.opacity(0.12))
+                            .clipShape(Capsule())
+                            .padding(.top, 2)
+                    }
+                }
+
+                Spacer(minLength: 0)
+
+                if item.isExpandable {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Color.textSecondary)
+                        .rotationEffect(.degrees(isExpanded ? 90 : 0))
                 }
             }
 
-            Spacer(minLength: 0)
+            if isExpanded {
+                expandedContent
+            }
         }
         .cardStyle()
+        .contentShape(Rectangle())
+        .onTapGesture {
+            guard item.isExpandable else { return }
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                isExpanded.toggle()
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var expandedContent: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Divider()
+                .overlay(Color.textSecondary.opacity(0.3))
+                .padding(.top, 8)
+
+            if let steps = item.steps {
+                VStack(alignment: .leading, spacing: 4) {
+                    ForEach(Array(steps.enumerated()), id: \.offset) { index, step in
+                        Text("\(index + 1). \(step)")
+                            .font(.roundedCaption)
+                            .foregroundStyle(Color.textSecondary)
+                    }
+                }
+            }
+
+            HStack(spacing: 8) {
+                if let horizon = item.timeHorizon {
+                    Text(horizon)
+                        .font(.system(.caption2, design: .rounded, weight: .medium))
+                        .foregroundStyle(Color.textSecondary)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(Color.textSecondary.opacity(0.15))
+                        .clipShape(Capsule())
+                }
+
+                if let urlString = item.link, let url = URL(string: urlString) {
+                    Link(item.linkTitle ?? "Learn More", destination: url)
+                        .font(.system(.caption, design: .rounded, weight: .semibold))
+                        .foregroundStyle(Color.accent)
+                }
+            }
+        }
+        .transition(.opacity.combined(with: .move(edge: .top)))
     }
 }
 

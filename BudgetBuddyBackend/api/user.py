@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 
 from flask import Blueprint, jsonify, request
 
+from middleware.auth import require_auth
 from db_models import (
     get_user,
     update_user,
@@ -84,6 +85,7 @@ def format_category_name(raw_name: str) -> str:
 
 
 @user_bp.route("/user/financial-summary", methods=["GET"])
+@require_auth
 def get_financial_summary():
     user_id = request.args.get("userId")
     if not user_id:
@@ -192,6 +194,7 @@ def get_financial_summary():
 
 
 @user_bp.route("/user/statement", methods=["DELETE"])
+@require_auth
 def delete_statement():
     user_id = request.args.get("userId")
     if not user_id:
@@ -211,6 +214,7 @@ def delete_statement():
 
 
 @user_bp.route("/user/profile/<user_id>", methods=["GET"])
+@require_auth
 def get_user_profile(user_id):
     user = get_user(user_id)
     if not user:
@@ -255,6 +259,7 @@ def get_user_profile(user_id):
 
 
 @user_bp.route("/user/profile/<user_id>", methods=["PUT"])
+@require_auth
 def update_user_profile(user_id):
     user = get_user(user_id)
     if not user:
@@ -288,6 +293,7 @@ def update_user_profile(user_id):
 
 
 @user_bp.route("/user/top-expenses/<user_id>", methods=["GET"])
+@require_auth
 def get_top_expenses(user_id):
     user = get_user(user_id)
     if not user:
@@ -365,6 +371,7 @@ def get_top_expenses(user_id):
 
 
 @user_bp.route("/user/category-preferences/<user_id>", methods=["GET"])
+@require_auth
 def get_category_preferences(user_id):
     user = get_user(user_id)
     if not user:
@@ -384,6 +391,7 @@ def get_category_preferences(user_id):
 
 
 @user_bp.route("/user/category-preferences/<user_id>", methods=["PUT"])
+@require_auth
 def update_category_preferences(user_id):
     user = get_user(user_id)
     if not user:
@@ -398,6 +406,7 @@ def update_category_preferences(user_id):
 
 
 @user_bp.route("/user/nudges/<user_id>", methods=["GET"])
+@require_auth
 def get_nudges(user_id):
     user = get_user(user_id)
     if not user:
@@ -476,6 +485,7 @@ def parse_transaction():
 
 
 @user_bp.route("/user/transactions", methods=["POST"])
+@require_auth
 def save_manual_transaction():
     data = request.get_json()
     if not data:
