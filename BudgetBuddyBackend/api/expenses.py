@@ -30,16 +30,27 @@ from services.classification_service import (
 
 expenses_bp = Blueprint('expenses', __name__)
 
-VALID_CATEGORIES = ('food', 'drink', 'transportation', 'entertainment', 'other')
+VALID_CATEGORIES = ('food', 'drink', 'groceries', 'transportation', 'entertainment', 'other')
 
 
 def _parse_receipt_items(raw):
-    """Parse a JSON-encoded receipt_items string into a list, or return None."""
+    """Parse a JSON-encoded receipt_items string into a list, or return None.
+    Normalizes the category key: renames "category" → "classification" so the
+    iOS ReceiptLineItem decoder (which expects "classification") always succeeds.
+    """
     if not raw:
         return None
     try:
         items = json.loads(raw)
-        return items if items else None
+        if not items:
+            return None
+        normalized = []
+        for item in items:
+            n = dict(item)
+            if "category" in n and "classification" not in n:
+                n["classification"] = n.pop("category")
+            normalized.append(n)
+        return normalized
     except (ValueError, TypeError):
         return None
 
@@ -112,6 +123,7 @@ def get_expenses(user_id):
     # Compute summary by category
     summary_totals = {cat: 0.0 for cat in VALID_CATEGORIES}
     summary_totals['unclassified'] = 0.0
+
     for t in filtered:
         t_sub = t.get('sub_category') or 'unclassified'
         t_amount = t.get('amount') or 0
@@ -209,6 +221,7 @@ def get_expenses(user_id):
         "summary": {
             "totalFood": round(summary_totals['food'], 2),
             "totalDrink": round(summary_totals['drink'], 2),
+            "totalGroceries": round(summary_totals['groceries'], 2),
             "totalTransportation": round(summary_totals['transportation'], 2),
             "totalEntertainment": round(summary_totals['entertainment'], 2),
             "totalOther": round(summary_totals['other'], 2),
@@ -360,6 +373,75 @@ def classify_single_transaction(transaction_id):
         "autoApplied": auto_applied,
         "challenge": {"show": False, "reason": None},
     })
+
+
+@expenses_bp.route("/transaction/<int:transaction_id>/receipt-items", methods=["PUT"])
+def add_transaction_receipt_items(transaction_id):
+    """
+    Append items to a transaction's receipt_items and recompute sub_category
+    from the dominant item category by spend.
+
+    JSON body: {"items": [{"name": str, "price": float, "classification": str}]}
+    """
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "Request body must be JSON"}), 400
+
+    new_items = data.get('items', [])
+    if not isinstance(new_items, list):
+        return jsonify({"error": "items must be an array"}), 400
+
+    replace = bool(data.get('replace', False))
+
+    client = get_client()
+    txn = client.get(client.key('Transaction', transaction_id))
+    if not txn:
+        txn = client.get(client.key('ManualTransaction', transaction_id))
+    if not txn:
+        return jsonify({"error": "Transaction not found"}), 404
+
+    if replace:
+        existing_items = new_items
+    else:
+        existing_json = txn.get('receipt_items') or '[]'
+        try:
+            existing_items = json.loads(existing_json)
+        except (ValueError, TypeError):
+            existing_items = []
+        existing_items.extend(new_items)
+
+    txn['receipt_items'] = json.dumps(existing_items)
+
+    # Recompute dominant category from all items
+    totals = {}
+    for item in existing_items:
+        cat = (item.get('classification') or 'other').lower()
+        if cat not in VALID_CATEGORIES:
+            cat = 'other'
+        totals[cat] = totals.get(cat, 0) + float(item.get('price') or 0)
+    if totals:
+        txn['sub_category'] = max(totals, key=totals.get)
+
+    client.put(txn)
+    return jsonify({"success": True, "itemCount": len(existing_items),
+                    "subCategory": txn.get('sub_category')})
+
+
+@expenses_bp.route("/transaction/<int:transaction_id>", methods=["DELETE"])
+def delete_transaction(transaction_id):
+    """Delete a transaction (Plaid or manual) by ID."""
+    client = get_client()
+    key = client.key('Transaction', transaction_id)
+    txn = client.get(key)
+    if txn:
+        client.delete(key)
+        return jsonify({"success": True})
+    key = client.key('ManualTransaction', transaction_id)
+    txn = client.get(key)
+    if txn:
+        client.delete(key)
+        return jsonify({"success": True})
+    return jsonify({"error": "Transaction not found"}), 404
 
 
 @expenses_bp.route("/merchant/classifications/<user_id>", methods=["GET"])

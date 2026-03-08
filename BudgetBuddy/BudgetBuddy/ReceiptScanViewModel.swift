@@ -32,9 +32,12 @@ class ReceiptScanViewModel {
     var capturedImage: UIImage?
     var analysisResult: ReceiptAnalysisResult?
     var attachResponse: ReceiptAttachResponse?
+    /// Set to true when backend analysis returns; loading view observes this to fast-drain remaining steps.
+    var analysisIsComplete = false
 
     func analyzeImage(_ image: UIImage) async {
         capturedImage = image
+        analysisIsComplete = false
         state = .analyzing
 
         guard let userId = AuthManager.shared.authToken else {
@@ -50,13 +53,19 @@ class ReceiptScanViewModel {
         do {
             let result = try await APIService.shared.analyzeReceipt(imageData: imageData, userId: userId)
             analysisResult = result
-            state = .reviewed
+            analysisIsComplete = true   // signal loading view to fast-drain, then it calls finishAnalysis()
         } catch {
             state = .error("Failed to analyze receipt: \(error.localizedDescription)")
         }
     }
 
-    func confirmAndAttach(date: String, merchant: String, category: String) async {
+    /// Called by ReceiptLoadingView once all animation steps have completed.
+    func finishAnalysis() {
+        guard analysisResult != nil else { return }
+        state = .reviewed
+    }
+
+    func confirmAndAttach(category: String, items: [EditableReceiptItem], date: String, merchant: String) async {
         guard let result = analysisResult,
               let userId = AuthManager.shared.authToken else {
             state = .error("Missing data")
@@ -65,16 +74,18 @@ class ReceiptScanViewModel {
 
         state = .attaching
 
-        // Build a result with user-edited merchant
+        // Build result with user-edited merchant and items
         let finalResult = ReceiptAnalysisResult(
             merchant: merchant,
             date: result.date,
             total: result.total,
-            items: result.items
+            items: items.map { $0.toReceiptLineItem() }
         )
 
         do {
-            let response = try await APIService.shared.attachReceipt(userId: userId, result: finalResult, category: category, date: date)
+            let response = try await APIService.shared.attachReceipt(
+                userId: userId, result: finalResult, category: category, date: date
+            )
             attachResponse = response
             state = .done
             NotificationCenter.default.post(name: .transactionAdded, object: nil)

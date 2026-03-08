@@ -67,6 +67,7 @@
 		E19B249E2F5529F1005C18DA /* ReceiptScanView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E19B249C2F5529F1005C18DA /* ReceiptScanView.swift */; };
 		E1AB00022F56A10000E66577 /* NotificationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1AB00012F56A10000E66577 /* NotificationManager.swift */; };
 		E1AB00042F56A10000E66577 /* NotificationSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1AB00032F56A10000E66577 /* NotificationSettingsView.swift */; };
+		E1AB00062F56A10000E66577 /* TransactionItemsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1AB00052F56A10000E66577 /* TransactionItemsSection.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -141,6 +142,7 @@
 		E19B249C2F5529F1005C18DA /* ReceiptScanView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ReceiptScanView.swift; sourceTree = "<group>"; };
 		E1AB00012F56A10000E66577 /* NotificationManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = NotificationManager.swift; sourceTree = "<group>"; };
 		E1AB00032F56A10000E66577 /* NotificationSettingsView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = NotificationSettingsView.swift; sourceTree = "<group>"; };
+		E1AB00052F56A10000E66577 /* TransactionItemsSection.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = TransactionItemsSection.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -306,6 +308,7 @@
 				E18C83A12F54330700E66577 /* GenerativeWidgetView.swift */,
 				E18C83A22F54330700E66577 /* BurndownWidgetView.swift */,
 				E18C83A32F54330700E66577 /* PulseHeaderView.swift */,
+				E1AB00052F56A10000E66577 /* TransactionItemsSection.swift */,
 			);
 			path = Components;
 			sourceTree = "<group>";
@@ -487,6 +490,7 @@
 				E19B249D2F5529F1005C18DA /* ReceiptLineItemsView.swift in Sources */,
 				E1AB00022F56A10000E66577 /* NotificationManager.swift in Sources */,
 				E1AB00042F56A10000E66577 /* NotificationSettingsView.swift in Sources */,
+				E1AB00062F56A10000E66577 /* TransactionItemsSection.swift in Sources */,
 				ACDFE3122F5CCE1800EDF3AE /* InsightsViewModel.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
