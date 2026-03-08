@@ -22,8 +22,8 @@ class NotificationManager {
         "Don't forget to log your spending today!",
         "Quick check-in: any purchases to track today?",
         "Stay on top of your budget — log today's expenses!",
-        "A minute now saves  later. Log your transactions!",
-        "Keep your strestressak going — have you logged today?",
+        "A minute now saves later. Log your transactions!",
+        "Keep your streak going — have you logged today?",
         "Your budget works best when it's up to date!"
     ]
 

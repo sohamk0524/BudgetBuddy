@@ -26,6 +26,9 @@ struct ProfileView: View {
                 // MARK: - Notification Settings
                 notificationSettingsSection
 
+                // MARK: - Face ID
+                biometricSection
+
                 // MARK: - Linked Accounts
                 linkedAccountsSection
 
@@ -204,15 +207,7 @@ struct ProfileView: View {
                         .foregroundStyle(Color.accent)
                 }
 
-                profileRow(label: "Strictness", value: formatStrictness(viewModel.strictnessLevel)) {
-                    Picker("Strictness", selection: $viewModel.strictnessLevel) {
-                        Text("Relaxed").tag("relaxed")
-                        Text("Moderate").tag("moderate")
-                        Text("Strict").tag("strict")
-                    }
-                    .pickerStyle(.menu)
-                    .tint(Color.accent)
-                }
+
             }
         }
         .padding()
@@ -248,6 +243,36 @@ struct ProfileView: View {
             .frame(width: 160, alignment: .trailing)
         }
         .padding(.vertical, 4)
+    }
+
+    // MARK: - Biometric Section
+
+    private var biometricSection: some View {
+        HStack {
+            let type = AuthManager.shared.biometricType
+            let icon = type == "Face ID" ? "faceid" : "touchid"
+            Label(type, systemImage: icon)
+                .font(.roundedHeadline)
+                .foregroundStyle(Color.textPrimary)
+
+            Spacer()
+
+            Toggle("", isOn: Binding(
+                get: { AuthManager.shared.biometricEnabled },
+                set: { newValue in
+                    if newValue {
+                        Task { await AuthManager.shared.enableBiometrics() }
+                    } else {
+                        AuthManager.shared.disableBiometrics()
+                    }
+                }
+            ))
+            .tint(Color.accent)
+            .labelsHidden()
+        }
+        .padding()
+        .background(Color.surface)
+        .clipShape(RoundedRectangle(cornerRadius: 16))
     }
 
     // MARK: - Notification Settings Section
@@ -286,12 +311,14 @@ struct ProfileView: View {
                     Text("No bank accounts linked")
                         .font(.roundedBody)
                         .foregroundStyle(Color.textSecondary)
+                        .multilineTextAlignment(.center)
 
                     Text("Connect your bank to see real-time transactions and spending insights")
                         .font(.roundedCaption)
                         .foregroundStyle(Color.textSecondary)
                         .multilineTextAlignment(.center)
                 }
+                .frame(maxWidth: .infinity)
                 .padding(.vertical, 8)
             } else {
                 ForEach(viewModel.plaidItems) { item in
@@ -346,16 +373,6 @@ struct ProfileView: View {
         .clipShape(RoundedRectangle(cornerRadius: 16))
     }
 
-    // MARK: - Formatters
-
-    private func formatStrictness(_ value: String) -> String {
-        switch value {
-        case "relaxed": return "Relaxed"
-        case "moderate": return "Moderate"
-        case "strict": return "Strict"
-        default: return "--"
-        }
-    }
 }
 
 #Preview {

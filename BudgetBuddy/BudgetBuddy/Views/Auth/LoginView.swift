@@ -18,6 +18,9 @@ struct LoginView: View {
         case .verifyOTP(let phoneNumber):
             OTPView(phoneNumber: phoneNumber)
 
+        case .biometricPrompt:
+            BiometricUnlockView()
+
         case .authenticated:
             EmptyView()
         }

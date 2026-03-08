@@ -10,12 +10,14 @@
 import SwiftUI
 import Observation
 import FirebaseAuth
+import LocalAuthentication
 
 // MARK: - Auth State
 
 enum AuthState: Equatable {
     case enterPhone
     case verifyOTP(phoneNumber: String)
+    case biometricPrompt
     case authenticated
 }
 
@@ -30,6 +32,45 @@ class AuthManager {
     var needsOnboarding: Bool = false
     var isLoading: Bool = false
     var errorMessage: String?
+
+    var biometricEnabled: Bool = false {
+        didSet {
+            UserDefaults.standard.set(biometricEnabled, forKey: "biometricEnabled")
+        }
+    }
+
+    private static let inactivityTimeoutDays: Double = 30
+
+    func recordActivity() {
+        UserDefaults.standard.set(Date(), forKey: "lastActiveDate")
+    }
+
+    private func isSessionExpiredDueToInactivity() -> Bool {
+        guard let lastActive = UserDefaults.standard.object(forKey: "lastActiveDate") as? Date else {
+            return false
+        }
+        let daysSinceActive = Date().timeIntervalSince(lastActive) / 86400
+        return daysSinceActive > Self.inactivityTimeoutDays
+    }
+
+    var isBiometricAvailable: Bool {
+        let context = LAContext()
+        var error: NSError?
+        return context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error)
+    }
+
+    var biometricType: String {
+        let context = LAContext()
+        var error: NSError?
+        guard context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error) else {
+            return "Biometrics"
+        }
+        switch context.biometryType {
+        case .faceID:   return "Face ID"
+        case .touchID:  return "Touch ID"
+        default:        return "Biometrics"
+        }
+    }
 
     var isAuthenticated: Bool {
         if case .authenticated = authState { return true }
@@ -70,13 +111,17 @@ class AuthManager {
     private var verificationID: String?
 
     init() {
-        // Restore cached token for immediate UI — restoreSession() validates with Firebase
+        biometricEnabled = UserDefaults.standard.bool(forKey: "biometricEnabled")
         if let token = UserDefaults.standard.string(forKey: "authToken") {
             self.authToken = token
-            self.authState = .authenticated
-        }
-        if let name = UserDefaults.standard.string(forKey: "userName") {
-            self.userName = name
+            if let name = UserDefaults.standard.string(forKey: "userName") {
+                self.userName = name
+            }
+            if biometricEnabled && Auth.auth().currentUser != nil {
+                self.authState = .biometricPrompt
+            } else {
+                self.authState = .authenticated
+            }
         }
     }
 
@@ -85,6 +130,11 @@ class AuthManager {
     /// On app launch, re-checks Firebase current user and refreshes backend profile.
     func restoreSession() async {
         guard let firebaseUser = Auth.auth().currentUser, let userId = authToken else {
+            await MainActor.run { self.signOut() }
+            return
+        }
+
+        if isSessionExpiredDueToInactivity() {
             await MainActor.run { self.signOut() }
             return
         }
@@ -212,6 +262,7 @@ class AuthManager {
                 self.authState = .authenticated
                 self.needsOnboarding = !hasProfile
                 self.isLoading = false
+                self.recordActivity()
             }
         } else {
             let message = json?["error"] as? String ?? "Authentication failed"
@@ -338,6 +389,62 @@ class AuthManager {
         }
     }
 
+    // MARK: - Biometric Auth
+
+    func authenticateWithBiometrics() async {
+        let context = LAContext()
+        var nsError: NSError?
+        guard context.canEvaluatePolicy(.deviceOwnerAuthentication, error: &nsError) else {
+            // No biometrics or passcode available — fall back to phone auth
+            await MainActor.run { self.signOut() }
+            return
+        }
+        do {
+            // .deviceOwnerAuthentication: tries Face ID first, automatically falls back
+            // to device passcode after repeated failures or lockout
+            try await context.evaluatePolicy(
+                .deviceOwnerAuthentication,
+                localizedReason: "Unlock BudgetBuddy"
+            )
+            await MainActor.run { authState = .authenticated }
+            await restoreSession()
+        } catch let laError as LAError {
+            switch laError.code {
+            case .userCancel, .appCancel, .systemCancel:
+                break // Stay on lock screen
+            default:
+                await MainActor.run { errorMessage = "Authentication failed. Try again." }
+            }
+        } catch {
+            await MainActor.run { errorMessage = error.localizedDescription }
+        }
+    }
+
+    /// Triggers biometric auth to confirm, then enables the feature. Returns success.
+    func enableBiometrics() async -> Bool {
+        let context = LAContext()
+        var nsError: NSError?
+        guard context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &nsError) else {
+            return false
+        }
+        do {
+            let success = try await context.evaluatePolicy(
+                .deviceOwnerAuthenticationWithBiometrics,
+                localizedReason: "Enable \(biometricType) for BudgetBuddy"
+            )
+            if success {
+                await MainActor.run { biometricEnabled = true }
+            }
+            return success
+        } catch {
+            return false
+        }
+    }
+
+    func disableBiometrics() {
+        biometricEnabled = false
+    }
+
     // MARK: - Sign Out
 
     func signOut() {
@@ -350,7 +457,25 @@ class AuthManager {
         verificationID = nil
         errorMessage = nil
         isLoading = false
+        clearUserCache()
         PlaidLinkManager.shared.reset()
+    }
+
+    private func clearUserCache() {
+        let keys = [
+            // Auth
+            "lastActiveDate",
+            // Profile
+            "profile_name", "profile_phone", "profile_isStudent",
+            "profile_weeklyLimit", "profile_strictness", "profile_school",
+            // Expenses
+            "expenses_transactions", "expenses_weeksBack",
+            // Insights
+            "insights_transactions_7D", "insights_transactions_30D", "insights_transactions_90D",
+            // Spending plan
+            "userSavingsGoals",
+        ]
+        keys.forEach { UserDefaults.standard.removeObject(forKey: $0) }
     }
 
     // MARK: - Error Helpers

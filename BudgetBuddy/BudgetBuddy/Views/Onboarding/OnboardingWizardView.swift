@@ -11,19 +11,19 @@ import SwiftUI
 struct OnboardingWizardView: View {
     @State private var currentPage = 0
     @FocusState private var isTextFieldFocused: Bool
+    @State private var showBiometricSetup = false
 
     // Question fields
     @State private var name: String = ""
-    @State private var isStudent: Bool = false
+    @State private var isStudent: Bool = true
     @State private var selectedSchool: String = ""
     @State private var weeklySpendingLimit: String = ""
-    @State private var strictnessLevel: String = "moderate"
 
     var authManager = AuthManager.shared
 
     /// Total pages changes based on whether the school page is shown.
     private var totalPages: Int {
-        isStudent ? 5 : 4
+        isStudent ? 4 : 3
     }
 
     private var canFinish: Bool {
@@ -78,18 +78,10 @@ struct OnboardingWizardView: View {
                         // Page 3: Weekly Spending Limit
                         WeeklySpendingLimitPage(weeklyLimit: $weeklySpendingLimit, isFocused: $isTextFieldFocused)
                             .tag(3)
-
-                        // Page 4: Strictness Level
-                        StrictnessLevelPage(selectedStrictness: $strictnessLevel)
-                            .tag(4)
                     } else {
                         // Page 2: Weekly Spending Limit
                         WeeklySpendingLimitPage(weeklyLimit: $weeklySpendingLimit, isFocused: $isTextFieldFocused)
                             .tag(2)
-
-                        // Page 3: Strictness Level
-                        StrictnessLevelPage(selectedStrictness: $strictnessLevel)
-                            .tag(3)
                     }
                 }
                 .tabViewStyle(.page(indexDisplayMode: .never))
@@ -118,13 +110,17 @@ struct OnboardingWizardView: View {
 
                     // Next / Finish Button
                     Button {
-                        isTextFieldFocused = false
+                        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
                         if currentPage < totalPages - 1 {
                             withAnimation {
                                 currentPage += 1
                             }
                         } else {
-                            finishOnboarding()
+                            if authManager.isBiometricAvailable {
+                                showBiometricSetup = true
+                            } else {
+                                finishOnboarding()
+                            }
                         }
                     } label: {
                         if authManager.isLoading {
@@ -157,6 +153,12 @@ struct OnboardingWizardView: View {
                 }
             }
         }
+        .sheet(isPresented: $showBiometricSetup) {
+            BiometricSetupSheet {
+                showBiometricSetup = false
+                finishOnboarding()
+            }
+        }
         .onChange(of: isStudent) {
             // When toggling student off, reset school and clamp page if needed
             if !isStudent {
@@ -180,7 +182,6 @@ struct OnboardingWizardView: View {
                 name: trimmedName,
                 isStudent: isStudent,
                 weeklySpendingLimit: limit,
-                strictnessLevel: strictnessLevel,
                 school: selectedSchool
             )
         }
@@ -351,52 +352,6 @@ struct WeeklySpendingLimitPage: View {
             .background(Color.surface)
             .clipShape(RoundedRectangle(cornerRadius: 16))
             .padding(.horizontal, 48)
-
-            Spacer()
-        }
-        .padding(.top, 24)
-    }
-}
-
-// MARK: - Strictness Level Page
-
-struct StrictnessLevelPage: View {
-    @Binding var selectedStrictness: String
-
-    private let options = [
-        ("relaxed", "Relaxed", "Guide me gently"),
-        ("moderate", "Moderate", "Keep me on track"),
-        ("strict", "Strict", "Don't let me overspend")
-    ]
-
-    var body: some View {
-        VStack(spacing: 24) {
-            Image(systemName: "slider.horizontal.3")
-                .font(.system(size: 56))
-                .foregroundStyle(Color.accent)
-
-            Text("How Strict Should We Be?")
-                .font(.roundedHeadline)
-                .foregroundStyle(Color.textPrimary)
-
-            Text("Choose how aggressively we should enforce your budget")
-                .font(.roundedBody)
-                .foregroundStyle(Color.textSecondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 24)
-
-            VStack(spacing: 12) {
-                ForEach(options, id: \.0) { value, title, subtitle in
-                    SelectableOptionCard(
-                        title: title,
-                        subtitle: subtitle,
-                        isSelected: selectedStrictness == value
-                    ) {
-                        selectedStrictness = value
-                    }
-                }
-            }
-            .padding(.horizontal, 24)
 
             Spacer()
         }

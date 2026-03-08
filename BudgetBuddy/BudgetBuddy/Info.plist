@@ -11,6 +11,8 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<key>NSFaceIDUsageDescription</key>
+	<string>BudgetBuddy uses Face ID to unlock your account quickly without needing a verification code.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>BudgetBuddy uses speech recognition to transcribe your voice into transaction details.</string>
 	<key>NSMicrophoneUsageDescription</key>

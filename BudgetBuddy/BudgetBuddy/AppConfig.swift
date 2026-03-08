@@ -13,8 +13,8 @@ enum AppConfig {
 
     /// Supported universities: (backendKey, displayName)
     static let universities: [(key: String, name: String)] = [
-        ("uc_berkeley",    "UC Berkeley"),
         ("uc_davis",       "UC Davis"),
+        ("uc_berkeley",    "UC Berkeley"),
         ("uc_irvine",      "UC Irvine"),
         ("uc_los_angeles", "UC Los Angeles"),
         ("uc_merced",      "UC Merced"),

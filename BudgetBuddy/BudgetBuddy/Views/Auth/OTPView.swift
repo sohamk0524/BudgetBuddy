@@ -6,12 +6,13 @@
 //
 
 import SwiftUI
+import UIKit
 
 struct OTPView: View {
     let phoneNumber: String
 
     @State private var otpDigits: [String] = Array(repeating: "", count: 6)
-    @FocusState private var focusedField: Int?
+    @State private var focusedField: Int? = nil
 
     var authManager = AuthManager.shared
 
@@ -70,9 +71,23 @@ struct OTPView: View {
                     ForEach(0..<6, id: \.self) { index in
                         OTPDigitField(
                             digit: $otpDigits[index],
-                            isFocused: focusedField == index
+                            isFocused: focusedField == index,
+                            onBackspaceWhenEmpty: {
+                                if index > 0 {
+                                    otpDigits[index - 1] = ""
+                                    focusedField = index - 1
+                                }
+                            },
+                            onFullCode: { code in
+                                let digits = code.filter { $0.isNumber }
+                                for i in 0..<6 {
+                                    otpDigits[i] = i < digits.count
+                                        ? String(digits[digits.index(digits.startIndex, offsetBy: i)])
+                                        : ""
+                                }
+                                focusedField = min(5, digits.count - 1)
+                            }
                         )
-                        .focused($focusedField, equals: index)
                         .onChange(of: otpDigits[index]) { oldValue, newValue in
                             handleDigitChange(index: index, oldValue: oldValue, newValue: newValue)
                         }
@@ -123,25 +138,23 @@ struct OTPView: View {
     }
 
     private func handleDigitChange(index: Int, oldValue: String, newValue: String) {
-        // Only allow single digit
-        if newValue.count > 1 {
-            otpDigits[index] = String(newValue.suffix(1))
-            return
-        }
+        // Multi-char changes come from onFullCode (already handled) — ignore here
+        if newValue.count > 1 { return }
 
-        // Only allow digits
+        // Only allow digits (guard against non-numeric input)
         if !newValue.isEmpty && !newValue.allSatisfy({ $0.isNumber }) {
             otpDigits[index] = oldValue
             return
         }
 
-        // Auto-advance to next field
+        // Auto-advance to next field when a digit is entered
         if !newValue.isEmpty && index < 5 {
             focusedField = index + 1
         }
 
-        // Auto-submit when complete
+        // Auto-submit when all fields are filled
         if isComplete && !authManager.isLoading {
+            focusedField = nil  // dismiss keyboard
             Task {
                 await authManager.verifyCode(phoneNumber: phoneNumber, code: otpCode)
             }
@@ -154,21 +167,98 @@ struct OTPView: View {
 struct OTPDigitField: View {
     @Binding var digit: String
     let isFocused: Bool
+    let onBackspaceWhenEmpty: () -> Void
+    let onFullCode: (String) -> Void
 
     var body: some View {
-        TextField("", text: $digit)
-            .keyboardType(.numberPad)
-            .textContentType(.oneTimeCode)
-            .multilineTextAlignment(.center)
-            .font(.system(size: 24, weight: .bold, design: .rounded))
-            .foregroundStyle(Color.textPrimary)
-            .frame(width: 48, height: 56)
-            .background(Color.surface)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(isFocused ? Color.accent : Color.clear, lineWidth: 2)
-            )
+        BackspaceDetectingField(
+            text: $digit,
+            isFocused: isFocused,
+            onBackspaceWhenEmpty: onBackspaceWhenEmpty,
+            onFullCode: onFullCode
+        )
+        .frame(width: 48, height: 56)
+        .background(Color.surface)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(isFocused ? Color.accent : Color.clear, lineWidth: 2)
+        )
+    }
+}
+
+// MARK: - UIKit-backed field (backspace detection + autofill spreading)
+
+private struct BackspaceDetectingField: UIViewRepresentable {
+    @Binding var text: String
+    let isFocused: Bool
+    let onBackspaceWhenEmpty: () -> Void
+    let onFullCode: (String) -> Void
+
+    func makeUIView(context: Context) -> BackspaceTextField {
+        let tf = BackspaceTextField()
+        tf.onDeleteWhenEmpty = onBackspaceWhenEmpty
+        tf.delegate = context.coordinator
+        tf.keyboardType = .numberPad
+        tf.textContentType = .oneTimeCode
+        tf.textAlignment = .center
+        let base = UIFont.systemFont(ofSize: 24, weight: .bold)
+        if let descriptor = base.fontDescriptor.withDesign(.rounded) {
+            tf.font = UIFont(descriptor: descriptor, size: 24)
+        } else {
+            tf.font = base
+        }
+        return tf
+    }
+
+    func updateUIView(_ uiView: BackspaceTextField, context: Context) {
+        if uiView.text != text {
+            uiView.text = text
+        }
+        // Defer focus changes to avoid modifying view hierarchy during a SwiftUI update pass
+        DispatchQueue.main.async {
+            if isFocused && !uiView.isFirstResponder {
+                uiView.becomeFirstResponder()
+            } else if !isFocused && uiView.isFirstResponder {
+                uiView.resignFirstResponder()
+            }
+        }
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator(self) }
+
+    class Coordinator: NSObject, UITextFieldDelegate {
+        var parent: BackspaceDetectingField
+        init(_ parent: BackspaceDetectingField) { self.parent = parent }
+
+        func textField(_ textField: UITextField,
+                       shouldChangeCharactersIn range: NSRange,
+                       replacementString string: String) -> Bool {
+            let digits = string.filter { $0.isNumber }
+
+            // Full OTP autofill (e.g. iOS SMS suggestion pastes "123456")
+            if digits.count >= 6 {
+                DispatchQueue.main.async { self.parent.onFullCode(digits) }
+                return false
+            }
+
+            // Single digit or backspace
+            parent.text = String(digits.prefix(1))
+            return false
+        }
+    }
+}
+
+// MARK: - Backspace-aware UITextField
+
+class BackspaceTextField: UITextField {
+    var onDeleteWhenEmpty: (() -> Void)?
+
+    override func deleteBackward() {
+        if (text ?? "").isEmpty {
+            onDeleteWhenEmpty?()
+        }
+        super.deleteBackward()
     }
 }
 

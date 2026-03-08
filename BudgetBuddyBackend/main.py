@@ -5,11 +5,18 @@ Gunicorn targets this file: gunicorn -b :$PORT main:app
 """
 
 import os
+import firebase_admin
+from firebase_admin import credentials
 from flask import Flask, jsonify
 from flask_cors import CORS
 from dotenv import load_dotenv
 
 load_dotenv()
+
+# Initialize Firebase Admin SDK at startup so the auth middleware can verify tokens
+if not firebase_admin._apps:
+    cred_path = os.getenv("FIREBASE_CREDENTIALS")
+    firebase_admin.initialize_app(credentials.Certificate(cred_path))
 
 if os.environ.get("USE_LOCAL_DB", "").lower() in ("1", "true", "yes"):
     print("[DB] Using LOCAL Datastore emulator (localhost:8081)")

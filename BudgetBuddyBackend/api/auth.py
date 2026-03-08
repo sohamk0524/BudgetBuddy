@@ -7,8 +7,7 @@ Firebase ID token here. We verify it, then create/return our app user.
 """
 
 import os
-import firebase_admin
-from firebase_admin import credentials, auth as firebase_auth
+from firebase_admin import auth as firebase_auth
 from flask import Blueprint, jsonify, request
 from dotenv import load_dotenv
 
@@ -25,18 +24,6 @@ load_dotenv()
 
 auth_bp = Blueprint('auth', __name__)
 
-# Initialize Firebase Admin SDK once
-_firebase_initialized = False
-
-def _get_firebase_app():
-    global _firebase_initialized
-    if not _firebase_initialized:
-        cred_path = os.getenv('FIREBASE_CREDENTIALS')
-        cred = credentials.Certificate(cred_path)
-        firebase_admin.initialize_app(cred)
-        _firebase_initialized = True
-
-
 @auth_bp.route("/v1/auth/firebase", methods=["POST"])
 def firebase_login():
     """
@@ -44,8 +31,6 @@ def firebase_login():
     Body: { "idToken": "<firebase_id_token>" }
     Returns: { "token": "<firebase_uid>", "hasProfile": bool, "name": str|null }
     """
-    _get_firebase_app()
-
     data = request.get_json()
     id_token = (data or {}).get("idToken", "").strip()
 

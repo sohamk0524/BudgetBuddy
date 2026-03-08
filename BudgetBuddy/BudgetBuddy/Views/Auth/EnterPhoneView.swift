@@ -177,13 +177,20 @@ struct EnterPhoneView: View {
 
     /// Format phone number for display (US format)
     private func formatPhoneNumber(_ input: String) -> String {
-        let digits = input.filter { $0.isNumber }
+        var digits = input.filter { $0.isNumber }
 
-        // Limit to reasonable length
-        let limited = String(digits.prefix(15))
+        // Strip leading country dial code when autofilled (e.g. "+1669234322" → "669234322")
+        let dialCode = selectedCountry.dialCode
+        if digits.count == 10 + dialCode.count && digits.hasPrefix(dialCode) {
+            digits = String(digits.dropFirst(dialCode.count))
+        }
 
-        // For US, format as (XXX) XXX-XXXX
-        if selectedCountry == .us {
+        // Limit to the correct national number length
+        let limit = (selectedCountry == .us || selectedCountry == .ca) ? 10 : 15
+        let limited = String(digits.prefix(limit))
+
+        // For US/CA, format as (XXX) XXX-XXXX
+        if selectedCountry == .us || selectedCountry == .ca {
             if limited.count <= 3 {
                 return limited
             } else if limited.count <= 6 {

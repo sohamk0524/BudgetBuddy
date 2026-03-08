@@ -18,7 +18,7 @@ struct RecommendationsView: View {
             VStack(spacing: 0) {
                 // Hero — safe-to-spend pill
                 PulseHeaderView(
-                    safeToSpend: viewModel.safeToSpend,
+                    safeToSpend: viewModel.dailySafeToSpend,
                     isHealthy: viewModel.isHealthy,
                     status: viewModel.statusDisplayText
                 )

@@ -169,7 +169,7 @@ actor APIService {
             throw APIError.invalidResponse
         }
 
-        var request = try await authenticatedRequest(url: url, method: "DELETE")
+        let request = try await authenticatedRequest(url: url, method: "DELETE")
 
         let (_, response) = try await URLSession.shared.data(for: request)
 
