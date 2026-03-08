@@ -12,6 +12,7 @@ from firebase_admin import credentials, auth as firebase_auth
 from flask import Blueprint, jsonify, request
 from dotenv import load_dotenv
 
+from middleware.auth import require_auth
 from db_models import (
     get_user_by_firebase_uid,
     create_user,
@@ -75,6 +76,7 @@ def firebase_login():
 
 
 @auth_bp.route("/v1/user", methods=["DELETE"])
+@require_auth
 def delete_user():
     user_id = request.args.get("userId")
     if not user_id:

@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import FirebaseAuth
 
 actor APIService {
 
@@ -25,6 +26,25 @@ actor APIService {
         self.baseURL = AppConfig.baseURL
     }
 
+    // MARK: - Auth Helper
+
+    /// Gets a fresh Firebase ID token for authenticating API requests.
+    private func firebaseIDToken() async throws -> String {
+        guard let user = Auth.auth().currentUser else {
+            throw APIError.invalidResponse
+        }
+        return try await user.getIDToken()
+    }
+
+    /// Creates a URLRequest with the Authorization header set.
+    private func authenticatedRequest(url: URL, method: String = "GET") async throws -> URLRequest {
+        var request = URLRequest(url: url)
+        request.httpMethod = method
+        let token = try await firebaseIDToken()
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        return request
+    }
+
     // MARK: - Chat API
 
     /// Sends a message to the AI backend and returns the response
@@ -35,8 +55,7 @@ actor APIService {
     func sendMessage(text: String, userId: String?) async throws -> AssistantResponse {
         let url = baseURL.appendingPathComponent("chat")
 
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
+        var request = try await authenticatedRequest(url: url, method: "POST")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
         let body: [String: Any] = [
@@ -94,8 +113,7 @@ actor APIService {
 
         body.append("--\(boundary)--\r\n".data(using: .utf8)!)
 
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
+        var request = try await authenticatedRequest(url: url, method: "POST")
         request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
         request.httpBody = body
 
@@ -126,7 +144,8 @@ actor APIService {
             throw APIError.invalidResponse
         }
 
-        let (data, response) = try await URLSession.shared.data(from: url)
+        let request = try await authenticatedRequest(url: url)
+        let (data, response) = try await URLSession.shared.data(for: request)
 
         guard let httpResponse = response as? HTTPURLResponse else {
             throw APIError.invalidResponse
@@ -150,8 +169,7 @@ actor APIService {
             throw APIError.invalidResponse
         }
 
-        var request = URLRequest(url: url)
-        request.httpMethod = "DELETE"
+        var request = try await authenticatedRequest(url: url, method: "DELETE")
 
         let (_, response) = try await URLSession.shared.data(for: request)
 
@@ -195,8 +213,7 @@ actor APIService {
     func generatePlan(userId: String, planInput: SpendingPlanInput) async throws -> SpendingPlanResponse {
         let url = baseURL.appendingPathComponent("generate-plan")
 
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
+        var request = try await authenticatedRequest(url: url, method: "POST")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
         // Format the date for JSON
@@ -286,7 +303,8 @@ actor APIService {
     func getPlan(userId: String) async throws -> GetPlanResponse {
         let url = baseURL.appendingPathComponent("get-plan/\(userId)")
 
-        let (data, response) = try await URLSession.shared.data(from: url)
+        let request = try await authenticatedRequest(url: url)
+        let (data, response) = try await URLSession.shared.data(for: request)
 
         guard let httpResponse = response as? HTTPURLResponse else {
             throw APIError.invalidResponse
@@ -306,7 +324,8 @@ actor APIService {
     func getUserProfile(userId: String) async throws -> UserProfile {
         let url = baseURL.appendingPathComponent("user/profile/\(userId)")
 
-        let (data, response) = try await URLSession.shared.data(from: url)
+        let request = try await authenticatedRequest(url: url)
+        let (data, response) = try await URLSession.shared.data(for: request)
 
         guard let httpResponse = response as? HTTPURLResponse,
               httpResponse.statusCode == 200 else {
@@ -320,8 +339,7 @@ actor APIService {
     func updateUserProfile(userId: String, update: UserProfileUpdateRequest) async throws {
         let url = baseURL.appendingPathComponent("user/profile/\(userId)")
 
-        var request = URLRequest(url: url)
-        request.httpMethod = "PUT"
+        var request = try await authenticatedRequest(url: url, method: "PUT")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONEncoder().encode(update)
 
@@ -342,7 +360,8 @@ actor APIService {
             throw APIError.invalidResponse
         }
 
-        let (data, response) = try await URLSession.shared.data(from: url)
+        let request = try await authenticatedRequest(url: url)
+        let (data, response) = try await URLSession.shared.data(for: request)
 
         guard let httpResponse = response as? HTTPURLResponse,
               httpResponse.statusCode == 200 else {
@@ -356,7 +375,8 @@ actor APIService {
     func getCategoryPreferences(userId: String) async throws -> CategoryPreferencesResponse {
         let url = baseURL.appendingPathComponent("user/category-preferences/\(userId)")
 
-        let (data, response) = try await URLSession.shared.data(from: url)
+        let request = try await authenticatedRequest(url: url)
+        let (data, response) = try await URLSession.shared.data(for: request)
 
         guard let httpResponse = response as? HTTPURLResponse,
               httpResponse.statusCode == 200 else {
@@ -370,8 +390,7 @@ actor APIService {
     func updateCategoryPreferences(userId: String, categories: [String]) async throws {
         let url = baseURL.appendingPathComponent("user/category-preferences/\(userId)")
 
-        var request = URLRequest(url: url)
-        request.httpMethod = "PUT"
+        var request = try await authenticatedRequest(url: url, method: "PUT")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
         let body: [String: Any] = ["categories": categories]
@@ -391,6 +410,10 @@ actor APIService {
         var urlRequest = URLRequest(url: url)
         urlRequest.httpMethod = "POST"
         urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        // Note: parse-transaction is unprotected (no user data), but we add auth for consistency
+        if let user = Auth.auth().currentUser, let token = try? await user.getIDToken() {
+            urlRequest.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
 
         let body: [String: Any] = ["statement": statement]
         urlRequest.httpBody = try JSONSerialization.data(withJSONObject: body)
@@ -402,12 +425,11 @@ actor APIService {
     }
 
     /// Saves a manually-entered (voice) transaction
-    func saveManualTransaction(request: SaveTransactionRequest) async throws -> SaveTransactionResponse {
+    func saveManualTransaction(request saveRequest: SaveTransactionRequest) async throws -> SaveTransactionResponse {
         let url = baseURL.appendingPathComponent("user/transactions")
-        var urlRequest = URLRequest(url: url)
-        urlRequest.httpMethod = "POST"
+        var urlRequest = try await authenticatedRequest(url: url, method: "POST")
         urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        urlRequest.httpBody = try JSONEncoder().encode(request)
+        urlRequest.httpBody = try JSONEncoder().encode(saveRequest)
 
         let (data, response) = try await URLSession.shared.data(for: urlRequest)
         guard let httpResponse = response as? HTTPURLResponse else { throw APIError.invalidResponse }
@@ -432,7 +454,8 @@ actor APIService {
 
         guard let url = urlComponents.url else { throw APIError.invalidResponse }
 
-        let (data, response) = try await URLSession.shared.data(from: url)
+        let request = try await authenticatedRequest(url: url)
+        let (data, response) = try await URLSession.shared.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
             throw APIError.invalidResponse
         }
@@ -443,8 +466,7 @@ actor APIService {
     func classifyMerchant(userId: String, merchantName: String, classification: String, essentialRatio: Double? = nil) async throws -> ClassifyMerchantResponse {
         let url = baseURL.appendingPathComponent("merchant/classify")
 
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
+        var request = try await authenticatedRequest(url: url, method: "POST")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
         var body: [String: Any] = [
@@ -466,8 +488,7 @@ actor APIService {
     func classifyTransaction(transactionId: Int, subCategory: String, essentialRatio: Double? = nil) async throws -> ClassifyTransactionResponse {
         let url = baseURL.appendingPathComponent("transaction/\(transactionId)/classify")
 
-        var request = URLRequest(url: url)
-        request.httpMethod = "PUT"
+        var request = try await authenticatedRequest(url: url, method: "PUT")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
         var body: [String: Any] = ["subCategory": subCategory]
@@ -485,7 +506,8 @@ actor APIService {
     func getMerchantClassifications(userId: String) async throws -> MerchantClassificationsResponse {
         let url = baseURL.appendingPathComponent("merchant/classifications/\(userId)")
 
-        let (data, response) = try await URLSession.shared.data(from: url)
+        let request = try await authenticatedRequest(url: url)
+        let (data, response) = try await URLSession.shared.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
             throw APIError.invalidResponse
         }
@@ -499,7 +521,8 @@ actor APIService {
 
         guard let url = urlComponents.url else { throw APIError.invalidResponse }
 
-        let (data, response) = try await URLSession.shared.data(from: url)
+        let request = try await authenticatedRequest(url: url)
+        let (data, response) = try await URLSession.shared.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
             throw APIError.invalidResponse
         }
@@ -512,8 +535,7 @@ actor APIService {
     func registerDeviceToken(userId: String, token: String) async throws {
         let url = baseURL.appendingPathComponent("device/register")
 
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
+        var request = try await authenticatedRequest(url: url, method: "POST")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
         let body: [String: Any] = [
@@ -533,8 +555,7 @@ actor APIService {
     func unregisterDeviceToken(userId: String, token: String) async throws {
         let url = baseURL.appendingPathComponent("device/unregister")
 
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
+        var request = try await authenticatedRequest(url: url, method: "POST")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
         let body: [String: Any] = [
@@ -553,8 +574,7 @@ actor APIService {
     func autoClassifyMerchants(userId: String) async throws -> AutoClassifyResponse {
         let url = baseURL.appendingPathComponent("expenses/auto-classify/\(userId)")
 
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
+        var request = try await authenticatedRequest(url: url, method: "POST")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
         let (data, response) = try await URLSession.shared.data(for: request)
@@ -587,8 +607,7 @@ actor APIService {
 
         body.append("--\(boundary)--\r\n".data(using: .utf8)!)
 
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
+        var request = try await authenticatedRequest(url: url, method: "POST")
         request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
         request.httpBody = body
 
@@ -612,8 +631,7 @@ actor APIService {
             date: date
         )
 
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
+        var request = try await authenticatedRequest(url: url, method: "POST")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONEncoder().encode(requestBody)
 
@@ -629,7 +647,8 @@ actor APIService {
     func getNudges(userId: String) async throws -> NudgesResponse {
         let url = baseURL.appendingPathComponent("user/nudges/\(userId)")
 
-        let (data, response) = try await URLSession.shared.data(from: url)
+        let request = try await authenticatedRequest(url: url)
+        let (data, response) = try await URLSession.shared.data(for: request)
 
         guard let httpResponse = response as? HTTPURLResponse,
               httpResponse.statusCode == 200 else {
@@ -643,7 +662,8 @@ actor APIService {
     func getRecommendations(userId: String) async throws -> RecommendationsResponse {
         let url = baseURL.appendingPathComponent("recommendations/\(userId)")
 
-        let (data, response) = try await URLSession.shared.data(from: url)
+        let request = try await authenticatedRequest(url: url)
+        let (data, response) = try await URLSession.shared.data(for: request)
 
         guard let httpResponse = response as? HTTPURLResponse,
               httpResponse.statusCode == 200 else {
@@ -657,8 +677,7 @@ actor APIService {
     func generateRecommendations(userId: String, action: String = "general") async throws -> RecommendationsResponse {
         let url = baseURL.appendingPathComponent("recommendations/generate")
 
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
+        var request = try await authenticatedRequest(url: url, method: "POST")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.timeoutInterval = 120
 
