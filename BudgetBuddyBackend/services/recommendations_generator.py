@@ -316,9 +316,15 @@ def _parse_recommendations_json(raw: str) -> Optional[Dict[str, Any]]:
 
 
 def _build_user_context(user_id: int) -> str:
-    """Pre-fetch all financial data for the user so the agent has full context."""
+    """Pre-fetch all financial data for the user so the agent has full context.
+
+    Strips spending-strictness info since recommendations should not vary by strictness.
+    """
+    import re
     from services.orchestrator import _build_user_context as _orch_context
-    return _orch_context(user_id) or "No financial data available for this user."
+    context = _orch_context(user_id) or "No financial data available for this user."
+    context = re.sub(r",?\s*strictness=[^,\n)]*", "", context)
+    return context
 
 
 def _fallback_recommendations(user_id: int) -> Dict[str, Any]:
