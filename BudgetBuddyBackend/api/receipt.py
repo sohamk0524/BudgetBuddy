@@ -7,6 +7,7 @@ from datetime import datetime
 
 from flask import Blueprint, jsonify, request
 
+from middleware.auth import require_auth
 from db_models import (
     get_user,
     find_matching_transaction,
@@ -37,6 +38,7 @@ def _detect_media_type(file) -> str:
 
 
 @receipt_bp.route("/receipt/analyze", methods=["POST"])
+@require_auth
 def analyze_receipt_endpoint():
     """
     Accept a receipt image upload and return Claude Vision analysis.
@@ -74,6 +76,7 @@ def analyze_receipt_endpoint():
 
 
 @receipt_bp.route("/receipt/attach", methods=["POST"])
+@require_auth
 def attach_receipt():
     """
     Attach an analyzed receipt to an existing Plaid transaction (enrich) or

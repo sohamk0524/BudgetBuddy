@@ -84,14 +84,17 @@ class AuthManager {
 
     /// On app launch, re-checks Firebase current user and refreshes backend profile.
     func restoreSession() async {
-        guard Auth.auth().currentUser != nil, let userId = authToken else {
+        guard let firebaseUser = Auth.auth().currentUser, let userId = authToken else {
             await MainActor.run { self.signOut() }
             return
         }
 
         do {
             let url = baseURL.appendingPathComponent("user/profile/\(userId)")
-            let (data, response) = try await URLSession.shared.data(from: url)
+            let idToken = try await firebaseUser.getIDToken()
+            var request = URLRequest(url: url)
+            request.setValue("Bearer \(idToken)", forHTTPHeaderField: "Authorization")
+            let (data, response) = try await URLSession.shared.data(for: request)
 
             guard let httpResponse = response as? HTTPURLResponse else { return }
 
@@ -235,6 +238,10 @@ class AuthManager {
 
             var request = URLRequest(url: components.url!)
             request.httpMethod = "DELETE"
+            if let firebaseUser = Auth.auth().currentUser,
+               let idToken = try? await firebaseUser.getIDToken() {
+                request.setValue("Bearer \(idToken)", forHTTPHeaderField: "Authorization")
+            }
 
             let (_, response) = try await session.data(for: request)
 
@@ -287,6 +294,10 @@ class AuthManager {
             var request = URLRequest(url: url)
             request.httpMethod = "POST"
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            if let firebaseUser = Auth.auth().currentUser,
+               let idToken = try? await firebaseUser.getIDToken() {
+                request.setValue("Bearer \(idToken)", forHTTPHeaderField: "Authorization")
+            }
 
             var body: [String: Any] = [
                 "userId": userId,

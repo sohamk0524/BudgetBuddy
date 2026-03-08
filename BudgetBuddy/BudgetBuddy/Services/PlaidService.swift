@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import FirebaseAuth
 
 /// Errors that can occur during Plaid operations
 enum PlaidError: LocalizedError {
@@ -40,13 +41,29 @@ actor PlaidService {
 
     private init() {}
 
+    /// Gets a fresh Firebase ID token for authenticating API requests.
+    private func firebaseIDToken() async throws -> String {
+        guard let user = Auth.auth().currentUser else {
+            throw PlaidError.invalidResponse
+        }
+        return try await user.getIDToken()
+    }
+
+    /// Creates a URLRequest with the Authorization header set.
+    private func authenticatedRequest(url: URL, method: String = "GET") async throws -> URLRequest {
+        var request = URLRequest(url: url)
+        request.httpMethod = method
+        let token = try await firebaseIDToken()
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        return request
+    }
+
     // MARK: - Link Token
 
     /// Create a link token to initialize Plaid Link
     func createLinkToken(userId: String) async throws -> PlaidLinkTokenResponse {
         let url = baseURL.appendingPathComponent("plaid/link-token")
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
+        var request = try await authenticatedRequest(url: url, method: "POST")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
         let body = ["userId": userId]
@@ -79,8 +96,7 @@ actor PlaidService {
         institutionName: String?
     ) async throws -> PlaidExchangeResponse {
         let url = baseURL.appendingPathComponent("plaid/exchange-token")
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
+        var request = try await authenticatedRequest(url: url, method: "POST")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
         var body: [String: Any] = [
@@ -118,8 +134,7 @@ actor PlaidService {
     /// Get all linked accounts for a user
     func getLinkedAccounts(userId: String) async throws -> PlaidAccountsResponse {
         let url = baseURL.appendingPathComponent("plaid/accounts/\(userId)")
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
+        let request = try await authenticatedRequest(url: url)
 
         let (data, response) = try await URLSession.shared.data(for: request)
 
@@ -167,8 +182,7 @@ actor PlaidService {
 
         components.queryItems = queryItems
 
-        var request = URLRequest(url: components.url!)
-        request.httpMethod = "GET"
+        let request = try await authenticatedRequest(url: components.url!)
 
         let (data, response) = try await URLSession.shared.data(for: request)
 
@@ -192,8 +206,7 @@ actor PlaidService {
     /// Sync new transactions for a user
     func syncTransactions(userId: String) async throws -> PlaidSyncResponse {
         let url = baseURL.appendingPathComponent("plaid/sync/\(userId)")
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
+        let request = try await authenticatedRequest(url: url, method: "POST")
 
         let (data, response) = try await URLSession.shared.data(for: request)
 
@@ -217,8 +230,7 @@ actor PlaidService {
     /// Unlink a bank account
     func unlinkItem(userId: String, itemId: String) async throws {
         let url = baseURL.appendingPathComponent("plaid/unlink/\(userId)/\(itemId)")
-        var request = URLRequest(url: url)
-        request.httpMethod = "DELETE"
+        let request = try await authenticatedRequest(url: url, method: "DELETE")
 
         let (data, response) = try await URLSession.shared.data(for: request)
 
