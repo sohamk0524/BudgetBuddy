@@ -27,6 +27,15 @@ class RecommendationsViewModel {
         status == "on_track" || status == "unknown"
     }
 
+    /// Daily safe-to-spend: distribute the remaining weekly budget across the remaining days (today through Sunday).
+    var dailySafeToSpend: Double {
+        let calendar = Calendar.current
+        let weekday = calendar.component(.weekday, from: Date()) // 1 = Sunday, 7 = Saturday
+        // Days remaining including today (Sunday = 1 day left, Monday = 7 days left)
+        let daysRemaining = max(1, 8 - weekday)
+        return (safeToSpend / Double(daysRemaining)).rounded(.down)
+    }
+
     var statusDisplayText: String {
         switch status {
         case "on_track": return "On Track"
