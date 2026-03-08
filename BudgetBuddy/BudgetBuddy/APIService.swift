@@ -385,8 +385,8 @@ actor APIService {
         }
     }
 
-    /// Parses a spoken transaction statement into structured fields via a dedicated LLM endpoint
-    func parseTransaction(statement: String) async throws -> ParsedTransactionResponse {
+    /// Parses a spoken transaction statement into grouped transactions via LLM
+    func parseTransaction(statement: String) async throws -> ParsedTransactionGroupResponse {
         let url = baseURL.appendingPathComponent("user/parse-transaction")
         var urlRequest = URLRequest(url: url)
         urlRequest.httpMethod = "POST"
@@ -398,7 +398,7 @@ actor APIService {
         let (data, response) = try await URLSession.shared.data(for: urlRequest)
         guard let httpResponse = response as? HTTPURLResponse else { throw APIError.invalidResponse }
         guard httpResponse.statusCode == 200 else { throw APIError.serverError(statusCode: httpResponse.statusCode) }
-        return try JSONDecoder().decode(ParsedTransactionResponse.self, from: data)
+        return try JSONDecoder().decode(ParsedTransactionGroupResponse.self, from: data)
     }
 
     /// Saves a manually-entered (voice) transaction
@@ -412,6 +412,20 @@ actor APIService {
         let (data, response) = try await URLSession.shared.data(for: urlRequest)
         guard let httpResponse = response as? HTTPURLResponse else { throw APIError.invalidResponse }
         guard httpResponse.statusCode == 201 else { throw APIError.serverError(statusCode: httpResponse.statusCode) }
+        return try JSONDecoder().decode(SaveTransactionResponse.self, from: data)
+    }
+
+    /// Updates an existing manual transaction (for back-navigation re-edits)
+    func updateManualTransaction(transactionId: Int, request: SaveTransactionRequest) async throws -> SaveTransactionResponse {
+        let url = baseURL.appendingPathComponent("user/transactions/\(transactionId)")
+        var urlRequest = URLRequest(url: url)
+        urlRequest.httpMethod = "PUT"
+        urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        urlRequest.httpBody = try JSONEncoder().encode(request)
+
+        let (data, response) = try await URLSession.shared.data(for: urlRequest)
+        guard let httpResponse = response as? HTTPURLResponse else { throw APIError.invalidResponse }
+        guard httpResponse.statusCode == 200 else { throw APIError.serverError(statusCode: httpResponse.statusCode) }
         return try JSONDecoder().decode(SaveTransactionResponse.self, from: data)
     }
 

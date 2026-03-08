@@ -34,12 +34,23 @@ VALID_CATEGORIES = ('food', 'drink', 'groceries', 'transportation', 'entertainme
 
 
 def _parse_receipt_items(raw):
-    """Parse a JSON-encoded receipt_items string into a list, or return None."""
+    """Parse a JSON-encoded receipt_items string into a list, or return None.
+    Normalizes the category key: renames "category" → "classification" so the
+    iOS ReceiptLineItem decoder (which expects "classification") always succeeds.
+    """
     if not raw:
         return None
     try:
         items = json.loads(raw)
-        return items if items else None
+        if not items:
+            return None
+        normalized = []
+        for item in items:
+            n = dict(item)
+            if "category" in n and "classification" not in n:
+                n["classification"] = n.pop("category")
+            normalized.append(n)
+        return normalized
     except (ValueError, TypeError):
         return None
 

@@ -700,6 +700,26 @@ struct ParsedTransactionResponse: Codable {
     let notes: String?
 }
 
+// Multi-transaction parse response (new grouped format)
+struct ParsedTransactionGroupResponse: Codable {
+    let transactions: [ParsedTransactionWithItems]
+}
+
+struct ParsedTransactionWithItems: Codable {
+    let amount: Double?
+    let category: String?
+    let store: String?
+    let date: String?
+    let notes: String?
+    let items: [ParsedItem]?
+}
+
+struct ParsedItem: Codable {
+    let name: String
+    let price: Double
+    let classification: String
+}
+
 struct SaveTransactionRequest: Codable {
     let userId: String
     let amount: Double

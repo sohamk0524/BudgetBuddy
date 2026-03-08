@@ -155,12 +155,13 @@ struct ExpensesView: View {
                 ReceiptScanView(viewModel: receiptViewModel) {
                     showReceiptScan = false
                     receiptViewModel.reset()
-                    Task { await viewModel.refresh() }
+                    Task { await viewModel.refreshWithRetry() }
                 }
             }
             .onChange(of: voiceViewModel.state) { _, newState in
                 if newState == .success {
-                    Task { await viewModel.refresh() }
+                    // Refresh with retries to handle Datastore propagation delay
+                    Task { await viewModel.refreshWithRetry() }
                 }
             }
         }

@@ -194,12 +194,14 @@ class ExpensesViewModel {
 
         isLoadingMore = true
 
-        let maxWeeksBack = 13   // ~3 months absolute cap
-        var totalNewFound = 0
-        var lastFetchedCount = allTransactions.count
+        let startCount = allTransactions.count
+        let maxNewItems = 10
+        let maxWeeksToAdd = 4
 
-        while weeksBack < maxWeeksBack {
+        var weeksAdded = 0
+        while weeksAdded < maxWeeksToAdd && canLoadMore {
             weeksBack += 1
+            weeksAdded += 1
 
             do {
                 let response = try await apiService.getExpenses(
@@ -210,21 +212,12 @@ class ExpensesViewModel {
                     limit: 500,
                     offset: 0
                 )
-                let newInThisWeek = response.transactions.count - lastFetchedCount
-                lastFetchedCount = response.transactions.count
                 allTransactions = response.transactions
                 NotificationCenter.default.post(name: .expensesDidChange, object: nil)
 
-                // End of available data — show whatever was found and stop
-                if newInThisWeek <= 0 { break }
-
-                totalNewFound += newInThisWeek
-
-                // Accumulated enough new events
-                if totalNewFound >= 5 { break }
-
+                if allTransactions.count - startCount >= maxNewItems { break }
             } catch {
-                print("Failed to load previous week: \(error)")
+                print("Failed to load more history: \(error)")
                 weeksBack -= 1
                 break
             }
@@ -298,6 +291,21 @@ class ExpensesViewModel {
         return allTransactions.contains { txn in
             guard let dateStr = txn.date, let date = Self.parseDate(dateStr) else { return false }
             return calendar.isDateInToday(date)
+        }
+    }
+
+    /// Refresh immediately, then retry up to 3 more times (at 1s, 2s, 4s) until
+    /// the transaction count increases — handles Datastore eventual-consistency lag.
+    func refreshWithRetry() async {
+        let countBefore = allTransactions.count
+        await fetchExpenses()
+        if allTransactions.count > countBefore { return }
+
+        let delays: [UInt64] = [1_000_000_000, 2_000_000_000, 4_000_000_000]
+        for delay in delays {
+            try? await Task.sleep(nanoseconds: delay)
+            await fetchExpenses()
+            if allTransactions.count > countBefore { return }
         }
     }
 
