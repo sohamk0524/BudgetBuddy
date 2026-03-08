@@ -167,8 +167,11 @@ def _infer_cuisine_types(merchants: List[str]) -> List[str]:
     return list(found) if found else ["affordable"]
 
 
-def _get_school_food_tip(user_id: int, analysis: Dict[str, Any]) -> Optional[str]:
-    """If the user is a student, search Tavily for a specific cheaper food alternative based on their actual spending."""
+def _get_school_food_tip(user_id: int, analysis: Dict[str, Any]) -> Optional[Dict[str, str]]:
+    """If the user is a student, search Tavily for a specific cheaper food alternative.
+
+    Returns a dict with 'tip' (str) and optionally 'url' (str), or None.
+    """
     try:
         import os
         import litellm
@@ -242,8 +245,19 @@ def _get_school_food_tip(user_id: int, analysis: Dict[str, Any]) -> Optional[str
         if len(tip) > 90:
             tip = tip[:87].rsplit(" ", 1)[0] + "..."
 
+        # Extract the best URL from search results
+        best_url = None
+        for r in results_list:
+            url = r.get("url", "")
+            if url:
+                best_url = url
+                break
+
         print(f"[food_tip] Extracted: {tip}")
-        return tip
+        result = {"tip": tip}
+        if best_url:
+            result["url"] = best_url
+        return result
 
     except Exception as e:
         print(f"School food tip failed (non-fatal): {e}")
@@ -274,18 +288,40 @@ def food_spending_template(user_id: int) -> Optional[Dict[str, Any]]:
     title = f"${total:.0f} spent on {cuisine_label}"
 
     # Description: just the school-specific recommendation
-    school_tip = _get_school_food_tip(user_id, analysis)
-    description = school_tip.rstrip(".") if school_tip else f"Top spots: {', '.join(merchant_names)}"
+    school_tip_result = _get_school_food_tip(user_id, analysis)
+    if school_tip_result:
+        description = school_tip_result["tip"].rstrip(".")
+    else:
+        description = f"Top spots: {', '.join(merchant_names)}"
 
     # Potential savings: 15% of top merchant spend
     top_merchant_spend = breakdown[0]["amount"] if breakdown else 0
     potential_savings = round(top_merchant_spend * 0.15, 2)
 
-    return {
+    # Spending context from analysis data
+    top = breakdown[0] if breakdown else None
+    spending_context = (
+        f"You spent ${total:.0f} on food this month"
+        + (f" — ${top['amount']:.0f} at {top['merchant']} ({top['count']} visits)" if top else "")
+    )
+
+    # Build detail fields
+    rec: Dict[str, Any] = {
         "category": "spending",
         "title": title,
         "description": description,
         "potentialSavings": potential_savings,
         "priority": 1,
         "icon": "fork.knife",
+        "spendingContext": spending_context,
     }
+
+    if school_tip_result:
+        rec["steps"] = [school_tip_result["tip"]]
+        if potential_savings > 0:
+            rec["steps"].append(f"Save ~${potential_savings:.0f}/mo by switching a few visits")
+        if school_tip_result.get("url"):
+            rec["link"] = school_tip_result["url"]
+            rec["linkTitle"] = "See Restaurant"
+
+    return rec

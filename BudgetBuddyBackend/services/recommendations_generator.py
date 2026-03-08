@@ -50,7 +50,13 @@ OUTPUT FORMAT — return ONLY a JSON object, no markdown fences:
       "description": "ONE short punchy sentence (max 18 words). Include the key number and the action. No compound sentences.",
       "potentialSavings": 0.00,
       "priority": 1-5 (1=highest),
-      "icon": "SF Symbol name"
+      "icon": "SF Symbol name",
+
+      "steps": ["Step 1 imperative sentence", "Step 2"],
+      "spendingContext": "You spent $52 at Chipotle this month (4 visits)",
+      "timeHorizon": "Every Tuesday",
+      "link": "https://example.com/deal",
+      "linkTitle": "View Menu"
     }
   ],
   "summary": "One sentence overall financial health summary referencing a key number"
@@ -62,6 +68,11 @@ RULES:
 - Use REAL numbers from the provided data — never make up amounts
 - potentialSavings should be a realistic monthly estimate (0 if not applicable)
 - Icon names: "dollarsign.arrow.circlepath" (spending), "banknote" (saving), "chart.pie" (budgeting), "arrow.up.right" (income), "lightbulb" (habits), "exclamationmark.triangle" (warning)
+- Detail fields (steps, spendingContext, timeHorizon, link, linkTitle) are OPTIONAL. Include them ONLY for recommendations where the user can take a specific action or visit a specific place (e.g., restaurant alternatives, deals, subscription cancellations). OMIT all detail fields for status/tracking/encouragement recommendations (e.g., "you're on track").
+- steps: 1-3 short imperative sentences. Focus on essential, nonredundant actions.
+- spendingContext: ONE short phrase (max ~60 chars) referencing a real number from the user's transactions.
+- timeHorizon: When/how often the deal applies (e.g., "Every Tuesday", "Weekdays 11am-2pm", "Ongoing"). Omit if unsure.
+- link: When search_local_deals returns a URL for a specific restaurant or deal, include it. linkTitle should describe the destination (e.g., "View Menu", "See Deal"). Omit if no relevant URL.
 - Return ONLY valid JSON, no markdown fences, no explanation text
 """
 
