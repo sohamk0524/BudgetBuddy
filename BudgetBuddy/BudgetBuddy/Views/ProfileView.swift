@@ -180,18 +180,12 @@ struct ProfileView: View {
                 }
 
                 if viewModel.isStudent {
-                    profileRow(label: "School", value: formatSchool(viewModel.selectedSchool)) {
-                        Picker("School", selection: $viewModel.selectedSchool) {
-                            Text("Select School").tag("")
-                            Text("UC Berkeley").tag("uc_berkeley")
-                            Text("UC Davis").tag("uc_davis")
-                            Text("UC Irvine").tag("uc_irvine")
-                            Text("UC Los Angeles").tag("uc_los_angeles")
-                            Text("UC Merced").tag("uc_merced")
-                            Text("UC Riverside").tag("uc_riverside")
-                            Text("UC San Diego").tag("uc_san_diego")
-                            Text("UC Santa Barbara").tag("uc_santa_barbara")
-                            Text("UC Santa Cruz").tag("uc_santa_cruz")
+                    profileRow(label: "University", value: AppConfig.universityDisplayName(for: viewModel.school)) {
+                        Picker("University", selection: $viewModel.school) {
+                            Text("Select...").tag("")
+                            ForEach(AppConfig.universities, id: \.key) { university in
+                                Text(university.name).tag(university.key)
+                            }
                         }
                         .pickerStyle(.menu)
                         .tint(Color.accent)
@@ -332,20 +326,6 @@ struct ProfileView: View {
 
     // MARK: - Formatters
 
-    private func formatSchool(_ value: String) -> String {
-        switch value {
-        case "uc_berkeley": return "UC Berkeley"
-        case "uc_davis": return "UC Davis"
-        case "uc_irvine": return "UC Irvine"
-        case "uc_los_angeles": return "UC Los Angeles"
-        case "uc_merced": return "UC Merced"
-        case "uc_riverside": return "UC Riverside"
-        case "uc_san_diego": return "UC San Diego"
-        case "uc_santa_barbara": return "UC Santa Barbara"
-        case "uc_santa_cruz": return "UC Santa Cruz"
-        default: return "--"
-        }
-    }
 }
 
 #Preview {
