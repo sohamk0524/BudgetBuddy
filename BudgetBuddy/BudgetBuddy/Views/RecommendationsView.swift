@@ -170,12 +170,19 @@ struct RecommendationCardView: View {
                         .font(.roundedHeadline)
                         .foregroundStyle(Color.textPrimary)
 
+                    if let context = item.spendingContext {
+                        Text(context)
+                            .font(.roundedBody)
+                            .foregroundStyle(Color.textSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+
                     if let savings = item.potentialSavings, savings > 0 {
                         Text("Save ~$\(Int(savings))")
-                            .font(.system(.caption2, design: .rounded, weight: .semibold))
+                            .font(.system(.caption, design: .rounded, weight: .semibold))
                             .foregroundStyle(Color.accent)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 3)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 4)
                             .background(Color.accent.opacity(0.12))
                             .clipShape(Capsule())
                             .padding(.top, 2)
@@ -212,12 +219,6 @@ struct RecommendationCardView: View {
             Divider()
                 .overlay(Color.textSecondary.opacity(0.3))
                 .padding(.top, 8)
-
-            if let context = item.spendingContext {
-                Text(context)
-                    .font(.roundedCaption)
-                    .foregroundStyle(Color.textSecondary.opacity(0.8))
-            }
 
             if let steps = item.steps {
                 VStack(alignment: .leading, spacing: 4) {

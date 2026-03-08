@@ -310,9 +310,8 @@ def food_spending_template(user_id: int) -> Optional[Dict[str, Any]]:
     else:
         description = f"Top spots: {', '.join(merchant_names)}"
 
-    # Potential savings: 15% of top merchant spend
-    top_merchant_spend = breakdown[0]["amount"] if breakdown else 0
-    potential_savings = round(top_merchant_spend * 0.15, 2)
+    # Potential savings: 15% of total food spend, capped to never exceed it
+    potential_savings = round(min(total * 0.15, total), 2)
 
     # Spending context from analysis data
     top = breakdown[0] if breakdown else None
