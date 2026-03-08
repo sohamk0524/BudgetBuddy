@@ -61,6 +61,12 @@ final class InsightsViewModel {
         let amount: Double
     }
 
+    // MARK: - Cache Keys
+
+    private static func cacheKey(for range: DateRange) -> String {
+        "insights_transactions_\(range.rawValue)"
+    }
+
     // MARK: - State
 
     var isLoading = false
@@ -70,6 +76,7 @@ final class InsightsViewModel {
     var needsRefresh = false
 
     init() {
+        loadFromCache(for: .month)   // pre-populate default range instantly
         NotificationCenter.default.addObserver(
             forName: .expensesDidChange,
             object: nil,
@@ -189,10 +196,27 @@ final class InsightsViewModel {
 
     // MARK: - Actions
 
+    // MARK: - Cache helpers
+
+    private func loadFromCache(for range: DateRange) {
+        let key = Self.cacheKey(for: range)
+        guard let data = UserDefaults.standard.data(forKey: key),
+              let decoded = try? JSONDecoder().decode([ExpenseTransaction].self, from: data) else { return }
+        allTransactions = decoded
+    }
+
+    private func saveToCache(for range: DateRange) {
+        let key = Self.cacheKey(for: range)
+        if let encoded = try? JSONEncoder().encode(allTransactions) {
+            UserDefaults.standard.set(encoded, forKey: key)
+        }
+    }
+
     func selectDateRange(_ range: DateRange) {
         selectedDateRange = range
         selectedPieCategory = nil
         selectedBarDate = nil
+        loadFromCache(for: range)   // swap in cached data instantly before network call
         Task { await fetchTransactions() }
     }
 
@@ -220,6 +244,7 @@ final class InsightsViewModel {
                 limit: 1000
             )
             allTransactions = response.transactions
+            saveToCache(for: selectedDateRange)
         } catch {
             errorMessage = "Unable to load spending data"
             print("InsightsViewModel: \(error)")

@@ -223,6 +223,7 @@ def get_user_profile(user_id):
             "isStudent": profile.get('is_student'),
             "weeklySpendingLimit": profile.get('weekly_spending_limit'),
             "strictnessLevel": profile.get('strictness_level'),
+            "school": profile.get('school'),
         }
 
     plaid_items_data = []
@@ -278,6 +279,8 @@ def update_user_profile(user_id):
                 pass
         if "strictnessLevel" in data:
             profile_updates['strictness_level'] = data["strictnessLevel"]
+        if "school" in data:
+            profile_updates['school'] = data["school"]
         if profile_updates:
             upsert_profile(user_id, **profile_updates)
 

@@ -26,6 +26,13 @@ enum ExpenseFilter: String, CaseIterable {
 @MainActor
 class ExpensesViewModel {
 
+    // MARK: - UserDefaults Cache Keys
+
+    private enum CacheKey {
+        static let transactions = "expenses_transactions"
+        static let weeksBack = "expenses_weeksBack"
+    }
+
     // MARK: - State
 
     var isLoading = false
@@ -79,6 +86,31 @@ class ExpensesViewModel {
     // MARK: - Dependencies
 
     private let apiService = APIService.shared
+    private let defaults = UserDefaults.standard
+
+    // MARK: - Init
+
+    init() {
+        loadFromCache()
+    }
+
+    // MARK: - Cache
+
+    private func loadFromCache() {
+        if let data = defaults.data(forKey: CacheKey.transactions),
+           let decoded = try? JSONDecoder().decode([ExpenseTransaction].self, from: data) {
+            allTransactions = decoded
+        }
+        let cached = defaults.integer(forKey: CacheKey.weeksBack)
+        if cached > 0 { weeksBack = cached }
+    }
+
+    private func saveToCache() {
+        if let encoded = try? JSONEncoder().encode(allTransactions) {
+            defaults.set(encoded, forKey: CacheKey.transactions)
+        }
+        defaults.set(weeksBack, forKey: CacheKey.weeksBack)
+    }
 
     // MARK: - Week-based date helpers
 
@@ -169,6 +201,7 @@ class ExpensesViewModel {
                 offset: 0
             )
             allTransactions = response.transactions
+            saveToCache()
             NotificationCenter.default.post(name: .expensesDidChange, object: nil)
 
             // Update daily reminder based on today's activity
@@ -213,6 +246,7 @@ class ExpensesViewModel {
                     offset: 0
                 )
                 allTransactions = response.transactions
+                saveToCache()
                 NotificationCenter.default.post(name: .expensesDidChange, object: nil)
 
                 if allTransactions.count - startCount >= maxNewItems { break }
@@ -266,6 +300,7 @@ class ExpensesViewModel {
     func deleteTransaction(transactionId: Int) async throws {
         try await apiService.deleteTransaction(transactionId: transactionId)
         allTransactions.removeAll { $0.id == transactionId }
+        saveToCache()
     }
 
     func addItemsToTransaction(transactionId: Int, items: [EditableReceiptItem], replace: Bool = false) async throws {
@@ -343,5 +378,6 @@ class ExpensesViewModel {
             notes: old.notes,
             receiptItems: old.receiptItems
         )
+        saveToCache()
     }
 }
