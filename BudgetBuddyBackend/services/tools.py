@@ -583,31 +583,53 @@ def _search_local_deals(user_id: Optional[int], query: str) -> Dict[str, Any]:
         if school_display.lower() not in query.lower():
             query = f"{query} near {school_display}"
 
+        # Local curated deals (always available, no API key needed)
+        from services.local_deals import match_deals
+        query_keywords = [w.lower() for w in query.split() if len(w) > 2]
+        local_matches = match_deals(school_slug, query_keywords)
+        local_results = [
+            {
+                "title": d["name"],
+                "snippet": f"{d.get('deal', '')} — {d.get('schedule', '')}".strip(" —"),
+                "url": d.get("url", ""),
+            }
+            for d in local_matches
+        ]
+
+        # Web search via Tavily (may fail if key not set)
+        tavily_results = []
+        tavily_answer = ""
         tavily_key = os.environ.get("TAVILY_API_KEY")
-        if not tavily_key:
-            return {"error": "TAVILY_API_KEY not configured"}
+        if tavily_key:
+            try:
+                from tavily import TavilyClient
+                client = TavilyClient(api_key=tavily_key)
+                search_results = client.search(
+                    query=query,
+                    search_depth="basic",
+                    max_results=5,
+                    include_answer=True,
+                )
+                tavily_answer = search_results.get("answer", "")
+                for r in search_results.get("results", []):
+                    tavily_results.append({
+                        "title": r.get("title", ""),
+                        "snippet": r.get("content", ""),
+                        "url": r.get("url", ""),
+                    })
+            except Exception as e:
+                print(f"[search_local_deals] Tavily search failed (non-fatal): {e}")
 
-        from tavily import TavilyClient
-        client = TavilyClient(api_key=tavily_key)
-        search_results = client.search(
-            query=query,
-            search_depth="basic",
-            max_results=5,
-            include_answer=True,
-        )
+        # Local deals first, then web results
+        results = local_results + tavily_results
 
-        results = []
-        for r in search_results.get("results", []):
-            results.append({
-                "title": r.get("title", ""),
-                "snippet": r.get("content", ""),
-                "url": r.get("url", ""),
-            })
+        if not results and not tavily_answer:
+            return {"error": "No deals found and TAVILY_API_KEY not configured" if not tavily_key else "No results found"}
 
         return {
             "school": school_display,
             "query": query,
-            "answer": search_results.get("answer", ""),
+            "answer": tavily_answer,
             "results": results,
         }
 
