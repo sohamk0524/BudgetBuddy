@@ -47,6 +47,7 @@ struct InsightsView: View {
             .refreshable { await viewModel.fetchTransactions() }
             .onChange(of: selectedTab) { _, newTab in
                 if newTab == 2 {
+                    AnalyticsManager.logInsightsViewed()
                     Task { await viewModel.fetchTransactions() }
                 }
             }
@@ -60,6 +61,7 @@ struct InsightsView: View {
             ForEach(InsightsViewModel.DateRange.allCases) { range in
                 Button {
                     viewModel.selectDateRange(range)
+                    AnalyticsManager.logInsightsDateRangeChanged(range: range.rawValue)
                 } label: {
                     Text(range.rawValue)
                         .font(.roundedCaption)
@@ -150,6 +152,7 @@ struct InsightsView: View {
                         withAnimation(.easeInOut(duration: 0.2)) {
                             viewModel.togglePieCategory(slice.category)
                         }
+                        AnalyticsManager.logInsightsCategoryTapped(category: slice.category)
                         pieAngleSelection = nil
                         return
                     }
@@ -189,6 +192,7 @@ struct InsightsView: View {
             ForEach(viewModel.pieData) { slice in
                 Button {
                     viewModel.togglePieCategory(slice.category)
+                    AnalyticsManager.logInsightsCategoryTapped(category: slice.category)
                 } label: {
                     HStack(spacing: 8) {
                         Image(systemName: slice.icon)
@@ -302,6 +306,7 @@ struct InsightsView: View {
                             viewModel.barGrouping = grouping
                             viewModel.selectedBarDate = nil
                         }
+                        AnalyticsManager.logInsightsBarGroupingChanged(grouping: grouping.rawValue)
                     } label: {
                         Text(grouping.rawValue)
                             .font(.roundedCaption)

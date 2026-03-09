@@ -84,4 +84,23 @@ enum AnalyticsManager {
         Analytics.setUserProperty("true", forName: "used_recommendations_generated")
     }
 
+    // MARK: - Insights
+
+    static func logInsightsViewed() {
+        Analytics.logEvent("insights_viewed", parameters: nil)
+        Analytics.setUserProperty("true", forName: "used_insights")
+    }
+
+    static func logInsightsDateRangeChanged(range: String) {
+        Analytics.logEvent("insights_date_range_changed", parameters: ["range": range])
+    }
+
+    static func logInsightsCategoryTapped(category: String) {
+        Analytics.logEvent("insights_category_tapped", parameters: ["category": category])
+    }
+
+    static func logInsightsBarGroupingChanged(grouping: String) {
+        Analytics.logEvent("insights_bar_grouping_changed", parameters: ["grouping": grouping])
+    }
+
 }
