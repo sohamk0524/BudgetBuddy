@@ -234,6 +234,71 @@ def get_expenses(user_id):
     })
 
 
+CATEGORY_ICONS = {
+    "food": "fork.knife",
+    "drink": "cup.and.saucer.fill",
+    "groceries": "cart.fill",
+    "transportation": "car.fill",
+    "entertainment": "theatermasks",
+    "other": "ellipsis.circle",
+}
+
+
+@expenses_bp.route("/expenses/spending-summary/<user_id>", methods=["GET"])
+@require_auth
+def get_spending_summary(user_id):
+    """Return spending totals per sub-category for Money Moves cards (current month)."""
+    user = get_user(user_id)
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
+    from datetime import date
+    today = date.today()
+    start_of_month = today.replace(day=1).isoformat()
+
+    account_ids, _ = _get_account_ids_and_map(user_id)
+
+    # Aggregate Plaid transactions
+    totals = {cat: {"amount": 0.0, "count": 0} for cat in VALID_CATEGORIES}
+
+    if account_ids:
+        all_txns, _ = get_transactions_for_accounts(account_ids, limit=10000)
+        for t in all_txns:
+            if (t.get('amount') or 0) <= 0:
+                continue
+            if (t.get('date') or '') < start_of_month:
+                continue
+            sub = t.get('sub_category') or 'unclassified'
+            if sub in totals:
+                totals[sub]["amount"] += t.get('amount') or 0
+                totals[sub]["count"] += 1
+
+    # Merge manual/voice transactions
+    for mt in get_manual_transactions(user_id):
+        if (mt.get('amount') or 0) <= 0:
+            continue
+        if (mt.get('date') or '') < start_of_month:
+            continue
+        sub = mt.get('sub_category') or 'unclassified'
+        if sub in totals:
+            totals[sub]["amount"] += mt.get('amount') or 0
+            totals[sub]["count"] += 1
+
+    # Build response: non-zero categories sorted by amount descending
+    categories = []
+    for cat in VALID_CATEGORIES:
+        if totals[cat]["amount"] > 0:
+            categories.append({
+                "category": cat,
+                "amount": round(totals[cat]["amount"], 2),
+                "transactionCount": totals[cat]["count"],
+                "icon": CATEGORY_ICONS.get(cat, "ellipsis.circle"),
+            })
+
+    categories.sort(key=lambda c: c["amount"], reverse=True)
+    return jsonify({"categories": categories})
+
+
 @expenses_bp.route("/merchant/classify", methods=["POST"])
 @require_auth
 def classify_merchant():

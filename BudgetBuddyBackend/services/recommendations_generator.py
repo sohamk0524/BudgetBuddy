@@ -150,6 +150,48 @@ ACTION_PROMPTS = {
         "3. Compute exact savings: (current price - deal price) × monthly visits\n\n"
         "DO NOT suggest the user stop visiting these merchants. Find them a deal for the same thing."
     ),
+    "food": (
+        "Focus exclusively on the user's FOOD spending (restaurants, fast food, dining out).\n\n"
+        "STEP 1: Call get_plaid_transactions and filter to food-related transactions.\n"
+        "STEP 2: Identify top food merchants by spend.\n"
+        "STEP 3: Call search_local_deals to find student food discounts, meal deals, and cheaper alternatives near their school.\n\n"
+        "Only return food-related recommendations. Find specific local deals, not generic advice."
+    ),
+    "drink": (
+        "Focus exclusively on the user's DRINK spending (coffee shops, cafes, boba, bars).\n\n"
+        "STEP 1: Call get_plaid_transactions and filter to drink-related transactions.\n"
+        "STEP 2: Identify top drink merchants by spend.\n"
+        "STEP 3: Call search_local_deals to find student coffee discounts, loyalty programs, and cheaper alternatives near their school.\n\n"
+        "Only return drink-related recommendations. Find specific local deals, not generic advice."
+    ),
+    "groceries": (
+        "Focus exclusively on the user's GROCERY spending.\n\n"
+        "STEP 1: Call get_plaid_transactions and filter to grocery transactions.\n"
+        "STEP 2: Identify top grocery merchants by spend.\n"
+        "STEP 3: Call search_local_deals to find student grocery discounts, bulk buying deals, and cheaper stores near their school.\n\n"
+        "Only return grocery-related recommendations. Find specific local deals, not generic advice."
+    ),
+    "transportation": (
+        "Focus exclusively on the user's TRANSPORTATION spending (rideshare, gas, parking, transit).\n\n"
+        "STEP 1: Call get_plaid_transactions and filter to transportation transactions.\n"
+        "STEP 2: Identify top transport expenses by spend.\n"
+        "STEP 3: Call search_local_deals to find student transit passes, rideshare discounts, and cheaper alternatives near their school.\n\n"
+        "Only return transportation-related recommendations. Find specific local deals, not generic advice."
+    ),
+    "entertainment": (
+        "Focus exclusively on the user's ENTERTAINMENT spending (streaming, movies, events, gaming).\n\n"
+        "STEP 1: Call get_plaid_transactions and filter to entertainment transactions.\n"
+        "STEP 2: Identify top entertainment expenses by spend.\n"
+        "STEP 3: Call search_local_deals to find student entertainment discounts, free campus events, and cheaper alternatives.\n\n"
+        "Only return entertainment-related recommendations. Find specific local deals, not generic advice."
+    ),
+    "other": (
+        "Focus on the user's miscellaneous spending (subscriptions, online shopping, recurring charges).\n\n"
+        "STEP 1: Call get_plaid_transactions and look for recurring or miscellaneous charges.\n"
+        "STEP 2: Identify subscriptions or repeated charges.\n"
+        "STEP 3: Call search_local_deals to find student discounts for any subscriptions or cheaper alternatives.\n\n"
+        "Only return recommendations for these miscellaneous expenses. Find specific deals, not generic advice."
+    ),
 }
 
 # Tool definitions for the recommendations agent (subset — no render_visual)

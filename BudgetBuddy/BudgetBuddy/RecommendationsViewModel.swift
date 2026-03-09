@@ -22,6 +22,11 @@ class RecommendationsViewModel {
     var isGenerating = false
     var errorMessage: String?
 
+    // Money Moves
+    var moneyMovesCards: [MoneyMovesCard] = []
+    var activeCategory: String?
+    private var generalRecommendations: [RecommendationItem] = []
+
     private var cancellables = Set<AnyCancellable>()
 
     init() {
@@ -58,6 +63,35 @@ class RecommendationsViewModel {
         }
     }
 
+    var displayedRecommendations: [RecommendationItem] {
+        guard let category = activeCategory else { return recommendations }
+        let keywords = Self.categoryKeywords[category] ?? [category]
+        return recommendations.filter { item in
+            let searchable = [item.title, item.description, item.spendingContext ?? ""]
+                .joined(separator: " ").lowercased()
+            return keywords.contains { searchable.contains($0) }
+        }
+    }
+
+    var activeCategoryDisplayName: String {
+        guard let category = activeCategory else { return "All" }
+        return category.prefix(1).uppercased() + category.dropFirst()
+    }
+
+    var activeCategoryIcon: String {
+        guard let category = activeCategory else { return "lightbulb" }
+        return moneyMovesCards.first { $0.category == category }?.icon ?? "lightbulb"
+    }
+
+    private static let categoryKeywords: [String: [String]] = [
+        "food": ["food", "restaurant", "dining", "eat", "meal", "lunch", "dinner", "breakfast", "fast food", "chipotle", "mcdonald"],
+        "drink": ["drink", "coffee", "cafe", "tea", "starbucks", "boba", "bar", "smoothie"],
+        "groceries": ["grocery", "groceries", "supermarket", "trader joe", "walmart", "costco", "aldi"],
+        "transportation": ["transport", "gas", "uber", "lyft", "ride", "bus", "transit", "parking", "fuel"],
+        "entertainment": ["entertainment", "movie", "streaming", "spotify", "netflix", "gaming", "concert", "event"],
+        "other": ["subscription", "recurring", "amazon", "online"]
+    ]
+
     // MARK: - Actions
 
     private var hasLoaded = false
@@ -92,6 +126,33 @@ class RecommendationsViewModel {
         }
 
         isGenerating = false
+    }
+
+    func loadSpendingSummary() async {
+        guard let userId = AuthManager.shared.authToken else { return }
+        do {
+            let response = try await APIService.shared.getSpendingSummary(userId: userId)
+            moneyMovesCards = Array(response.categories.prefix(3))
+        } catch {
+            // Silently fail — Money Moves row just won't appear
+        }
+    }
+
+    func selectCategory(_ category: String) {
+        if activeCategory == nil {
+            generalRecommendations = recommendations
+        }
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+            activeCategory = category
+        }
+        Task { await generateRecommendations(action: category) }
+    }
+
+    func clearCategoryFilter() {
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+            activeCategory = nil
+            recommendations = generalRecommendations
+        }
     }
 
     func refreshFinancialData() async {

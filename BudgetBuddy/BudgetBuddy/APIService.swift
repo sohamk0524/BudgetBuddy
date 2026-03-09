@@ -741,6 +741,21 @@ actor APIService {
 
         return try JSONDecoder().decode(RecommendationsResponse.self, from: data)
     }
+
+    /// Fetches spending summary by sub-category for Money Moves cards
+    func getSpendingSummary(userId: String) async throws -> SpendingSummaryResponse {
+        let url = baseURL.appendingPathComponent("expenses/spending-summary/\(userId)")
+
+        let request = try await authenticatedRequest(url: url)
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse,
+              httpResponse.statusCode == 200 else {
+            throw APIError.invalidResponse
+        }
+
+        return try JSONDecoder().decode(SpendingSummaryResponse.self, from: data)
+    }
 }
 
 // MARK: - Errors

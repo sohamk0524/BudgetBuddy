@@ -40,7 +40,11 @@ def generate_fresh_recommendations():
         return jsonify({"error": "User not found"}), 404
 
     action = data.get("action", "general")
-    if action not in ("general", "budget_balance", "spending_habits"):
+    valid_actions = (
+        "general", "budget_balance", "spending_habits",
+        "food", "drink", "groceries", "transportation", "entertainment", "other",
+    )
+    if action not in valid_actions:
         action = "general"
 
     result = generate_recommendations(user_id, action=action)

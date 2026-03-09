@@ -686,6 +686,20 @@ struct RecommendationsResponse: Codable {
     let generatedAt: String?
 }
 
+// MARK: - Money Moves Models
+
+struct MoneyMovesCard: Codable, Identifiable {
+    var id: String { category }
+    let category: String
+    let amount: Double
+    let transactionCount: Int
+    let icon: String
+}
+
+struct SpendingSummaryResponse: Codable {
+    let categories: [MoneyMovesCard]
+}
+
 // MARK: - Voice Transaction Models
 
 struct VoiceTransaction: Codable, Identifiable {
