@@ -69,16 +69,18 @@ FACTUAL ACCURACY / NO HALLUCINATION
 - When citing a deal, note the source if possible (e.g., "per their website" or "via Yelp").
 
 ═══════════════════════════════════════════════════════════
-WORKFLOW — MANDATORY STEPS
+WORKFLOW — MANDATORY STEPS (complete in 2 tool rounds max)
 ═══════════════════════════════════════════════════════════
-1. Call get_plaid_transactions to get real spending data
-2. Identify the TOP 3 merchants/categories by dollar amount
-3. Call search_local_deals for EACH of those top categories with specific queries like:
-   - "student discount [cuisine type] near [school]"
-   - "[merchant name] competitor deals [city]"
-   - "loyalty programs grocery stores [city] student"
-4. Call get_weekly_spending_status to ground recommendations in remaining budget
-5. Build recommendations ONLY from verified search results matched to real spending
+ROUND 1 — call ALL of these tools simultaneously in your first response:
+  • get_plaid_transactions — get real spending data
+  • get_weekly_spending_status — get remaining budget
+  • search_local_deals — search for deals in the user's top spending category (infer from user context)
+
+ROUND 2 — after reviewing Round 1 results:
+  • Call search_local_deals 1-2 more times for other top categories if needed
+  • Then produce your final JSON response
+
+DO NOT use more than 2 tool-calling rounds. After Round 2, output your final JSON immediately.
 
 OUTPUT FORMAT — return ONLY a JSON object, no markdown fences:
 {
@@ -149,6 +151,48 @@ ACTION_PROMPTS = {
         "   - A cheaper local competitor for the same product\n"
         "3. Compute exact savings: (current price - deal price) × monthly visits\n\n"
         "DO NOT suggest the user stop visiting these merchants. Find them a deal for the same thing."
+    ),
+    "food": (
+        "Focus exclusively on the user's FOOD spending (restaurants, fast food, dining out).\n\n"
+        "STEP 1: Call get_plaid_transactions and filter to food-related transactions.\n"
+        "STEP 2: Identify top food merchants by spend.\n"
+        "STEP 3: Call search_local_deals to find student food discounts, meal deals, and cheaper alternatives near their school.\n\n"
+        "Only return food-related recommendations. Find specific local deals, not generic advice."
+    ),
+    "drink": (
+        "Focus exclusively on the user's DRINK spending (coffee shops, cafes, boba, bars).\n\n"
+        "STEP 1: Call get_plaid_transactions and filter to drink-related transactions.\n"
+        "STEP 2: Identify top drink merchants by spend.\n"
+        "STEP 3: Call search_local_deals to find student coffee discounts, loyalty programs, and cheaper alternatives near their school.\n\n"
+        "Only return drink-related recommendations. Find specific local deals, not generic advice."
+    ),
+    "groceries": (
+        "Focus exclusively on the user's GROCERY spending.\n\n"
+        "STEP 1: Call get_plaid_transactions and filter to grocery transactions.\n"
+        "STEP 2: Identify top grocery merchants by spend.\n"
+        "STEP 3: Call search_local_deals to find student grocery discounts, bulk buying deals, and cheaper stores near their school.\n\n"
+        "Only return grocery-related recommendations. Find specific local deals, not generic advice."
+    ),
+    "transportation": (
+        "Focus exclusively on the user's TRANSPORTATION spending (rideshare, gas, parking, transit).\n\n"
+        "STEP 1: Call get_plaid_transactions and filter to transportation transactions.\n"
+        "STEP 2: Identify top transport expenses by spend.\n"
+        "STEP 3: Call search_local_deals to find student transit passes, rideshare discounts, and cheaper alternatives near their school.\n\n"
+        "Only return transportation-related recommendations. Find specific local deals, not generic advice."
+    ),
+    "entertainment": (
+        "Focus exclusively on the user's ENTERTAINMENT spending (streaming, movies, events, gaming).\n\n"
+        "STEP 1: Call get_plaid_transactions and filter to entertainment transactions.\n"
+        "STEP 2: Identify top entertainment expenses by spend.\n"
+        "STEP 3: Call search_local_deals to find student entertainment discounts, free campus events, and cheaper alternatives.\n\n"
+        "Only return entertainment-related recommendations. Find specific local deals, not generic advice."
+    ),
+    "other": (
+        "Focus on the user's miscellaneous spending (subscriptions, online shopping, recurring charges).\n\n"
+        "STEP 1: Call get_plaid_transactions and look for recurring or miscellaneous charges.\n"
+        "STEP 2: Identify subscriptions or repeated charges.\n"
+        "STEP 3: Call search_local_deals to find student discounts for any subscriptions or cheaper alternatives.\n\n"
+        "Only return recommendations for these miscellaneous expenses. Find specific deals, not generic advice."
     ),
 }
 
@@ -391,13 +435,9 @@ def generate_recommendations(user_id: int, action: str = "general") -> Dict[str,
             tools=_RECO_TOOLS,
             model="claude-sonnet-4-5-20250929",
             tool_executor=_tool_executor(user_id),
-            max_iterations=5,
+            max_iterations=3,
             response_format={"type": "json_object"},
         )
-
-        if not agent.is_available():
-            print(f"[RECO FALLBACK] user={user_id} reason=llm_unavailable")
-            return _cache_and_return(user_id, _fallback_recommendations(user_id))
 
         result = agent.run(user_message)
         raw_content = result.get("content", "")

@@ -19,20 +19,39 @@ struct PulseHeaderView: View {
     }
 
     var body: some View {
-        VStack(spacing: 8) {
+        HStack(spacing: 10) {
+            // Labels
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Safe to Spend Today")
+                    .font(.system(.subheadline, design: .rounded, weight: .medium))
+                    .foregroundStyle(Color.textPrimary)
+
+                HStack(spacing: 5) {
+                    Circle()
+                        .fill(isHealthy ? Color.accent : Color.danger)
+                        .frame(width: 6, height: 6)
+
+                    Text(status)
+                        .font(.roundedCaption)
+                        .foregroundStyle(Color.textSecondary)
+                }
+            }
+
+            Spacer()
+
             // Safe-to-Spend Amount
-            HStack(spacing: 4) {
+            HStack(spacing: 3) {
                 Text("$")
-                    .font(.rounded(.title2, weight: .medium))
+                    .font(.rounded(.body, weight: .medium))
                     .foregroundStyle(Color.textSecondary)
 
                 Text("\(Int(safeToSpend))")
-                    .font(.system(size: 48, weight: .bold, design: .rounded))
+                    .font(.system(size: 28, weight: .bold, design: .rounded))
                     .monospacedDigit()
                     .foregroundStyle(Color.textPrimary)
             }
-            .padding(.horizontal, 24)
-            .padding(.vertical, 12)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
             .background(
                 Capsule()
                     .fill(isHealthy ? Color.accent.opacity(0.2) : Color.danger.opacity(0.2))
@@ -44,24 +63,9 @@ struct PulseHeaderView: View {
                         lineWidth: 1
                     )
             )
-
-            // Status Label
-            HStack(spacing: 6) {
-                Circle()
-                    .fill(isHealthy ? Color.accent : Color.danger)
-                    .frame(width: 8, height: 8)
-
-                Text("Status: \(status)")
-                    .font(.roundedCaption)
-                    .foregroundStyle(Color.textSecondary)
-            }
-
-            // Safe-to-Spend Label
-            Text("Safe to Spend Today")
-                .font(.roundedCaption)
-                .foregroundStyle(Color.textSecondary)
         }
-        .padding(.vertical, 20)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
         .frame(maxWidth: .infinity)
         .background(
             Color.appBackground
