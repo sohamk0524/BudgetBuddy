@@ -25,8 +25,6 @@ class RecommendationsViewModel {
     // Money Moves
     var moneyMovesCards: [MoneyMovesCard] = []
     var activeCategory: String?
-    private var generalRecommendations: [RecommendationItem] = []
-
     private var cancellables = Set<AnyCancellable>()
 
     init() {
@@ -139,19 +137,14 @@ class RecommendationsViewModel {
     }
 
     func selectCategory(_ category: String) {
-        if activeCategory == nil {
-            generalRecommendations = recommendations
-        }
         withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
             activeCategory = category
         }
-        Task { await generateRecommendations(action: category) }
     }
 
     func clearCategoryFilter() {
         withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
             activeCategory = nil
-            recommendations = generalRecommendations
         }
     }
 
