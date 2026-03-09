@@ -279,14 +279,14 @@ struct RecommendationCardView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .top, spacing: 12) {
+            HStack(alignment: .top, spacing: 10) {
                 // Icon
                 ZStack {
                     Circle()
                         .fill(Color.accent.opacity(0.15))
-                        .frame(width: 40, height: 40)
+                        .frame(width: 32, height: 32)
                     Image(systemName: item.icon ?? "lightbulb")
-                        .font(.system(size: 16, weight: .semibold))
+                        .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(Color.accent)
                 }
 
@@ -294,13 +294,6 @@ struct RecommendationCardView: View {
                     Text(item.title)
                         .font(.roundedHeadline)
                         .foregroundStyle(Color.textPrimary)
-
-                    if let context = item.spendingContext {
-                        Text(context)
-                            .font(.roundedBody)
-                            .foregroundStyle(Color.textSecondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
 
                     if let savings = item.potentialSavings, savings > 0 {
                         Text("Save ~$\(Int(savings))")
@@ -344,6 +337,13 @@ struct RecommendationCardView: View {
             Divider()
                 .overlay(Color.textSecondary.opacity(0.3))
                 .padding(.top, 8)
+
+            if let context = item.spendingContext {
+                Text(context)
+                    .font(.system(.caption2, design: .rounded))
+                    .foregroundStyle(Color.textSecondary)
+                    .lineLimit(1)
+            }
 
             if let steps = item.steps {
                 VStack(alignment: .leading, spacing: 4) {
