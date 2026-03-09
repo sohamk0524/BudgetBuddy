@@ -76,6 +76,7 @@ struct ExpensesView: View {
                                             .onTapGesture {
                                                 viewModel.selectedTransaction = transaction
                                                 viewModel.showClassificationSheet = true
+                                                AnalyticsManager.logTransactionTapped()
                                             }
                                     }
                                 }
@@ -134,6 +135,7 @@ struct ExpensesView: View {
                 if viewModel.transactions.isEmpty {
                     await viewModel.refresh()
                 }
+                AnalyticsManager.logExpensesViewed()
             }
             .sheet(isPresented: $viewModel.showClassificationSheet) {
                 if let transaction = viewModel.selectedTransaction {
@@ -192,6 +194,7 @@ struct ExpensesView: View {
             Button {
                 voiceViewModel.reset()
                 showVoiceRecording = true
+                AnalyticsManager.logExpenseAdded(method: .voice)
             } label: {
                 Label("Voice", systemImage: "mic.fill")
             }
@@ -199,6 +202,7 @@ struct ExpensesView: View {
             Button {
                 voiceViewModel.startManualEntry()
                 showVoiceRecording = true
+                AnalyticsManager.logExpenseAdded(method: .manual)
             } label: {
                 Label("Manual Entry", systemImage: "square.and.pencil")
             }
@@ -206,6 +210,7 @@ struct ExpensesView: View {
             Button {
                 receiptViewModel.reset()
                 showReceiptScan = true
+                AnalyticsManager.logExpenseAdded(method: .receipt)
             } label: {
                 Label("Scan Receipt", systemImage: "receipt")
             }

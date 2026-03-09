@@ -50,6 +50,7 @@ struct RecommendationsView: View {
         }
         .task {
             await viewModel.loadRecommendations()
+            AnalyticsManager.logRecommendationsViewed()
         }
     }
 
@@ -97,6 +98,7 @@ struct RecommendationsView: View {
         VStack(spacing: 10) {
             Button {
                 Task { await viewModel.generateRecommendations() }
+                AnalyticsManager.logRecommendationsGenerated()
             } label: {
                 HStack(spacing: 8) {
                     if viewModel.isGenerating {
@@ -209,6 +211,9 @@ struct RecommendationCardView: View {
             guard item.isExpandable else { return }
             withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                 isExpanded.toggle()
+            }
+            if !isExpanded {
+                AnalyticsManager.logRecommendationExpanded(title: item.title)
             }
         }
     }

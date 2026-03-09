@@ -29,6 +29,7 @@ struct BudgetBuddyApp: App {
                 .onChange(of: scenePhase) { _, newPhase in
                     if newPhase == .active && AuthManager.shared.isAuthenticated {
                         AuthManager.shared.recordActivity()
+                        AnalyticsManager.logSessionStart()
                     }
                 }
                 .task {
