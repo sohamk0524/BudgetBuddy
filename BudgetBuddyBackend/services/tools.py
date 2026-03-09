@@ -554,11 +554,19 @@ def _get_school_advice(user_id: Optional[int], query: str) -> Dict[str, Any]:
         return {"error": f"Failed to get school advice: {str(e)}"}
 
 
+# In-memory Tavily result cache: key → (timestamp, result)
+_tavily_cache: Dict[str, tuple] = {}
+_TAVILY_CACHE_TTL = 60 * 60 * 24  # 24 hours
+
+
 def _search_local_deals(user_id: Optional[int], query: str) -> Dict[str, Any]:
     """
     Lightweight local deal search via Tavily. No LLM rewrite or synthesis —
     returns raw results for the agent to interpret.
+    Tavily results are cached in-memory for 24h keyed by normalized query.
     """
+    import time
+
     if not user_id:
         return {"error": "No user ID provided"}
     if not query:
@@ -601,24 +609,39 @@ def _search_local_deals(user_id: Optional[int], query: str) -> Dict[str, Any]:
         tavily_answer = ""
         tavily_key = os.environ.get("TAVILY_API_KEY")
         if tavily_key:
-            try:
-                from tavily import TavilyClient
-                client = TavilyClient(api_key=tavily_key)
-                search_results = client.search(
-                    query=query,
-                    search_depth="basic",
-                    max_results=5,
-                    include_answer=True,
-                )
-                tavily_answer = search_results.get("answer", "")
-                for r in search_results.get("results", []):
-                    tavily_results.append({
-                        "title": r.get("title", ""),
-                        "snippet": r.get("content", ""),
-                        "url": r.get("url", ""),
+            # Check cache first (normalized: lowercase + stripped)
+            cache_key = query.strip().lower()
+            now = time.time()
+            cached = _tavily_cache.get(cache_key)
+            if cached and (now - cached[0]) < _TAVILY_CACHE_TTL:
+                print(f"[search_local_deals] Tavily cache HIT for: {cache_key[:60]}")
+                tavily_answer = cached[1].get("answer", "")
+                tavily_results = cached[1].get("results", [])
+            else:
+                try:
+                    from tavily import TavilyClient
+                    client = TavilyClient(api_key=tavily_key)
+                    search_results = client.search(
+                        query=query,
+                        search_depth="basic",
+                        max_results=5,
+                        include_answer=True,
+                    )
+                    tavily_answer = search_results.get("answer", "")
+                    for r in search_results.get("results", []):
+                        tavily_results.append({
+                            "title": r.get("title", ""),
+                            "snippet": r.get("content", ""),
+                            "url": r.get("url", ""),
+                        })
+                    # Cache the result
+                    _tavily_cache[cache_key] = (now, {
+                        "answer": tavily_answer,
+                        "results": tavily_results,
                     })
-            except Exception as e:
-                print(f"[search_local_deals] Tavily search failed (non-fatal): {e}")
+                    print(f"[search_local_deals] Tavily cache MISS, stored: {cache_key[:60]}")
+                except Exception as e:
+                    print(f"[search_local_deals] Tavily search failed (non-fatal): {e}")
 
         # Local deals first, then web results
         results = local_results + tavily_results

@@ -69,16 +69,18 @@ FACTUAL ACCURACY / NO HALLUCINATION
 - When citing a deal, note the source if possible (e.g., "per their website" or "via Yelp").
 
 ═══════════════════════════════════════════════════════════
-WORKFLOW — MANDATORY STEPS
+WORKFLOW — MANDATORY STEPS (complete in 2 tool rounds max)
 ═══════════════════════════════════════════════════════════
-1. Call get_plaid_transactions to get real spending data
-2. Identify the TOP 3 merchants/categories by dollar amount
-3. Call search_local_deals for EACH of those top categories with specific queries like:
-   - "student discount [cuisine type] near [school]"
-   - "[merchant name] competitor deals [city]"
-   - "loyalty programs grocery stores [city] student"
-4. Call get_weekly_spending_status to ground recommendations in remaining budget
-5. Build recommendations ONLY from verified search results matched to real spending
+ROUND 1 — call ALL of these tools simultaneously in your first response:
+  • get_plaid_transactions — get real spending data
+  • get_weekly_spending_status — get remaining budget
+  • search_local_deals — search for deals in the user's top spending category (infer from user context)
+
+ROUND 2 — after reviewing Round 1 results:
+  • Call search_local_deals 1-2 more times for other top categories if needed
+  • Then produce your final JSON response
+
+DO NOT use more than 2 tool-calling rounds. After Round 2, output your final JSON immediately.
 
 OUTPUT FORMAT — return ONLY a JSON object, no markdown fences:
 {
@@ -433,13 +435,9 @@ def generate_recommendations(user_id: int, action: str = "general") -> Dict[str,
             tools=_RECO_TOOLS,
             model="claude-sonnet-4-5-20250929",
             tool_executor=_tool_executor(user_id),
-            max_iterations=5,
+            max_iterations=3,
             response_format={"type": "json_object"},
         )
-
-        if not agent.is_available():
-            print(f"[RECO FALLBACK] user={user_id} reason=llm_unavailable")
-            return _cache_and_return(user_id, _fallback_recommendations(user_id))
 
         result = agent.run(user_message)
         raw_content = result.get("content", "")
