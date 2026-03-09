@@ -39,15 +39,20 @@ struct RecommendationsView: View {
                 } else if viewModel.displayedRecommendations.isEmpty && viewModel.activeCategory != nil {
                     Spacer()
                     VStack(spacing: 12) {
-                        Image(systemName: "magnifyingglass")
-                            .font(.system(size: 32))
-                            .foregroundStyle(Color.textSecondary.opacity(0.6))
-                        Text("No \(viewModel.activeCategoryDisplayName.lowercased()) tips yet")
-                            .font(.roundedCaption)
-                            .foregroundStyle(Color.textSecondary)
-                        Text("Tap Refresh to generate new recommendations.")
-                            .font(.roundedCaption)
-                            .foregroundStyle(Color.textSecondary.opacity(0.7))
+                        if viewModel.isGenerating {
+                            ProgressView()
+                                .tint(Color.accent)
+                            Text("Finding \(viewModel.activeCategoryDisplayName.lowercased()) tips…")
+                                .font(.roundedCaption)
+                                .foregroundStyle(Color.textSecondary)
+                        } else {
+                            Image(systemName: "magnifyingglass")
+                                .font(.system(size: 32))
+                                .foregroundStyle(Color.textSecondary.opacity(0.6))
+                            Text("No \(viewModel.activeCategoryDisplayName.lowercased()) tips found")
+                                .font(.roundedCaption)
+                                .foregroundStyle(Color.textSecondary)
+                        }
                     }
                     Spacer()
                 } else if viewModel.displayedRecommendations.isEmpty && viewModel.activeCategory == nil {

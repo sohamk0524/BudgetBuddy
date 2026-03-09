@@ -20,6 +20,25 @@ struct PulseHeaderView: View {
 
     var body: some View {
         HStack(spacing: 10) {
+            // Labels
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Safe to Spend Today")
+                    .font(.system(.subheadline, design: .rounded, weight: .medium))
+                    .foregroundStyle(Color.textPrimary)
+
+                HStack(spacing: 5) {
+                    Circle()
+                        .fill(isHealthy ? Color.accent : Color.danger)
+                        .frame(width: 6, height: 6)
+
+                    Text(status)
+                        .font(.roundedCaption)
+                        .foregroundStyle(Color.textSecondary)
+                }
+            }
+
+            Spacer()
+
             // Safe-to-Spend Amount
             HStack(spacing: 3) {
                 Text("$")
@@ -44,25 +63,6 @@ struct PulseHeaderView: View {
                         lineWidth: 1
                     )
             )
-
-            // Labels
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Safe to Spend Today")
-                    .font(.system(.subheadline, design: .rounded, weight: .medium))
-                    .foregroundStyle(Color.textPrimary)
-
-                HStack(spacing: 5) {
-                    Circle()
-                        .fill(isHealthy ? Color.accent : Color.danger)
-                        .frame(width: 6, height: 6)
-
-                    Text(status)
-                        .font(.roundedCaption)
-                        .foregroundStyle(Color.textSecondary)
-                }
-            }
-
-            Spacer()
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)

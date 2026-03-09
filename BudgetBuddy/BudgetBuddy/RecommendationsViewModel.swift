@@ -104,6 +104,13 @@ class RecommendationsViewModel {
             let response = try await APIService.shared.getRecommendations(userId: userId)
             apply(response)
             hasLoaded = true
+
+            // Auto-generate if no cached recommendations exist
+            if recommendations.isEmpty {
+                isLoading = false
+                await generateRecommendations()
+                return
+            }
         } catch {
             errorMessage = "Could not load recommendations."
         }
@@ -139,6 +146,11 @@ class RecommendationsViewModel {
     func selectCategory(_ category: String) {
         withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
             activeCategory = category
+        }
+
+        // Auto-generate if no existing recs match this category
+        if displayedRecommendations.isEmpty {
+            Task { await generateRecommendations(action: category) }
         }
     }
 
