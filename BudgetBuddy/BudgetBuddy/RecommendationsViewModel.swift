@@ -65,6 +65,11 @@ class RecommendationsViewModel {
         guard let category = activeCategory else { return recommendations }
         let keywords = Self.categoryKeywords[category] ?? [category]
         return recommendations.filter { item in
+            // Exact tag match (set by backend when generating for a specific category)
+            if let tag = item.spendingCategory {
+                return tag == category
+            }
+            // Keyword fallback for general recs that happen to cover this category
             let searchable = [item.title, item.description, item.spendingContext ?? ""]
                 .joined(separator: " ").lowercased()
             return keywords.contains { searchable.contains($0) }
@@ -125,7 +130,11 @@ class RecommendationsViewModel {
 
         do {
             let response = try await APIService.shared.generateRecommendations(userId: userId, action: action)
-            apply(response)
+            if action == "general" {
+                apply(response)
+            } else {
+                merge(response)
+            }
         } catch {
             errorMessage = "Failed to generate recommendations."
         }
@@ -176,6 +185,16 @@ class RecommendationsViewModel {
 
     private func apply(_ response: RecommendationsResponse) {
         recommendations = response.recommendations
+        safeToSpend = response.safeToSpend ?? safeToSpend
+        status = response.status ?? status
+        summary = response.summary ?? summary
+    }
+
+    /// Merges category-specific results into the existing list without removing other tips.
+    private func merge(_ response: RecommendationsResponse) {
+        let existingIds = Set(recommendations.map { $0.id })
+        let newRecs = response.recommendations.filter { !existingIds.contains($0.id) }
+        recommendations.append(contentsOf: newRecs)
         safeToSpend = response.safeToSpend ?? safeToSpend
         status = response.status ?? status
         summary = response.summary ?? summary

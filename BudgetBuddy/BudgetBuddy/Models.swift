@@ -672,6 +672,9 @@ struct RecommendationItem: Codable, Identifiable {
     let link: String?
     let linkTitle: String?
 
+    /// Spending category this tip was generated for (e.g. "food", "drink"). Nil for general recs.
+    let spendingCategory: String?
+
     var isExpandable: Bool {
         steps != nil || spendingContext != nil || timeHorizon != nil || link != nil
     }
