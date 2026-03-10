@@ -360,15 +360,30 @@ def _parse_recommendations_json(raw: str) -> Optional[Dict[str, Any]]:
 
 
 def _build_user_context(user_id: int) -> str:
-    """Pre-fetch all financial data for the user so the agent has full context.
+    """Build a lean context string with only the data the recommendations agent needs."""
+    from db_models import get_profile, get_active_plaid_items, get_accounts_for_item
 
-    Strips spending-strictness info since recommendations should not vary by strictness.
-    """
-    import re
-    from services.orchestrator import _build_user_context as _orch_context
-    context = _orch_context(user_id) or "No financial data available for this user."
-    context = re.sub(r",?\s*strictness=[^,\n)]*", "", context)
-    return context
+    parts = []
+
+    profile = get_profile(user_id)
+    if profile:
+        parts.append(
+            f"- Profile: student={profile.get('is_student')}, "
+            f"weekly_spending_limit=${float(profile.get('weekly_spending_limit', 0)):.2f}, "
+            f"school={profile.get('school') or 'not set'}"
+        )
+    else:
+        parts.append("- No financial profile (user has NOT completed onboarding)")
+
+    plaid_items = get_active_plaid_items(user_id)
+    if plaid_items:
+        account_count = sum(len(get_accounts_for_item(item.key.id)) for item in plaid_items)
+        institution_names = [item.get('institution_name') or "Unknown" for item in plaid_items]
+        parts.append(f"- Plaid linked: {account_count} account(s) at {', '.join(institution_names)}")
+    else:
+        parts.append("- No bank accounts linked via Plaid")
+
+    return "\n".join(parts) if parts else "No financial data available for this user."
 
 
 def _fallback_recommendations(user_id: int) -> Dict[str, Any]:

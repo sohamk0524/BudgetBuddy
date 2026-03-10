@@ -1,5 +1,9 @@
 """
-Chat Blueprint — AI chat and bank statement upload.
+Chat Blueprint — bank statement upload.
+
+The /chat AI conversation endpoint has been removed (ChatView is not in
+the iOS app navigation).  The /upload-statement route is still used by
+WalletView for statement uploads.
 """
 
 import json
@@ -9,28 +13,10 @@ from flask import Blueprint, jsonify, request
 
 from middleware.auth import require_auth
 from db_models import get_user, get_statement, upsert_statement, delete_statement_for_user
-from services.orchestrator import process_message
 from services.statement_analyzer import analyze_statement
 from services.gcs_service import upload_statement as gcs_upload, delete_statement as gcs_delete
 
 chat_bp = Blueprint('chat', __name__)
-
-
-@chat_bp.route("/chat", methods=["POST"])
-@require_auth
-def chat():
-    data = request.get_json()
-    if not data:
-        return jsonify({"error": "Request body must be JSON"}), 400
-
-    user_message = data.get("message", "")
-    user_id = data.get("userId", "anonymous")
-
-    if not user_message:
-        return jsonify({"error": "Message field is required"}), 400
-
-    response = process_message(user_message, user_id)
-    return jsonify(response.to_dict())
 
 
 @chat_bp.route("/upload-statement", methods=["POST", "OPTIONS"])
