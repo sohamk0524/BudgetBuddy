@@ -23,13 +23,39 @@ struct RecommendationsView: View {
                     status: viewModel.statusDisplayText
                 )
 
+                // Money Moves or category indicator
+                if viewModel.activeCategory != nil {
+                    categoryChip
+                } else if !viewModel.moneyMovesCards.isEmpty {
+                    moneyMovesRow
+                }
+
                 // Content
                 if viewModel.isLoading && viewModel.recommendations.isEmpty {
                     Spacer()
                     ProgressView()
                         .tint(Color.accent)
                     Spacer()
-                } else if viewModel.recommendations.isEmpty {
+                } else if viewModel.displayedRecommendations.isEmpty && viewModel.activeCategory != nil {
+                    Spacer()
+                    VStack(spacing: 12) {
+                        if viewModel.isGenerating {
+                            ProgressView()
+                                .tint(Color.accent)
+                            Text("Finding \(viewModel.activeCategoryDisplayName.lowercased()) tips…")
+                                .font(.roundedCaption)
+                                .foregroundStyle(Color.textSecondary)
+                        } else {
+                            Image(systemName: "magnifyingglass")
+                                .font(.system(size: 32))
+                                .foregroundStyle(Color.textSecondary.opacity(0.6))
+                            Text("No \(viewModel.activeCategoryDisplayName.lowercased()) tips found")
+                                .font(.roundedCaption)
+                                .foregroundStyle(Color.textSecondary)
+                        }
+                    }
+                    Spacer()
+                } else if viewModel.displayedRecommendations.isEmpty && viewModel.activeCategory == nil {
                     emptyState
                 } else {
                     recommendationsList
@@ -50,6 +76,7 @@ struct RecommendationsView: View {
         }
         .task {
             await viewModel.loadRecommendations()
+            await viewModel.loadSpendingSummary()
             AnalyticsManager.logRecommendationsViewed()
         }
     }
@@ -59,13 +86,62 @@ struct RecommendationsView: View {
     private var recommendationsList: some View {
         ScrollView {
             LazyVStack(spacing: 12) {
-                ForEach(viewModel.recommendations) { item in
+                ForEach(viewModel.displayedRecommendations) { item in
                     RecommendationCardView(item: item)
                 }
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
         }
+    }
+
+    // MARK: - Money Moves
+
+    private var moneyMovesRow: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Money Moves")
+                .font(.roundedCaption)
+                .foregroundStyle(Color.textSecondary)
+                .padding(.leading, 16)
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 10) {
+                    ForEach(viewModel.moneyMovesCards) { card in
+                        MoneyMovesCardView(card: card) {
+                            viewModel.selectCategory(card.category)
+                        }
+                    }
+                }
+                .padding(.horizontal, 16)
+            }
+        }
+        .padding(.vertical, 10)
+    }
+
+    private var categoryChip: some View {
+        HStack(spacing: 8) {
+            Button {
+                viewModel.clearCategoryFilter()
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: viewModel.activeCategoryIcon)
+                        .font(.system(size: 12, weight: .semibold))
+                    Text(viewModel.activeCategoryDisplayName)
+                        .font(.system(.subheadline, design: .rounded, weight: .semibold))
+                    Image(systemName: "xmark")
+                        .font(.system(size: 10, weight: .bold))
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+                .background(Color.accent)
+                .foregroundStyle(Color.appBackground)
+                .clipShape(Capsule())
+            }
+
+            Spacer()
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
     }
 
     // MARK: - Empty State
@@ -82,7 +158,7 @@ struct RecommendationsView: View {
                 .font(.roundedHeadline)
                 .foregroundStyle(Color.textPrimary)
 
-            Text("Tap \"Generate Recommendations\" to get personalized financial tips based on your spending and budget.")
+            Text("Tap \"Refresh\" to get personalized financial tips based on your spending and budget.")
                 .font(.roundedCaption)
                 .foregroundStyle(Color.textSecondary)
                 .multilineTextAlignment(.center)
@@ -95,32 +171,34 @@ struct RecommendationsView: View {
     // MARK: - Action Buttons
 
     private var actionButtons: some View {
-        VStack(spacing: 10) {
+        HStack {
+            Spacer()
             Button {
                 Task { await viewModel.generateRecommendations() }
                 AnalyticsManager.logRecommendationsGenerated()
             } label: {
-                HStack(spacing: 8) {
-                    if viewModel.isGenerating {
+                HStack(spacing: 6) {
+                    if viewModel.isGenerating && viewModel.activeCategory == nil {
                         ProgressView()
-                            .tint(.white)
-                            .controlSize(.small)
+                            .tint(Color.accent)
+                            .controlSize(.mini)
                     } else {
-                        Image(systemName: "lightbulb.fill")
+                        Image(systemName: "arrow.clockwise")
+                            .font(.system(size: 12, weight: .semibold))
                     }
-                    Text("Generate Recommendations")
-                        .font(.roundedHeadline)
+                    Text("Refresh")
+                        .font(.system(.subheadline, design: .rounded, weight: .medium))
                 }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 14)
-                .background(Color.accent)
-                .foregroundStyle(Color.appBackground)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+                .background(Color.accent.opacity(0.15))
+                .foregroundStyle(Color.accent)
                 .clipShape(Capsule())
             }
             .disabled(viewModel.isGenerating)
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 12)
+        .padding(.vertical, 8)
         .background(Color.surface)
     }
 
@@ -148,6 +226,58 @@ struct RecommendationsView: View {
     }
 }
 
+// MARK: - Money Moves Card
+
+struct MoneyMovesCardView: View {
+    let card: MoneyMovesCard
+    let onTap: () -> Void
+
+    var body: some View {
+        Button(action: onTap) {
+            VStack(alignment: .leading, spacing: 8) {
+                // Icon + category
+                HStack(spacing: 6) {
+                    Image(systemName: card.icon)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(Color.accent)
+                    Text(card.category.prefix(1).uppercased() + card.category.dropFirst())
+                        .font(.roundedCaption)
+                        .foregroundStyle(Color.textSecondary)
+                }
+
+                // Amount
+                Text("$\(Int(card.amount))")
+                    .font(.rounded(.title2, weight: .bold))
+                    .monospacedDigit()
+                    .foregroundStyle(Color.textPrimary)
+
+                // Context
+                Text("\(card.transactionCount) transaction\(card.transactionCount == 1 ? "" : "s")")
+                    .font(.roundedCaption)
+                    .foregroundStyle(Color.textSecondary)
+
+                // CTA
+                Text("Get tips →")
+                    .font(.system(.caption, design: .rounded, weight: .semibold))
+                    .foregroundStyle(Color.appBackground)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(Color.accent)
+                    .clipShape(Capsule())
+            }
+            .frame(width: 150, alignment: .leading)
+            .padding(14)
+            .background(Color.surface)
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .strokeBorder(Color.accent.opacity(0.15), lineWidth: 1)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 16))
+        }
+        .buttonStyle(.plain)
+    }
+}
+
 // MARK: - Recommendation Card
 
 struct RecommendationCardView: View {
@@ -156,14 +286,14 @@ struct RecommendationCardView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .top, spacing: 12) {
+            HStack(alignment: .top, spacing: 10) {
                 // Icon
                 ZStack {
                     Circle()
                         .fill(Color.accent.opacity(0.15))
-                        .frame(width: 40, height: 40)
+                        .frame(width: 32, height: 32)
                     Image(systemName: item.icon ?? "lightbulb")
-                        .font(.system(size: 16, weight: .semibold))
+                        .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(Color.accent)
                 }
 
@@ -171,13 +301,6 @@ struct RecommendationCardView: View {
                     Text(item.title)
                         .font(.roundedHeadline)
                         .foregroundStyle(Color.textPrimary)
-
-                    if let context = item.spendingContext {
-                        Text(context)
-                            .font(.roundedBody)
-                            .foregroundStyle(Color.textSecondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
 
                     if let savings = item.potentialSavings, savings > 0 {
                         Text("Save ~$\(Int(savings))")
@@ -224,6 +347,13 @@ struct RecommendationCardView: View {
             Divider()
                 .overlay(Color.textSecondary.opacity(0.3))
                 .padding(.top, 8)
+
+            if let context = item.spendingContext {
+                Text(context)
+                    .font(.system(.caption2, design: .rounded))
+                    .foregroundStyle(Color.textSecondary)
+                    .lineLimit(1)
+            }
 
             if let steps = item.steps {
                 VStack(alignment: .leading, spacing: 4) {
