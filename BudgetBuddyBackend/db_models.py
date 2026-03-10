@@ -73,6 +73,10 @@ def delete_user_cascade(user_id: str):
     client = get_client()
     _delete_kind_for_user(client, 'FinancialProfile', user_id)
     _delete_kind_for_user(client, 'BudgetPlan', user_id)
+    _delete_kind_for_user(client, 'ManualTransaction', user_id)
+    _delete_kind_for_user(client, 'CachedRecommendations', user_id)
+    _delete_kind_for_user(client, 'DeviceToken', user_id)
+    _delete_kind_for_user(client, 'MerchantClassification', user_id)
 
     statement = get_statement(user_id)
     if statement:

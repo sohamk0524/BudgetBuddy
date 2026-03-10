@@ -39,8 +39,10 @@ struct ContentView: View {
                     }
                 )
             } else {
-                // Show main app
+                // Show main app — use authToken as identity so SwiftUI recreates the
+                // tab view (and all child ViewModels) whenever the signed-in user changes.
                 mainTabView
+                    .id(authManager.authToken ?? "")
             }
         }
         .task {
