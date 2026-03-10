@@ -88,6 +88,12 @@ struct ContentView: View {
                 .tag(3)
         }
         .tint(Color.accent)
+        .onChange(of: selectedTab) { _, newTab in
+            let tabs: [AnalyticsManager.Tab] = [.tips, .expenses, .insights, .profile]
+            if newTab < tabs.count {
+                AnalyticsManager.logTabViewed(tabs[newTab])
+            }
+        }
         .onAppear {
             // Configure TabBar appearance for dark theme
             let appearance = UITabBarAppearance()

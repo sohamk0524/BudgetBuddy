@@ -452,32 +452,60 @@ def generate_recommendations(user_id: int, action: str = "general") -> Dict[str,
         safe_to_spend = sts["safe_to_spend"]
         status = sts["status"]
 
+        recs = parsed.get("recommendations", [])[:5]
+        if action != "general":
+            recs = [{**r, "spendingCategory": action} for r in recs]
+
         output = {
-            "recommendations": parsed.get("recommendations", [])[:5],
+            "recommendations": recs,
             "safeToSpend": safe_to_spend,
             "status": status,
             "summary": parsed.get("summary", ""),
         }
 
-        return _cache_and_return(user_id, output)
+        return _cache_and_return(user_id, output, action=action)
 
     except Exception as e:
         print(f"[RECO FALLBACK] user={user_id} reason=exception error={e}")
-        return _cache_and_return(user_id, _fallback_recommendations(user_id))
+        return _cache_and_return(user_id, _fallback_recommendations(user_id), action=action)
 
 
-def _cache_and_return(user_id: int, data: Dict[str, Any]) -> Dict[str, Any]:
-    """Cache recommendations in Datastore and return the response."""
-    from db_models import upsert_cached_recommendations
+def _cache_and_return(user_id: int, data: Dict[str, Any], action: str = "general") -> Dict[str, Any]:
+    """Cache recommendations in Datastore and return the response.
+
+    For category-specific actions, new recs are merged into the existing cache so
+    that general recommendations aren't wiped out by a single category generation.
+    For 'general', the cache is fully replaced (intentional fresh start).
+    """
+    from db_models import upsert_cached_recommendations, get_cached_recommendations
+
+    new_recs = data.get("recommendations", [])
+
+    if action != "general":
+        cached = get_cached_recommendations(user_id)
+        if cached:
+            try:
+                existing_recs = json.loads(cached.get("recommendations_json", "[]"))
+            except (json.JSONDecodeError, TypeError):
+                existing_recs = []
+            existing_ids = {
+                (r.get("category", "") + r.get("title", "")) for r in existing_recs
+            }
+            added = [
+                r for r in new_recs
+                if (r.get("category", "") + r.get("title", "")) not in existing_ids
+            ]
+            new_recs = existing_recs + added
 
     upsert_cached_recommendations(
         user_id,
-        recommendations_json=json.dumps(data.get("recommendations", [])),
+        recommendations_json=json.dumps(new_recs),
         safe_to_spend=data.get("safeToSpend", 0),
         status=data.get("status", "unknown"),
         summary=data.get("summary", ""),
     )
 
+    data["recommendations"] = new_recs
     data["cached"] = False
     data["generatedAt"] = datetime.utcnow().isoformat()
     return data

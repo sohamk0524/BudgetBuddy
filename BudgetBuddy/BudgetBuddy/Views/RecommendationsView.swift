@@ -10,6 +10,27 @@ import SwiftUI
 @MainActor
 struct RecommendationsView: View {
     @State private var viewModel = RecommendationsViewModel()
+    @State private var loadingStepIndex = 0
+
+    private var loadingStepLabels: [String] {
+        if let cat = viewModel.activeCategory {
+            let name = cat.prefix(1).uppercased() + cat.dropFirst()
+            return [
+                "Reviewing \(name.lowercased()) transactions",
+                "Analyzing your \(name.lowercased()) spending",
+                "Finding \(name.lowercased()) deals nearby",
+                "Building \(name.lowercased()) savings tips",
+            ]
+        }
+        return [
+            "Fetching your transactions",
+            "Checking spending status",
+            "Searching for local deals",
+            "Crafting personalized tips",
+        ]
+    }
+    private let loadingStepIcons = ["creditcard", "chart.bar.fill", "mappin.and.ellipse", "lightbulb.fill"]
+    private var loadingStepIcon: String { loadingStepIcons[min(loadingStepIndex, loadingStepIcons.count - 1)] }
 
     var body: some View {
         ZStack {
@@ -36,23 +57,17 @@ struct RecommendationsView: View {
                     ProgressView()
                         .tint(Color.accent)
                     Spacer()
-                } else if viewModel.displayedRecommendations.isEmpty && viewModel.activeCategory != nil {
+                } else if viewModel.isGenerating && viewModel.displayedRecommendations.isEmpty {
+                    generatingPlaceholder
+                } else if viewModel.displayedRecommendations.isEmpty && viewModel.activeCategory != nil && !viewModel.isGenerating {
                     Spacer()
                     VStack(spacing: 12) {
-                        if viewModel.isGenerating {
-                            ProgressView()
-                                .tint(Color.accent)
-                            Text("Finding \(viewModel.activeCategoryDisplayName.lowercased()) tips…")
-                                .font(.roundedCaption)
-                                .foregroundStyle(Color.textSecondary)
-                        } else {
-                            Image(systemName: "magnifyingglass")
-                                .font(.system(size: 32))
-                                .foregroundStyle(Color.textSecondary.opacity(0.6))
-                            Text("No \(viewModel.activeCategoryDisplayName.lowercased()) tips found")
-                                .font(.roundedCaption)
-                                .foregroundStyle(Color.textSecondary)
-                        }
+                        Image(systemName: "magnifyingglass")
+                            .font(.system(size: 32))
+                            .foregroundStyle(Color.textSecondary.opacity(0.6))
+                        Text("No \(viewModel.activeCategoryDisplayName.lowercased()) tips found")
+                            .font(.roundedCaption)
+                            .foregroundStyle(Color.textSecondary)
                     }
                     Spacer()
                 } else if viewModel.displayedRecommendations.isEmpty && viewModel.activeCategory == nil {
@@ -74,9 +89,21 @@ struct RecommendationsView: View {
                 .padding(.top, 8)
             }
         }
+        .task(id: viewModel.isGenerating) {
+            guard viewModel.isGenerating else { return }
+            loadingStepIndex = 0
+            while !Task.isCancelled && viewModel.isGenerating {
+                try? await Task.sleep(nanoseconds: 5_000_000_000)
+                guard viewModel.isGenerating else { break }
+                withAnimation(.easeInOut(duration: 0.25)) {
+                    loadingStepIndex = min(loadingStepIndex + 1, loadingStepLabels.count - 1)
+                }
+            }
+        }
         .task {
             await viewModel.loadRecommendations()
             await viewModel.loadSpendingSummary()
+            AnalyticsManager.logRecommendationsViewed()
         }
     }
 
@@ -167,6 +194,64 @@ struct RecommendationsView: View {
         }
     }
 
+    // MARK: - Generating Placeholder (no cached content)
+
+    private var generatingPlaceholder: some View {
+        VStack(spacing: 28) {
+            Spacer()
+
+            ZStack {
+                Circle()
+                    .fill(Color.accent.opacity(0.12))
+                    .frame(width: 72, height: 72)
+                Image(systemName: loadingStepIcon)
+                    .font(.system(size: 28, weight: .medium))
+                    .foregroundStyle(Color.accent)
+                    .id(loadingStepIndex)
+                    .transition(.asymmetric(
+                        insertion: .scale(scale: 0.7).combined(with: .opacity),
+                        removal: .opacity
+                    ))
+            }
+
+            VStack(spacing: 10) {
+                ForEach(Array(loadingStepLabels.enumerated()), id: \.offset) { index, label in
+                    HStack(spacing: 10) {
+                        ZStack {
+                            if index < loadingStepIndex {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundStyle(Color.accent)
+                                    .font(.system(size: 16))
+                            } else if index == loadingStepIndex {
+                                ProgressView()
+                                    .scaleEffect(0.7)
+                                    .tint(Color.accent)
+                                    .frame(width: 16, height: 16)
+                            } else {
+                                Circle()
+                                    .strokeBorder(Color.textSecondary.opacity(0.3), lineWidth: 1.5)
+                                    .frame(width: 16, height: 16)
+                            }
+                        }
+                        .frame(width: 18)
+
+                        Text(label)
+                            .font(.roundedBody)
+                            .foregroundStyle(
+                                index <= loadingStepIndex ? Color.textPrimary : Color.textSecondary.opacity(0.4)
+                            )
+                            .animation(.easeInOut(duration: 0.3), value: loadingStepIndex)
+
+                        Spacer()
+                    }
+                }
+            }
+            .padding(.horizontal, 40)
+
+            Spacer()
+        }
+    }
+
     // MARK: - Action Buttons
 
     private var actionButtons: some View {
@@ -174,24 +259,34 @@ struct RecommendationsView: View {
             Spacer()
             Button {
                 Task { await viewModel.generateRecommendations() }
+                AnalyticsManager.logRecommendationsGenerated()
             } label: {
                 HStack(spacing: 6) {
-                    if viewModel.isGenerating && viewModel.activeCategory == nil {
+                    if viewModel.isGenerating {
                         ProgressView()
                             .tint(Color.accent)
                             .controlSize(.mini)
+                        Text(loadingStepLabels[min(loadingStepIndex, loadingStepLabels.count - 1)])
+                            .font(.system(.subheadline, design: .rounded, weight: .medium))
+                            .lineLimit(1)
+                            .id(loadingStepIndex)
+                            .transition(.asymmetric(
+                                insertion: .move(edge: .bottom).combined(with: .opacity),
+                                removal:   .move(edge: .top).combined(with: .opacity)
+                            ))
                     } else {
                         Image(systemName: "arrow.clockwise")
                             .font(.system(size: 12, weight: .semibold))
+                        Text("Refresh")
+                            .font(.system(.subheadline, design: .rounded, weight: .medium))
                     }
-                    Text("Refresh")
-                        .font(.system(.subheadline, design: .rounded, weight: .medium))
                 }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 8)
                 .background(Color.accent.opacity(0.15))
                 .foregroundStyle(Color.accent)
                 .clipShape(Capsule())
+                .animation(.easeInOut(duration: 0.2), value: viewModel.isGenerating)
             }
             .disabled(viewModel.isGenerating)
         }
@@ -332,6 +427,9 @@ struct RecommendationCardView: View {
             guard item.isExpandable else { return }
             withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                 isExpanded.toggle()
+            }
+            if !isExpanded {
+                AnalyticsManager.logRecommendationExpanded(title: item.title)
             }
         }
     }

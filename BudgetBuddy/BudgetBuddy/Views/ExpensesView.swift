@@ -76,6 +76,7 @@ struct ExpensesView: View {
                                             .onTapGesture {
                                                 viewModel.selectedTransaction = transaction
                                                 viewModel.showClassificationSheet = true
+                                                AnalyticsManager.logTransactionTapped()
                                             }
                                     }
                                 }
@@ -134,6 +135,7 @@ struct ExpensesView: View {
                 if viewModel.transactions.isEmpty {
                     await viewModel.refresh()
                 }
+                AnalyticsManager.logExpensesViewed()
             }
             .sheet(isPresented: $viewModel.showClassificationSheet) {
                 if let transaction = viewModel.selectedTransaction {
@@ -192,6 +194,7 @@ struct ExpensesView: View {
             Button {
                 voiceViewModel.reset()
                 showVoiceRecording = true
+                AnalyticsManager.logExpenseAdded(method: .voice)
             } label: {
                 Label("Voice", systemImage: "mic.fill")
             }
@@ -199,6 +202,7 @@ struct ExpensesView: View {
             Button {
                 voiceViewModel.startManualEntry()
                 showVoiceRecording = true
+                AnalyticsManager.logExpenseAdded(method: .manual)
             } label: {
                 Label("Manual Entry", systemImage: "square.and.pencil")
             }
@@ -206,6 +210,7 @@ struct ExpensesView: View {
             Button {
                 receiptViewModel.reset()
                 showReceiptScan = true
+                AnalyticsManager.logExpenseAdded(method: .receipt)
             } label: {
                 Label("Scan Receipt", systemImage: "receipt")
             }
@@ -492,19 +497,26 @@ struct TransactionClassificationSheet: View {
         .padding(.horizontal)
     }
 
-    @ViewBuilder
     private var sourceBadge: some View {
         let src = transaction.source ?? "plaid"
-        HStack(spacing: 4) {
-            Image(systemName: src == "receipt" ? "receipt" : src == "voice" ? "mic.fill" : "building.columns")
+        let (icon, label, color): (String, String, Color) = {
+            switch src {
+            case "receipt": return ("receipt", "Receipt", Color.accent)
+            case "voice":   return ("mic.fill", "Voice", Color.orange)
+            case "manual":  return ("pencil", "Manual", Color.secondary)
+            default:        return ("building.columns", "Plaid", Color.indigo)
+            }
+        }()
+        return HStack(spacing: 4) {
+            Image(systemName: icon)
                 .font(.system(size: 9))
-            Text(src == "receipt" ? "Receipt" : src == "voice" ? "Voice" : "Plaid")
+            Text(label)
                 .font(.system(size: 10, weight: .semibold, design: .rounded))
         }
         .foregroundStyle(.white)
         .padding(.horizontal, 8)
         .padding(.vertical, 4)
-        .background(src == "receipt" ? Color.accent : src == "voice" ? Color.orange : Color.indigo)
+        .background(color)
         .clipShape(Capsule())
     }
 

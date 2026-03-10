@@ -21,6 +21,9 @@ struct TransactionItemsSection: View {
     @State private var newName = ""
     @State private var newPrice = ""
     @State private var newCategory = "food"
+    @State private var showDiscardConfirm = false
+    @State private var showNameRequired = false
+    @State private var showPriceRequired = false
 
     private let allCategories = ["food", "drink", "groceries", "transportation", "entertainment", "other"]
 
@@ -35,28 +38,47 @@ struct TransactionItemsSection: View {
                     .font(.roundedCaption)
                     .foregroundStyle(Color.textSecondary)
                 Spacer()
-                if isEditMode {
+                if isEditMode && !showAddForm {
                     Button {
                         withAnimation(.spring(duration: 0.25)) {
-                            showAddForm.toggle()
-                            if showAddForm {
-                                newName = ""; newPrice = ""; newCategory = "food"
-                                editingItemId = nil
-                            }
+                            newName = ""; newPrice = ""; newCategory = "food"
+                            editingItemId = nil
+                            showAddForm = true
                         }
                     } label: {
-                        Label(showAddForm ? "Cancel" : "Add Item",
-                              systemImage: showAddForm ? "xmark" : "plus")
+                        Label("Add Item", systemImage: "plus")
                             .font(.roundedCaption)
                             .foregroundStyle(Color.accent)
                     }
                 }
                 Button {
-                    withAnimation(.spring(duration: 0.25)) {
-                        isEditMode.toggle()
-                        if !isEditMode {
-                            editingItemId = nil
-                            showAddForm = false
+                    if isEditMode && showAddForm {
+                        let trimmedName = newName.trimmingCharacters(in: .whitespaces)
+                        let parsedPrice = Double(newPrice.trimmingCharacters(in: .whitespaces))
+                        let hasName = !trimmedName.isEmpty
+                        let hasPrice = parsedPrice != nil && parsedPrice! > 0
+                        if hasName && hasPrice {
+                            // Auto-save: both fields valid
+                            let newItem = EditableReceiptItem(name: trimmedName, price: parsedPrice!, category: newCategory)
+                            withAnimation(.spring(duration: 0.25)) {
+                                items.append(newItem)
+                                newName = ""; newPrice = ""; showAddForm = false
+                                isEditMode = false; editingItemId = nil
+                            }
+                            onAdd?(newItem)
+                        } else if hasName || hasPrice {
+                            // Partially filled — confirm discard
+                            showDiscardConfirm = true
+                        } else {
+                            // Empty form — just close
+                            withAnimation(.spring(duration: 0.25)) {
+                                showAddForm = false; isEditMode = false; editingItemId = nil
+                            }
+                        }
+                    } else {
+                        withAnimation(.spring(duration: 0.25)) {
+                            isEditMode.toggle()
+                            if !isEditMode { editingItemId = nil; showAddForm = false }
                         }
                     }
                 } label: {
@@ -71,6 +93,17 @@ struct TransactionItemsSection: View {
                         .clipShape(Capsule())
                 }
                 .padding(.leading, 4)
+                .confirmationDialog("Discard unsaved item?", isPresented: $showDiscardConfirm, titleVisibility: .visible) {
+                    Button("Discard", role: .destructive) {
+                        withAnimation(.spring(duration: 0.25)) {
+                            newName = ""; newPrice = ""; showAddForm = false
+                            isEditMode = false; editingItemId = nil
+                        }
+                    }
+                    Button("Keep Editing", role: .cancel) {}
+                } message: {
+                    Text("You entered a price but no item name.")
+                }
             }
             .padding(.horizontal)
 
@@ -111,7 +144,7 @@ struct TransactionItemsSection: View {
         VStack(spacing: 0) {
             HStack(spacing: 10) {
                 // Name
-                if editable {
+                if editable || isEditMode {
                     TextField("Item name", text: nameBinding(item))
                         .font(.roundedBody)
                         .foregroundStyle(Color.textPrimary)
@@ -124,7 +157,7 @@ struct TransactionItemsSection: View {
                 }
 
                 // Price
-                if editable {
+                if editable || isEditMode {
                     if isDiscount {
                         HStack(spacing: 2) {
                             Text("−")
@@ -233,12 +266,14 @@ struct TransactionItemsSection: View {
                     .font(.roundedBody)
                     .foregroundStyle(Color.textPrimary)
                     .frame(maxWidth: .infinity)
+                    .onChange(of: newName) { _, _ in showNameRequired = false }
                 TextField("0.00", text: $newPrice)
                     .font(.roundedBody.monospacedDigit())
                     .foregroundStyle(Color.textPrimary)
                     .multilineTextAlignment(.trailing)
                     .keyboardType(.decimalPad)
                     .frame(width: 60)
+                    .onChange(of: newPrice) { _, _ in showPriceRequired = false }
             }
 
             ScrollView(.horizontal, showsIndicators: false) {
@@ -259,26 +294,64 @@ struct TransactionItemsSection: View {
                 }
             }
 
-            Button {
-                let price = Double(newPrice) ?? 0
-                guard !newName.trimmingCharacters(in: .whitespaces).isEmpty else { return }
-                let newItem = EditableReceiptItem(name: newName, price: price, category: newCategory)
-                withAnimation {
-                    items.append(newItem)
-                    newName = ""; newPrice = ""; showAddForm = false
+            HStack(spacing: 10) {
+                Button {
+                    let trimmedName = newName.trimmingCharacters(in: .whitespaces)
+                    let trimmedPrice = newPrice.trimmingCharacters(in: .whitespaces)
+                    let parsedPrice = Double(trimmedPrice)
+                    let nameValid = !trimmedName.isEmpty
+                    let priceValid = parsedPrice != nil && parsedPrice! > 0
+                    showNameRequired = !nameValid
+                    showPriceRequired = !priceValid
+                    guard nameValid && priceValid else { return }
+                    let newItem = EditableReceiptItem(name: trimmedName, price: parsedPrice!, category: newCategory)
+                    withAnimation {
+                        items.append(newItem)
+                        newName = ""; newPrice = ""; showAddForm = false
+                        showNameRequired = false; showPriceRequired = false
+                    }
+                    onAdd?(newItem)
+                } label: {
+                    Text("Add Item")
+                        .font(.roundedBody).fontWeight(.semibold)
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(Color.accent)
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
                 }
-                onAdd?(newItem)
-            } label: {
-                Text("Add Item")
-                    .font(.roundedBody).fontWeight(.semibold)
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 10)
-                    .background(newName.trimmingCharacters(in: .whitespaces).isEmpty
-                                ? Color.accent.opacity(0.4) : Color.accent)
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
+
+                Button {
+                    withAnimation(.spring(duration: 0.25)) {
+                        newName = ""; newPrice = ""; newCategory = "food"
+                        showNameRequired = false; showPriceRequired = false; showAddForm = false
+                    }
+                } label: {
+                    Text("Discard")
+                        .font(.roundedBody).fontWeight(.semibold)
+                        .foregroundStyle(Color.danger)
+                        .padding(.vertical, 10)
+                        .padding(.horizontal, 16)
+                        .background(Color.danger.opacity(0.12))
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                }
             }
-            .disabled(newName.trimmingCharacters(in: .whitespaces).isEmpty)
+
+            if showNameRequired || showPriceRequired {
+                VStack(alignment: .leading, spacing: 3) {
+                    if showNameRequired {
+                        Text("Item name is required")
+                            .font(.roundedCaption)
+                            .foregroundStyle(Color.danger)
+                    }
+                    if showPriceRequired {
+                        Text("Price is required")
+                            .font(.roundedCaption)
+                            .foregroundStyle(Color.danger)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
         }
         .padding(14)
         .background(Color.surface)
