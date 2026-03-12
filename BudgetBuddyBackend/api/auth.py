@@ -70,4 +70,10 @@ def delete_user():
     user = get_user(user_id)
     if user:
         delete_user_cascade(user_id)
+
+    try:
+        firebase_auth.delete_user(user_id)
+    except firebase_auth.UserNotFoundError:
+        pass  # Already deleted or never existed — still return success
+
     return "", 204

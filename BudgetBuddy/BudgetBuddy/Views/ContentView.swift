@@ -13,9 +13,6 @@ struct ContentView: View {
     @State private var selectedTab = 0
     @State private var expensesViewModel = ExpensesViewModel()
     @State private var insightsViewModel = InsightsViewModel()
-    @State private var showPlaidLink = false
-    @State private var hasCompletedPlaidFlow = false
-
     var body: some View {
         Group {
             if !authManager.isAuthenticated {
@@ -24,23 +21,11 @@ struct ContentView: View {
             } else if authManager.needsOnboarding {
                 // Show onboarding wizard
                 OnboardingWizardView()
-            } else if showPlaidLink && !hasCompletedPlaidFlow {
-                // Show Plaid Link after onboarding
-                PlaidLinkView(
-                    showPlaidLink: $showPlaidLink,
-                    userId: authManager.authToken ?? "",
-                    onComplete: {
-                        hasCompletedPlaidFlow = true
-                        showPlaidLink = false
-                    },
-                    onSkip: {
-                        hasCompletedPlaidFlow = true
-                        showPlaidLink = false
-                    }
-                )
             } else {
-                // Show main app
+                // Show main app — use authToken as identity so SwiftUI recreates the
+                // tab view (and all child ViewModels) whenever the signed-in user changes.
                 mainTabView
+                    .id(authManager.authToken ?? "")
             }
         }
         .task {
@@ -48,10 +33,6 @@ struct ContentView: View {
             // authenticateWithBiometrics() calls restoreSession() after a successful unlock.
             guard authManager.authState != .biometricPrompt else { return }
             await authManager.restoreSession()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .onboardingCompleted)) { _ in
-            // Show Plaid Link after onboarding completes
-            showPlaidLink = true
         }
     }
 

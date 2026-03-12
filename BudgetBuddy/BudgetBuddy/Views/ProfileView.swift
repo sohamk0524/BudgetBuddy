@@ -10,7 +10,6 @@ import SwiftUI
 @MainActor
 struct ProfileView: View {
     @State private var viewModel = ProfileViewModel()
-    @State private var showPlaidLink = false
     @State private var showDeleteConfirmation = false
 
     var body: some View {
@@ -105,19 +104,6 @@ struct ProfileView: View {
         }
         .task {
             await viewModel.loadProfile()
-        }
-        .sheet(isPresented: $showPlaidLink) {
-            PlaidLinkView(
-                showPlaidLink: $showPlaidLink,
-                userId: AuthManager.shared.authToken ?? "",
-                onComplete: {
-                    showPlaidLink = false
-                    Task { await viewModel.loadProfile() }
-                },
-                onSkip: {
-                    showPlaidLink = false
-                }
-            )
         }
     }
 
@@ -302,71 +288,26 @@ struct ProfileView: View {
 
     private var linkedAccountsSection: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Label("Linked Accounts", systemImage: "building.columns")
-                .font(.roundedHeadline)
-                .foregroundStyle(Color.textPrimary)
+            HStack {
+                Label("Linked Accounts", systemImage: "building.columns")
+                    .font(.roundedHeadline)
+                    .foregroundStyle(Color.textPrimary)
 
-            if viewModel.plaidItems.isEmpty {
-                VStack(spacing: 8) {
-                    Text("No bank accounts linked")
-                        .font(.roundedBody)
-                        .foregroundStyle(Color.textSecondary)
-                        .multilineTextAlignment(.center)
+                Spacer()
 
-                    Text("Connect your bank to see real-time transactions and spending insights")
-                        .font(.roundedCaption)
-                        .foregroundStyle(Color.textSecondary)
-                        .multilineTextAlignment(.center)
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 8)
-            } else {
-                ForEach(viewModel.plaidItems) { item in
-                    HStack {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(item.institutionName ?? "Unknown Bank")
-                                .font(.roundedHeadline)
-                                .foregroundStyle(Color.textPrimary)
-
-                            Text("\(item.accounts.count) account\(item.accounts.count == 1 ? "" : "s")")
-                                .font(.roundedCaption)
-                                .foregroundStyle(Color.textSecondary)
-                        }
-
-                        Spacer()
-
-                        HStack(spacing: 8) {
-                            Text(item.status.capitalized)
-                                .font(.roundedCaption)
-                                .foregroundStyle(item.status == "active" ? Color.accent : Color.danger)
-
-                            Button {
-                                Task { await viewModel.unlinkPlaidItem(itemId: item.itemId) }
-                            } label: {
-                                Text("Unlink")
-                                    .font(.roundedCaption)
-                                    .foregroundStyle(Color.danger)
-                            }
-                        }
-                    }
+                Text("Coming Soon")
+                    .font(.roundedCaption)
+                    .foregroundStyle(Color.accent)
+                    .padding(.horizontal, 10)
                     .padding(.vertical, 4)
-                }
+                    .background(Color.accent.opacity(0.15))
+                    .clipShape(Capsule())
             }
 
-            Button {
-                showPlaidLink = true
-            } label: {
-                HStack {
-                    Image(systemName: "plus.circle.fill")
-                    Text("Link New Account")
-                }
-                .font(.roundedHeadline)
-                .foregroundStyle(Color.accent)
-                .frame(maxWidth: .infinity)
-                .padding()
-                .background(Color.accent.opacity(0.1))
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-            }
+            Text("Bank account linking will be available in a future update. Stay tuned!")
+                .font(.roundedBody)
+                .foregroundStyle(Color.textSecondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding()
         .background(Color.surface)
