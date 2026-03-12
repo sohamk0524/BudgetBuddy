@@ -19,10 +19,10 @@ from db_models import (
     get_plaid_items,
     get_accounts_for_item,
     get_transactions_for_accounts,
-    get_latest_plan,
     get_category_prefs,
     set_category_prefs,
     create_manual_transaction,
+    get_manual_transactions,
 )
 
 user_bp = Blueprint('user', __name__)
@@ -115,23 +115,10 @@ def get_financial_summary():
         )
         net_worth = round(asset_total - liability_total, 2)
 
-        safe_to_spend = None
-        latest_plan = get_latest_plan(user_id)
-        if latest_plan:
-            try:
-                plan_data = json.loads(latest_plan['plan_json'])
-                safe_to_spend = plan_data.get("safeToSpend")
-            except (json.JSONDecodeError, TypeError):
-                pass
-
-        if safe_to_spend is None:
-            safe_to_spend = sum(
-                (a.get('balance_available') or a.get('balance_current') or 0)
-                for a in plaid_accounts
-                if a.get('account_type') == "depository"
-            )
-
-        safe_to_spend = round(max(0, safe_to_spend), 2)
+        # Compute safe-to-spend from weekly limit minus this week's spending
+        from services.recommendations_generator import _compute_safe_to_spend
+        sts = _compute_safe_to_spend(user_id)
+        safe_to_spend = round(max(0, sts["safe_to_spend"]), 2)
 
         return jsonify({
             "hasData": True,
