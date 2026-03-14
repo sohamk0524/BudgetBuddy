@@ -19,7 +19,7 @@ struct ExpenseFilter: Hashable {
     static let unclassified = ExpenseFilter(name: "unclassified", displayName: "Unclassified")
 
     /// Generates the full filter list from CategoryManager.
-    static var allFilters: [ExpenseFilter] {
+    @MainActor static var allFilters: [ExpenseFilter] {
         var filters = [ExpenseFilter.all]
         filters += CategoryManager.shared.categories.map {
             ExpenseFilter(name: $0.name, displayName: $0.displayName)

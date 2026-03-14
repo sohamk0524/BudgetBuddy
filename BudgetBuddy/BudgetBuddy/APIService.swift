@@ -411,7 +411,7 @@ actor APIService {
         var components = URLComponents(url: url, resolvingAgainstBaseURL: false)!
         components.queryItems = [URLQueryItem(name: "migrate_to", value: migrateTo)]
 
-        var request = try await authenticatedRequest(url: components.url!, method: "DELETE")
+        let request = try await authenticatedRequest(url: components.url!, method: "DELETE")
         let (_, response) = try await URLSession.shared.data(for: request)
 
         guard let httpResponse = response as? HTTPURLResponse,
