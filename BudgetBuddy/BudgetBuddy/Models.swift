@@ -443,15 +443,10 @@ struct ExpenseTransaction: Codable, Identifiable {
 }
 
 struct ExpensesSummary {
-    let totalFood: Double
-    let totalDrink: Double
-    let totalGroceries: Double
-    let totalTransportation: Double
-    let totalEntertainment: Double
-    let totalOther: Double
+    let categoryTotals: [String: Double]
     let totalUnclassified: Double
 
-    var total: Double { totalFood + totalDrink + totalGroceries + totalTransportation + totalEntertainment + totalOther + totalUnclassified }
+    var total: Double { categoryTotals.values.reduce(0, +) + totalUnclassified }
 }
 
 struct ExpensesResponse: Codable {
@@ -483,6 +478,9 @@ struct ClassifiedTransactionInfo: Codable {
     let subCategory: String
     let essentialAmount: Double?
     let discretionaryAmount: Double?
+    let amount: Double?
+    let merchantName: String?
+    let date: String?
 }
 
 struct ChallengeInfo: Codable {
@@ -579,6 +577,7 @@ struct ReceiptAttachResponse: Codable {
     let transactionId: Int
     let source: String   // "plaid" | "manual"
     let enriched: Bool
+    let transaction: ExpenseTransaction?
 }
 
 struct AddReceiptItemsResponse: Codable {
@@ -634,9 +633,11 @@ struct CategoryPreferencesResponse: Codable {
 }
 
 struct CategoryPreference: Codable, Identifiable {
-    let id: Int
+    let id: Int?
     let categoryName: String
-    let displayOrder: Int
+    let displayOrder: Int?
+    let emoji: String?
+    let isBuiltin: Bool?
 }
 
 // MARK: - Smart Nudge Models
@@ -764,4 +765,5 @@ struct SaveTransactionRequest: Codable {
 struct SaveTransactionResponse: Codable {
     let success: Bool
     let transactionId: String?
+    let transaction: ExpenseTransaction?
 }

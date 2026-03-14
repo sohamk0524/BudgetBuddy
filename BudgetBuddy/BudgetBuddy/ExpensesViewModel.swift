@@ -11,15 +11,22 @@ extension Notification.Name {
     static let expensesDidChange = Notification.Name("expensesDidChange")
 }
 
-enum ExpenseFilter: String, CaseIterable {
-    case all = "All"
-    case food = "Food"
-    case drink = "Drink"
-    case groceries = "Groceries"
-    case transportation = "Transportation"
-    case entertainment = "Entertainment"
-    case other = "Other"
-    case unclassified = "Unclassified"
+struct ExpenseFilter: Hashable {
+    let name: String       // lowercase key or special: "all", "food", "unclassified"
+    let displayName: String
+
+    static let all = ExpenseFilter(name: "all", displayName: "All")
+    static let unclassified = ExpenseFilter(name: "unclassified", displayName: "Unclassified")
+
+    /// Generates the full filter list from CategoryManager.
+    static var allFilters: [ExpenseFilter] {
+        var filters = [ExpenseFilter.all]
+        filters += CategoryManager.shared.categories.map {
+            ExpenseFilter(name: $0.name, displayName: $0.displayName)
+        }
+        filters.append(.unclassified)
+        return filters
+    }
 }
 
 @Observable
@@ -43,33 +50,26 @@ class ExpensesViewModel {
 
     /// Filtered view used by the UI. Computed locally — no API call on filter change.
     var transactions: [ExpenseTransaction] {
-        switch selectedFilter {
-        case .all:             return allTransactions
-        case .food:            return allTransactions.filter { $0.subCategory.lowercased() == "food" }
-        case .drink:           return allTransactions.filter { $0.subCategory.lowercased() == "drink" }
-        case .groceries:       return allTransactions.filter { $0.subCategory.lowercased() == "groceries" }
-        case .transportation:  return allTransactions.filter { $0.subCategory.lowercased() == "transportation" }
-        case .entertainment:   return allTransactions.filter { $0.subCategory.lowercased() == "entertainment" }
-        case .other:           return allTransactions.filter { $0.subCategory.lowercased() == "other" }
-        case .unclassified:    return allTransactions.filter { isUnclassified($0) }
+        if selectedFilter == .all {
+            return allTransactions
+        } else if selectedFilter == .unclassified {
+            return allTransactions.filter { isUnclassified($0) }
+        } else {
+            return allTransactions.filter { $0.subCategory.lowercased() == selectedFilter.name }
         }
     }
 
-    /// Summary computed locally from the full list.
+    /// Summary computed locally from the full list — supports custom categories.
     var summary: ExpensesSummary {
-        let knownCategories = ["food", "drink", "groceries", "transportation", "entertainment", "other"]
         var totals = [String: Double]()
-        for cat in knownCategories {
-            totals[cat] = allTransactions.filter { $0.subCategory.lowercased() == cat }.reduce(0) { $0 + $1.amount }
+        for cat in CategoryManager.shared.categories {
+            totals[cat.name] = allTransactions
+                .filter { $0.subCategory.lowercased() == cat.name }
+                .reduce(0) { $0 + $1.amount }
         }
         let unclassified = allTransactions.filter { isUnclassified($0) }.reduce(0.0) { $0 + $1.amount }
         return ExpensesSummary(
-            totalFood: totals["food"] ?? 0,
-            totalDrink: totals["drink"] ?? 0,
-            totalGroceries: totals["groceries"] ?? 0,
-            totalTransportation: totals["transportation"] ?? 0,
-            totalEntertainment: totals["entertainment"] ?? 0,
-            totalOther: totals["other"] ?? 0,
+            categoryTotals: totals,
             totalUnclassified: unclassified
         )
     }
@@ -92,6 +92,18 @@ class ExpensesViewModel {
 
     init() {
         loadFromCache()
+    }
+
+    // MARK: - Clear (called on sign-out / account switch)
+
+    func clearData() {
+        allTransactions = []
+        weeksBack = 2
+        selectedFilter = .all
+        selectedTransaction = nil
+        showClassificationSheet = false
+        isLoading = false
+        errorMessage = nil
     }
 
     // MARK: - Cache
@@ -273,10 +285,19 @@ class ExpensesViewModel {
     }
 
     /// Classifies a transaction and returns the response. Does NOT dismiss the sheet — caller handles dismissal.
-    func classifyTransactionForSheet(transactionId: Int, subCategory: String) async throws -> ClassifyTransactionResponse {
+    func classifyTransactionForSheet(
+        transactionId: Int,
+        subCategory: String,
+        amount: Double? = nil,
+        merchantName: String? = nil,
+        date: String? = nil
+    ) async throws -> ClassifyTransactionResponse {
         let response = try await apiService.classifyTransaction(
             transactionId: transactionId,
-            subCategory: subCategory
+            subCategory: subCategory,
+            amount: amount,
+            merchantName: merchantName,
+            date: date
         )
 
         // Update local record immediately — no refetch needed for single classification
@@ -284,7 +305,10 @@ class ExpensesViewModel {
             transactionId: transactionId,
             subCategory: response.transaction.subCategory,
             essentialAmount: response.transaction.essentialAmount,
-            discretionaryAmount: response.transaction.discretionaryAmount
+            discretionaryAmount: response.transaction.discretionaryAmount,
+            amount: response.transaction.amount,
+            merchantName: response.transaction.merchantName,
+            date: response.transaction.date
         )
 
         NotificationCenter.default.post(name: .expensesDidChange, object: nil)
@@ -316,7 +340,10 @@ class ExpensesViewModel {
     }
 
     func refresh() async {
-        await fetchExpenses()
+        // Wrap in a child Task so SwiftUI .refreshable cancellation
+        // doesn't abort the in-flight network request.
+        let task = Task { await fetchExpenses() }
+        await task.value
     }
 
     // MARK: - Private Helpers
@@ -344,17 +371,27 @@ class ExpensesViewModel {
         }
     }
 
+    /// Optimistically insert a newly created transaction into the local list and cache.
+    func insertTransactionLocally(_ transaction: ExpenseTransaction) {
+        // Avoid duplicates (in case a background refresh already picked it up)
+        guard !allTransactions.contains(where: { $0.id == transaction.id }) else { return }
+        allTransactions.insert(transaction, at: 0)
+        saveToCache()
+    }
+
     /// Returns true if a transaction has not been categorized yet.
     private func isUnclassified(_ txn: ExpenseTransaction) -> Bool {
-        let known = ["food", "drink", "groceries", "transportation", "entertainment", "other"]
-        return !known.contains(txn.subCategory.lowercased())
+        !CategoryManager.shared.isValidCategory(txn.subCategory)
     }
 
     private func applyClassificationLocally(
         transactionId: Int,
         subCategory: String,
         essentialAmount: Double?,
-        discretionaryAmount: Double?
+        discretionaryAmount: Double?,
+        amount: Double? = nil,
+        merchantName: String? = nil,
+        date: String? = nil
     ) {
         guard let idx = allTransactions.firstIndex(where: { $0.id == transactionId }) else { return }
         let old = allTransactions[idx]
@@ -362,11 +399,11 @@ class ExpensesViewModel {
             id: old.id,
             transactionId: old.transactionId,
             accountId: old.accountId,
-            amount: old.amount,
-            date: old.date,
+            amount: amount ?? old.amount,
+            date: date ?? old.date,
             authorizedDate: old.authorizedDate,
             name: old.name,
-            merchantName: old.merchantName,
+            merchantName: merchantName ?? old.merchantName,
             categoryPrimary: old.categoryPrimary,
             categoryDetailed: old.categoryDetailed,
             pending: old.pending,

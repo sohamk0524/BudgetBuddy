@@ -372,7 +372,7 @@ actor APIService {
     }
 
     /// Gets category preferences
-    func getCategoryPreferences(userId: String) async throws -> CategoryPreferencesResponse {
+    func getCategoryPreferences(userId: String) async throws -> [CategoryPreference] {
         let url = baseURL.appendingPathComponent("user/category-preferences/\(userId)")
 
         let request = try await authenticatedRequest(url: url)
@@ -383,11 +383,12 @@ actor APIService {
             throw APIError.invalidResponse
         }
 
-        return try JSONDecoder().decode(CategoryPreferencesResponse.self, from: data)
+        let decoded = try JSONDecoder().decode(CategoryPreferencesResponse.self, from: data)
+        return decoded.categories
     }
 
-    /// Updates category preferences
-    func updateCategoryPreferences(userId: String, categories: [String]) async throws {
+    /// Updates category preferences (accepts rich category dicts)
+    func updateCategoryPreferences(userId: String, categories: [[String: Any]]) async throws {
         let url = baseURL.appendingPathComponent("user/category-preferences/\(userId)")
 
         var request = try await authenticatedRequest(url: url, method: "PUT")
@@ -404,8 +405,23 @@ actor APIService {
         }
     }
 
+    /// Deletes a custom category and migrates its transactions
+    func deleteCustomCategory(userId: String, categoryName: String, migrateTo: String) async throws {
+        let url = baseURL.appendingPathComponent("user/category-preferences/\(userId)/\(categoryName)")
+        var components = URLComponents(url: url, resolvingAgainstBaseURL: false)!
+        components.queryItems = [URLQueryItem(name: "migrate_to", value: migrateTo)]
+
+        var request = try await authenticatedRequest(url: components.url!, method: "DELETE")
+        let (_, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse,
+              httpResponse.statusCode == 200 else {
+            throw APIError.invalidResponse
+        }
+    }
+
     /// Parses a spoken transaction statement into grouped transactions via LLM
-    func parseTransaction(statement: String) async throws -> ParsedTransactionGroupResponse {
+    func parseTransaction(statement: String, userId: String? = nil) async throws -> ParsedTransactionGroupResponse {
         let url = baseURL.appendingPathComponent("user/parse-transaction")
         var urlRequest = URLRequest(url: url)
         urlRequest.httpMethod = "POST"
@@ -415,7 +431,8 @@ actor APIService {
             urlRequest.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         }
 
-        let body: [String: Any] = ["statement": statement]
+        var body: [String: Any] = ["statement": statement]
+        if let userId { body["userId"] = userId }
         urlRequest.httpBody = try JSONSerialization.data(withJSONObject: body)
 
         let (data, response) = try await URLSession.shared.data(for: urlRequest)
@@ -498,8 +515,15 @@ actor APIService {
         return try JSONDecoder().decode(ClassifyMerchantResponse.self, from: data)
     }
 
-    /// Classifies a single transaction
-    func classifyTransaction(transactionId: Int, subCategory: String, essentialRatio: Double? = nil) async throws -> ClassifyTransactionResponse {
+    /// Classifies a single transaction, with optional field overrides for amount, merchant, and date
+    func classifyTransaction(
+        transactionId: Int,
+        subCategory: String,
+        essentialRatio: Double? = nil,
+        amount: Double? = nil,
+        merchantName: String? = nil,
+        date: String? = nil
+    ) async throws -> ClassifyTransactionResponse {
         let url = baseURL.appendingPathComponent("transaction/\(transactionId)/classify")
 
         var request = try await authenticatedRequest(url: url, method: "PUT")
@@ -507,6 +531,9 @@ actor APIService {
 
         var body: [String: Any] = ["subCategory": subCategory]
         if let essentialRatio { body["essentialRatio"] = essentialRatio }
+        if let amount { body["amount"] = amount }
+        if let merchantName { body["merchantName"] = merchantName }
+        if let date { body["date"] = date }
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
         let (data, response) = try await URLSession.shared.data(for: request)

@@ -14,6 +14,20 @@ CONFIDENCE_THRESHOLD = 3
 
 VALID_CATEGORIES = ('food', 'drink', 'groceries', 'transportation', 'entertainment', 'other')
 
+
+def get_valid_categories_for_user(user_id) -> tuple:
+    """Return VALID_CATEGORIES + any custom categories the user has defined."""
+    if not user_id:
+        return VALID_CATEGORIES
+    try:
+        from db_models import get_user_custom_categories
+        custom = get_user_custom_categories(user_id)
+        if custom:
+            return VALID_CATEGORIES + tuple(c.lower() for c in custom)
+    except Exception:
+        pass
+    return VALID_CATEGORIES
+
 # Pre-seeded defaults by Plaid detailed category (personal_finance_category.detailed)
 # Maps Plaid categories to our 5 categories.
 # See: https://plaid.com/documents/transactions-personal-finance-category-taxonomy.csv
@@ -255,6 +269,18 @@ def _get_user_classification_context(user_id: int) -> str:
     return "\n".join(lines)
 
 
+def _build_custom_category_context(user_id: int) -> str:
+    """Build additional LLM context about user's custom categories."""
+    try:
+        from db_models import get_user_custom_categories
+        custom = get_user_custom_categories(user_id)
+        if custom:
+            return "\nThis user also has custom categories: " + ", ".join(custom) + ". Use these if they are a better fit than the standard categories."
+    except Exception:
+        pass
+    return ""
+
+
 def llm_classify_merchant(
     merchant_name: str,
     category_primary: Optional[str],
@@ -269,6 +295,8 @@ def llm_classify_merchant(
         from services.llm_service import Agent
 
         user_context = _get_user_classification_context(user_id)
+        user_context += _build_custom_category_context(user_id)
+        valid_cats = get_valid_categories_for_user(user_id)
         system_prompt = LLM_CLASSIFICATION_PROMPT.format(user_context=user_context)
 
         agent = Agent(
@@ -296,7 +324,7 @@ def llm_classify_merchant(
         classification = data.get("classification", "").lower()
         essential_ratio = float(data.get("essential_ratio", 0.5))
 
-        if classification not in VALID_CATEGORIES:
+        if classification not in valid_cats:
             return None
 
         essential_ratio = max(0.0, min(1.0, essential_ratio))
@@ -344,8 +372,11 @@ def llm_classify_merchants_batch(
         from services.llm_service import Agent
 
         user_context = _get_user_classification_context(user_id)
+        custom_context = _build_custom_category_context(user_id)
+        valid_cats = get_valid_categories_for_user(user_id)
+        cats_str = "|".join(valid_cats)
 
-        system_prompt = f"""You are a financial transaction classifier. Classify each merchant into one of these categories: food, drink, groceries, transportation, entertainment, or other.
+        system_prompt = f"""You are a financial transaction classifier. Classify each merchant into one of these categories: {", ".join(valid_cats)}.
 
 Definitions:
 - **groceries**: Supermarkets, grocery stores, wholesale clubs (Walmart, Costco, Trader Joe's, Whole Foods, Safeway, Kroger, etc.)
@@ -355,10 +386,10 @@ Definitions:
 - **entertainment**: Movies, music, games, concerts, events, streaming services
 - **other**: Everything else (rent, utilities, medical, insurance, shopping, personal care, travel, etc.)
 
-{user_context}
+{user_context}{custom_context}
 
 Respond with ONLY a JSON array:
-[{{"name": "merchant", "classification": "food|drink|groceries|transportation|entertainment|other", "essential_ratio": 0.0}}]"""
+[{{"name": "merchant", "classification": "{cats_str}", "essential_ratio": 0.0}}]"""
 
         agent = Agent(
             name="BatchMerchantClassifier",
@@ -392,7 +423,7 @@ Respond with ONLY a JSON array:
         validated = []
         for item in results:
             classification = item.get("classification", "").lower()
-            if classification in VALID_CATEGORIES:
+            if classification in valid_cats:
                 validated.append({
                     "name": item.get("name", ""),
                     "classification": classification,

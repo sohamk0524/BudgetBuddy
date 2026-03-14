@@ -25,7 +25,9 @@ struct TransactionItemsSection: View {
     @State private var showNameRequired = false
     @State private var showPriceRequired = false
 
-    private let allCategories = ["food", "drink", "groceries", "transportation", "entertainment", "other"]
+    private var allCategories: [String] {
+        CategoryManager.shared.categories.map { $0.name }
+    }
 
     private var regularItems: [EditableReceiptItem] { items.filter { $0.price > 0 } }
     private var discountItems: [EditableReceiptItem] { items.filter { $0.price < 0 } }

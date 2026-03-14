@@ -26,11 +26,11 @@ struct ExpensesView: View {
                         // Filter chips (horizontally scrollable)
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 8) {
-                                ForEach(ExpenseFilter.allCases, id: \.self) { filter in
+                                ForEach(ExpenseFilter.allFilters, id: \.self) { filter in
                                     Button {
                                         viewModel.selectedFilter = filter
                                     } label: {
-                                        Text(filter.rawValue)
+                                        Text(filter.displayName)
                                             .font(.roundedCaption)
                                             .foregroundStyle(viewModel.selectedFilter == filter ? Color.appBackground : Color.textPrimary)
                                             .padding(.horizontal, 14)
@@ -150,6 +150,7 @@ struct ExpensesView: View {
             .sheet(isPresented: $showVoiceRecording) {
                 VoiceTransactionFlowView(viewModel: voiceViewModel) {
                     showVoiceRecording = false
+                    // Background sync for eventual consistency
                     Task { await viewModel.refresh() }
                 }
             }
@@ -157,13 +158,14 @@ struct ExpensesView: View {
                 ReceiptScanView(viewModel: receiptViewModel) {
                     showReceiptScan = false
                     receiptViewModel.reset()
-                    Task { await viewModel.refreshWithRetry() }
+                    // Background sync for eventual consistency
+                    Task { await viewModel.refresh() }
                 }
             }
-            .onChange(of: voiceViewModel.state) { _, newState in
-                if newState == .success {
-                    // Refresh with retries to handle Datastore propagation delay
-                    Task { await viewModel.refreshWithRetry() }
+            .onReceive(NotificationCenter.default.publisher(for: .transactionAdded)) { notification in
+                // Optimistic local insert — transaction appears instantly
+                if let txn = notification.userInfo?["transaction"] as? ExpenseTransaction {
+                    viewModel.insertTransactionLocally(txn)
                 }
             }
         }
@@ -224,34 +226,15 @@ struct ExpensesView: View {
 
 /// Maps legacy or unknown category strings to valid display categories.
 func normalizedItemCategory(_ raw: String) -> String {
-    switch raw.lowercased() {
-    case "food", "drink", "groceries", "transportation", "entertainment", "other": return raw.lowercased()
-    default: return "other"
-    }
+    CategoryManager.shared.isValidCategory(raw) ? raw.lowercased() : "other"
 }
 
 func categoryColor(for category: String) -> Color {
-    switch category.lowercased() {
-    case "food":            return .orange
-    case "drink":           return .purple
-    case "groceries":       return .green
-    case "transportation":  return .cyan
-    case "entertainment":   return .pink
-    case "other":           return .indigo
-    default:                return .gray
-    }
+    CategoryManager.shared.color(for: category)
 }
 
 func categoryIcon(for category: String) -> String {
-    switch category.lowercased() {
-    case "food":            return "fork.knife"
-    case "drink":           return "cup.and.saucer.fill"
-    case "groceries":       return "cart.fill"
-    case "transportation":  return "car.fill"
-    case "entertainment":   return "film.fill"
-    case "other":           return "ellipsis.circle.fill"
-    default:                return "questionmark.circle"
-    }
+    CategoryManager.shared.icon(for: category)
 }
 
 // MARK: - Summary Card (category-based)
@@ -260,15 +243,11 @@ struct ExpensesSummaryCard: View {
     let summary: ExpensesSummary
 
     private var segments: [(label: String, amount: Double, color: Color)] {
-        [
-            ("Food", summary.totalFood, .orange),
-            ("Drink", summary.totalDrink, .purple),
-            ("Groceries", summary.totalGroceries, .green),
-            ("Transportation", summary.totalTransportation, .cyan),
-            ("Entertainment", summary.totalEntertainment, .pink),
-            ("Other", summary.totalOther, .indigo),
-            ("Unclassified", summary.totalUnclassified, .gray),
-        ].filter { $0.amount > 0 }
+        var result: [(String, Double, Color)] = CategoryManager.shared.categories.map { cat in
+            (cat.displayName, summary.categoryTotals[cat.name] ?? 0, categoryColor(for: cat.name))
+        }
+        result.append(("Unclassified", summary.totalUnclassified, .gray))
+        return result.filter { $0.1 > 0 }
     }
 
     var body: some View {
@@ -370,9 +349,8 @@ struct ExpenseTransactionRow: View {
     @ViewBuilder
     private var categoryBadge: some View {
         let cat = transaction.subCategory.lowercased()
-        let known = ["food", "drink", "groceries", "transportation", "entertainment", "other"]
-        if known.contains(cat) {
-            textBadge(transaction.subCategory.capitalized, color: categoryColor(for: cat))
+        if CategoryManager.shared.isValidCategory(cat) {
+            textBadge(CategoryManager.shared.displayName(for: cat), color: categoryColor(for: cat))
         } else {
             textBadge("Unclassified", color: .gray)
         }
@@ -404,20 +382,32 @@ struct TransactionClassificationSheet: View {
     @State private var showDeleteTxnConfirm = false
     @State private var localItems: [EditableReceiptItem]   // draft — synced to backend on Save
     @State private var localItemsModified = false
+    @State private var editedMerchant: String
+    @State private var editedAmount: String
+    @State private var editedDate: Date
     @Environment(\.dismiss) private var dismiss
 
-    private let categories = ["Food", "Drink", "Groceries", "Transportation", "Entertainment", "Other"]
+    private var categories: [String] {
+        CategoryManager.shared.categories.map { $0.displayName }
+    }
 
     init(transaction: ExpenseTransaction, viewModel: ExpensesViewModel) {
         self.transaction = transaction
         self.viewModel = viewModel
-        let known = ["food", "drink", "groceries", "transportation", "entertainment", "other"]
         let current = transaction.subCategory.lowercased()
-        _selectedCategory = State(initialValue: known.contains(current) ? transaction.subCategory.capitalized : "")
+        _selectedCategory = State(initialValue: CategoryManager.shared.isValidCategory(current) ? CategoryManager.shared.displayName(for: current) : "")
         _localItems = State(initialValue: (transaction.receiptItems ?? []).map {
             EditableReceiptItem(name: $0.name, price: $0.price,
                                 category: normalizedItemCategory($0.category))
         })
+        _editedMerchant = State(initialValue: transaction.merchantName ?? transaction.name)
+        _editedAmount = State(initialValue: String(format: "%.2f", transaction.amount))
+
+        // Parse ISO date string into Date for DatePicker
+        let dateFmt = DateFormatter()
+        dateFmt.dateFormat = "yyyy-MM-dd"
+        let parsedDate = transaction.date.flatMap { dateFmt.date(from: $0) } ?? Date()
+        _editedDate = State(initialValue: parsedDate)
     }
 
     var body: some View {
@@ -448,50 +438,102 @@ struct TransactionClassificationSheet: View {
         }
     }
 
-    // MARK: - Header card
+    // MARK: - Header card (editable fields)
 
     private var headerCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(transaction.merchantName ?? transaction.name)
-                        .font(.roundedHeadline)
-                        .foregroundStyle(Color.textPrimary)
-                    if let dateStr = transaction.date {
-                        Text(expensesFormatDate(dateStr))
-                            .font(.roundedCaption)
-                            .foregroundStyle(Color.textSecondary)
-                    }
-                }
+        VStack(spacing: 0) {
+            // Merchant name
+            HStack {
+                Text("Merchant")
+                    .font(.roundedCaption)
+                    .foregroundStyle(Color.textSecondary)
+                    .frame(width: 72, alignment: .leading)
                 Spacer()
-                VStack(alignment: .trailing, spacing: 6) {
-                    Text("$\(transaction.amount, specifier: "%.2f")")
-                        .font(.rounded(.title2, weight: .bold))
+                TextField("Merchant name", text: $editedMerchant)
+                    .font(.roundedBody)
+                    .foregroundStyle(Color.textPrimary)
+                    .multilineTextAlignment(.trailing)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 13)
+
+            Divider().padding(.horizontal, 16)
+
+            // Amount
+            HStack {
+                Text("Amount")
+                    .font(.roundedCaption)
+                    .foregroundStyle(Color.textSecondary)
+                    .frame(width: 72, alignment: .leading)
+                Spacer()
+                HStack(alignment: .firstTextBaseline, spacing: 3) {
+                    Text("$")
+                        .font(.rounded(.title3, weight: .bold))
                         .foregroundStyle(Color.accent)
+                    TextField("0.00", text: $editedAmount)
+                        .font(.rounded(.title3, weight: .bold))
+                        .foregroundStyle(Color.accent)
+                        .keyboardType(.decimalPad)
+                        .multilineTextAlignment(.trailing)
                         .monospacedDigit()
-                    sourceBadge
+                        .fixedSize()
                 }
             }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 13)
 
-            // Plaid category
+            Divider().padding(.horizontal, 16)
+
+            // Date
+            HStack {
+                Text("Date")
+                    .font(.roundedCaption)
+                    .foregroundStyle(Color.textSecondary)
+                    .frame(width: 72, alignment: .leading)
+                Spacer()
+                DatePicker("", selection: $editedDate, displayedComponents: [.date])
+                    .datePickerStyle(.compact)
+                    .labelsHidden()
+                    .tint(Color.accent)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 13)
+
+            // Source badge
+            if transaction.source != nil {
+                Divider().padding(.horizontal, 16)
+                HStack {
+                    Spacer()
+                    sourceBadge
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+            }
+
+            // Plaid category hint
             if let cat = transaction.categoryDetailed ?? transaction.categoryPrimary,
                !cat.isEmpty, transaction.source == nil || transaction.source == "plaid" {
+                Divider().padding(.horizontal, 16)
                 Text(cat.replacingOccurrences(of: "_", with: " ").capitalized)
                     .font(.roundedCaption)
                     .foregroundStyle(Color.textSecondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
             }
 
-            // Voice notes (not shown for receipts — merchant name already displayed above)
+            // Voice notes
             if let notes = transaction.notes, !notes.isEmpty,
                transaction.source != "receipt" {
-                Divider()
+                Divider().padding(.horizontal, 16)
                 Text(notes)
                     .font(.roundedBody)
                     .foregroundStyle(Color.textSecondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
             }
         }
-        .padding(16)
         .background(Color.surface)
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .padding(.horizontal)
@@ -534,24 +576,24 @@ struct TransactionClassificationSheet: View {
                 GridItem(.flexible()),
                 GridItem(.flexible())
             ], spacing: 10) {
-                ForEach(categories, id: \.self) { cat in
+                ForEach(CategoryManager.shared.categories) { cat in
                     Button {
-                        selectedCategory = cat
+                        selectedCategory = cat.displayName
                     } label: {
                         VStack(spacing: 6) {
-                            Image(systemName: categoryIcon(for: cat))
+                            Text(cat.emoji)
                                 .font(.system(size: 20))
-                            Text(cat)
+                            Text(cat.displayName)
                                 .font(.roundedCaption)
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 12)
-                        .background(selectedCategory == cat ? categoryColor(for: cat).opacity(0.2) : Color.surface)
-                        .foregroundStyle(selectedCategory == cat ? categoryColor(for: cat) : Color.textSecondary)
+                        .background(selectedCategory == cat.displayName ? categoryColor(for: cat.name).opacity(0.2) : Color.surface)
+                        .foregroundStyle(selectedCategory == cat.displayName ? categoryColor(for: cat.name) : Color.textSecondary)
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                         .overlay(
                             RoundedRectangle(cornerRadius: 12)
-                                .stroke(selectedCategory == cat ? categoryColor(for: cat) : Color.clear, lineWidth: 2)
+                                .stroke(selectedCategory == cat.displayName ? categoryColor(for: cat.name) : Color.clear, lineWidth: 2)
                         )
                     }
                 }
@@ -604,9 +646,22 @@ struct TransactionClassificationSheet: View {
                         try await viewModel.addItemsToTransaction(
                             transactionId: transaction.id, items: payload, replace: true)
                     }
+                    // Compute changed fields — only send overrides if actually different
+                    let newAmount = Double(editedAmount)
+                    let amountChanged = newAmount != nil && newAmount != transaction.amount
+                    let merchantChanged = editedMerchant != (transaction.merchantName ?? transaction.name)
+
+                    let dateFmt = DateFormatter()
+                    dateFmt.dateFormat = "yyyy-MM-dd"
+                    let newDateStr = dateFmt.string(from: editedDate)
+                    let dateChanged = newDateStr != transaction.date
+
                     _ = try await viewModel.classifyTransactionForSheet(
                         transactionId: transaction.id,
-                        subCategory: selectedCategory.lowercased()
+                        subCategory: selectedCategory.lowercased(),
+                        amount: amountChanged ? newAmount : nil,
+                        merchantName: merchantChanged ? editedMerchant : nil,
+                        date: dateChanged ? newDateStr : nil
                     )
                     dismiss()
                 } catch {
