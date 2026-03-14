@@ -27,11 +27,11 @@ struct CategorySettingsView: View {
                         Text(cat.displayName)
                             .font(.roundedBody)
                             .foregroundStyle(Color.textPrimary)
-
-                        Spacer()
-
+                    }
+                    .listRowBackground(Color.surface)
+                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                         if !cat.isBuiltin {
-                            Button {
+                            Button(role: .destructive) {
                                 if let idx = categoryManager.categories.firstIndex(of: cat) {
                                     Task {
                                         await categoryManager.deleteCategory(at: idx)
@@ -39,20 +39,16 @@ struct CategorySettingsView: View {
                                     }
                                 }
                             } label: {
-                                Image(systemName: "trash")
-                                    .font(.system(size: 14))
-                                    .foregroundStyle(Color.danger)
+                                Label("Delete", systemImage: "trash")
                             }
-                            .buttonStyle(.plain)
                         }
                     }
-                    .listRowBackground(Color.surface)
                 }
                 .onMove { source, destination in
                     categoryManager.reorder(from: source, to: destination)
                 }
             } header: {
-                Text("Drag to reorder categories.")
+                Text("Drag to reorder. Swipe left to delete custom categories.")
                     .font(.roundedCaption)
                     .foregroundStyle(Color.textSecondary)
                     .textCase(nil)

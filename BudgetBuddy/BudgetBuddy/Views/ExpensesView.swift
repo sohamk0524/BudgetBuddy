@@ -630,6 +630,7 @@ struct TransactionClassificationSheet: View {
 
     // MARK: - Category picker
 
+    @ViewBuilder
     private var categorySection: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Category")
@@ -637,38 +638,58 @@ struct TransactionClassificationSheet: View {
                 .foregroundStyle(Color.textSecondary)
                 .padding(.horizontal)
 
-            LazyVGrid(columns: [
-                GridItem(.flexible()),
-                GridItem(.flexible()),
-                GridItem(.flexible())
-            ], spacing: 10) {
-                ForEach(CategoryManager.shared.categories) { cat in
-                    Button {
-                        if isEditing {
+            if isEditing {
+                LazyVGrid(columns: [
+                    GridItem(.flexible()),
+                    GridItem(.flexible()),
+                    GridItem(.flexible())
+                ], spacing: 10) {
+                    ForEach(CategoryManager.shared.categories) { cat in
+                        Button {
                             selectedCategory = cat.displayName
+                        } label: {
+                            VStack(spacing: 6) {
+                                Image(systemName: cat.icon)
+                                    .font(.system(size: 20))
+                                Text(cat.displayName)
+                                    .font(.roundedCaption)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                            .background(selectedCategory == cat.displayName ? categoryColor(for: cat.name).opacity(0.2) : Color.surface)
+                            .foregroundStyle(selectedCategory == cat.displayName ? categoryColor(for: cat.name) : Color.textSecondary)
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(selectedCategory == cat.displayName ? categoryColor(for: cat.name) : Color.clear, lineWidth: 2)
+                            )
                         }
-                    } label: {
-                        VStack(spacing: 6) {
-                            Image(systemName: cat.icon)
-                                .font(.system(size: 20))
-                            Text(cat.displayName)
-                                .font(.roundedCaption)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 12)
-                        .background(selectedCategory == cat.displayName ? categoryColor(for: cat.name).opacity(0.2) : Color.surface)
-                        .foregroundStyle(selectedCategory == cat.displayName ? categoryColor(for: cat.name) : Color.textSecondary)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12)
-                                .stroke(selectedCategory == cat.displayName ? categoryColor(for: cat.name) : Color.clear, lineWidth: 2)
-                        )
                     }
-                    .opacity(isEditing ? 1.0 : (selectedCategory == cat.displayName ? 1.0 : 0.5))
                 }
+                .padding(.horizontal)
+            } else if let cat = CategoryManager.shared.categories.first(where: { $0.displayName == selectedCategory }) {
+                // Match the grid cell size: 1/3 width minus padding/spacing
+                let columnWidth = (UIScreen.main.bounds.width - 32 - 20) / 3
+                HStack {
+                    VStack(spacing: 6) {
+                        Image(systemName: cat.icon)
+                            .font(.system(size: 20))
+                        Text(cat.displayName)
+                            .font(.roundedCaption)
+                    }
+                    .foregroundStyle(categoryColor(for: cat.name))
+                    .frame(width: columnWidth)
+                    .padding(.vertical, 12)
+                    .background(categoryColor(for: cat.name).opacity(0.2))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(categoryColor(for: cat.name), lineWidth: 2)
+                    )
+                    Spacer()
+                }
+                .padding(.horizontal)
             }
-            .allowsHitTesting(isEditing)
-            .padding(.horizontal)
         }
     }
 
