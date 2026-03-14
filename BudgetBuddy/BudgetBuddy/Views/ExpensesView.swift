@@ -225,15 +225,15 @@ struct ExpensesView: View {
 // MARK: - Category Helpers
 
 /// Maps legacy or unknown category strings to valid display categories.
-func normalizedItemCategory(_ raw: String) -> String {
+@MainActor func normalizedItemCategory(_ raw: String) -> String {
     CategoryManager.shared.isValidCategory(raw) ? raw.lowercased() : "other"
 }
 
-func categoryColor(for category: String) -> Color {
+@MainActor func categoryColor(for category: String) -> Color {
     CategoryManager.shared.color(for: category)
 }
 
-func categoryIcon(for category: String) -> String {
+@MainActor func categoryIcon(for category: String) -> String {
     CategoryManager.shared.icon(for: category)
 }
 
