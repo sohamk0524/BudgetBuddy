@@ -11,42 +11,27 @@ import SwiftUI
 struct CategorySettingsView: View {
     @State private var categoryManager = CategoryManager.shared
     @State private var showAddSheet = false
-    @State private var isSaving = false
 
     var body: some View {
         List {
             Section {
                 ForEach(categoryManager.categories) { cat in
                     HStack(spacing: 12) {
-                        Text(cat.emoji)
-                            .font(.title2)
-                            .frame(width: 36)
+                        Image(systemName: cat.icon)
+                            .font(.system(size: 16))
+                            .foregroundStyle(categoryColor(for: cat.name))
+                            .frame(width: 36, height: 36)
+                            .background(categoryColor(for: cat.name).opacity(0.15))
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
 
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(cat.displayName)
-                                .font(.roundedBody)
-                                .foregroundStyle(Color.textPrimary)
-                            if cat.isBuiltin {
-                                Text("Built-in")
-                                    .font(.roundedCaption)
-                                    .foregroundStyle(Color.textSecondary)
-                            } else {
-                                Text("Custom")
-                                    .font(.roundedCaption)
-                                    .foregroundStyle(Color.accent)
-                            }
-                        }
+                        Text(cat.displayName)
+                            .font(.roundedBody)
+                            .foregroundStyle(Color.textPrimary)
 
                         Spacer()
 
-                        Image(systemName: "line.3.horizontal")
-                            .foregroundStyle(Color.textSecondary)
-                            .font(.system(size: 14))
-                    }
-                    .listRowBackground(Color.surface)
-                    .swipeActions(edge: .trailing) {
                         if !cat.isBuiltin {
-                            Button(role: .destructive) {
+                            Button {
                                 if let idx = categoryManager.categories.firstIndex(of: cat) {
                                     Task {
                                         await categoryManager.deleteCategory(at: idx)
@@ -54,16 +39,20 @@ struct CategorySettingsView: View {
                                     }
                                 }
                             } label: {
-                                Label("Delete", systemImage: "trash")
+                                Image(systemName: "trash")
+                                    .font(.system(size: 14))
+                                    .foregroundStyle(Color.danger)
                             }
+                            .buttonStyle(.plain)
                         }
                     }
+                    .listRowBackground(Color.surface)
                 }
                 .onMove { source, destination in
                     categoryManager.reorder(from: source, to: destination)
                 }
             } header: {
-                Text("Drag to reorder. Swipe custom categories to delete.")
+                Text("Drag to reorder categories.")
                     .font(.roundedCaption)
                     .foregroundStyle(Color.textSecondary)
                     .textCase(nil)
@@ -98,8 +87,8 @@ struct CategorySettingsView: View {
         .toolbarColorScheme(.dark, for: .navigationBar)
         .environment(\.editMode, .constant(.active))
         .sheet(isPresented: $showAddSheet) {
-            AddCategorySheet { name, emoji in
-                categoryManager.addCategory(name: name, emoji: emoji)
+            AddCategorySheet { name, icon in
+                categoryManager.addCategory(name: name, icon: icon)
                 Task { await categoryManager.saveCategories() }
             }
             .presentationDetents([.medium])
@@ -117,16 +106,17 @@ struct CategorySettingsView: View {
 struct AddCategorySheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var name = ""
-    @State private var selectedEmoji = "🏷️"
+    @State private var selectedIcon = "tag.fill"
     @State private var showError = false
 
     let onSave: (String, String) -> Void
 
-    private let emojiOptions = [
-        "🏷️", "💼", "🏠", "💊", "🎓", "✈️", "👕", "💇",
-        "🐶", "🎁", "📱", "💰", "🏋️", "🎵", "📚", "🍕",
-        "🧹", "⚽", "🎮", "🛍️", "💡", "🔧", "🌿", "❤️",
-    ]
+    /// Human-readable label for an SF Symbol name.
+    private func iconLabel(_ icon: String) -> String {
+        icon.replacingOccurrences(of: ".fill", with: "")
+            .replacingOccurrences(of: ".", with: " ")
+            .capitalized
+    }
 
     var body: some View {
         NavigationStack {
@@ -145,25 +135,31 @@ struct AddCategorySheet: View {
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
 
-                // Emoji picker
+                // Icon picker
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Choose an Emoji")
-                        .font(.roundedCaption)
-                        .foregroundStyle(Color.textSecondary)
+                    HStack(spacing: 6) {
+                        Text("Choose an Icon")
+                            .font(.roundedCaption)
+                            .foregroundStyle(Color.textSecondary)
+                        Text("— \(iconLabel(selectedIcon))")
+                            .font(.roundedCaption)
+                            .foregroundStyle(Color.accent)
+                    }
 
-                    LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 8), spacing: 10) {
-                        ForEach(emojiOptions, id: \.self) { emoji in
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 6), spacing: 10) {
+                        ForEach(CategoryManager.iconOptions, id: \.self) { icon in
                             Button {
-                                selectedEmoji = emoji
+                                selectedIcon = icon
                             } label: {
-                                Text(emoji)
-                                    .font(.title2)
-                                    .frame(width: 40, height: 40)
-                                    .background(selectedEmoji == emoji ? Color.accent.opacity(0.2) : Color.clear)
-                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                                Image(systemName: icon)
+                                    .font(.system(size: 18))
+                                    .foregroundStyle(selectedIcon == icon ? Color.accent : Color.textSecondary)
+                                    .frame(width: 44, height: 44)
+                                    .background(selectedIcon == icon ? Color.accent.opacity(0.2) : Color.surface)
+                                    .clipShape(RoundedRectangle(cornerRadius: 10))
                                     .overlay(
-                                        RoundedRectangle(cornerRadius: 8)
-                                            .stroke(selectedEmoji == emoji ? Color.accent : Color.clear, lineWidth: 2)
+                                        RoundedRectangle(cornerRadius: 10)
+                                            .stroke(selectedIcon == icon ? Color.accent : Color.clear, lineWidth: 2)
                                     )
                             }
                             .buttonStyle(.plain)
@@ -199,7 +195,7 @@ struct AddCategorySheet: View {
                             showError = true
                             return
                         }
-                        onSave(trimmed, selectedEmoji)
+                        onSave(trimmed, selectedIcon)
                         dismiss()
                     }
                     .font(.roundedHeadline)

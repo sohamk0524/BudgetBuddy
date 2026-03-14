@@ -256,35 +256,49 @@ struct ExpensesSummaryCard: View {
                 .font(.roundedHeadline)
                 .foregroundStyle(Color.textPrimary)
 
-            // Colored segment bar
-            if summary.total > 0 {
-                GeometryReader { geometry in
-                    HStack(spacing: 2) {
-                        let width = geometry.size.width - CGFloat(max(segments.count - 1, 0)) * 2
-                        ForEach(segments, id: \.label) { seg in
-                            RoundedRectangle(cornerRadius: 4)
-                                .fill(seg.color)
-                                .frame(width: max(seg.amount / summary.total * width, 4))
+            if segments.isEmpty {
+                // Empty state
+                VStack(spacing: 8) {
+                    Image(systemName: "chart.bar")
+                        .font(.system(size: 28))
+                        .foregroundStyle(Color.textSecondary.opacity(0.5))
+                    Text("No spending data yet")
+                        .font(.roundedCaption)
+                        .foregroundStyle(Color.textSecondary)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+            } else {
+                // Colored segment bar
+                if summary.total > 0 {
+                    GeometryReader { geometry in
+                        HStack(spacing: 2) {
+                            let width = geometry.size.width - CGFloat(max(segments.count - 1, 0)) * 2
+                            ForEach(segments, id: \.label) { seg in
+                                RoundedRectangle(cornerRadius: 4)
+                                    .fill(seg.color)
+                                    .frame(width: max(seg.amount / summary.total * width, 4))
+                            }
                         }
                     }
+                    .frame(height: 12)
+                    .clipShape(Capsule())
                 }
-                .frame(height: 12)
-                .clipShape(Capsule())
-            }
 
-            // Legend — wrap into rows of 3
-            let row1 = segments.prefix(3)
-            let row2 = segments.dropFirst(3)
+                // Legend — wrap into rows of 3
+                let row1 = segments.prefix(3)
+                let row2 = segments.dropFirst(3)
 
-            HStack(spacing: 16) {
-                ForEach(Array(row1), id: \.label) { seg in
-                    legendItem(color: seg.color, label: seg.label, amount: seg.amount)
-                }
-            }
-            if !row2.isEmpty {
                 HStack(spacing: 16) {
-                    ForEach(Array(row2), id: \.label) { seg in
+                    ForEach(Array(row1), id: \.label) { seg in
                         legendItem(color: seg.color, label: seg.label, amount: seg.amount)
+                    }
+                }
+                if !row2.isEmpty {
+                    HStack(spacing: 16) {
+                        ForEach(Array(row2), id: \.label) { seg in
+                            legendItem(color: seg.color, label: seg.label, amount: seg.amount)
+                        }
                     }
                 }
             }
@@ -349,10 +363,13 @@ struct ExpenseTransactionRow: View {
     @ViewBuilder
     private var categoryBadge: some View {
         let cat = transaction.subCategory.lowercased()
-        if CategoryManager.shared.isValidCategory(cat) {
+        if cat.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            textBadge("Unclassified", color: .gray)
+        } else if CategoryManager.shared.isValidCategory(cat) {
             textBadge(CategoryManager.shared.displayName(for: cat), color: categoryColor(for: cat))
         } else {
-            textBadge("Unclassified", color: .gray)
+            // Orphaned category (deleted custom) — show as Other
+            textBadge("Other", color: categoryColor(for: "other"))
         }
     }
 
@@ -385,6 +402,7 @@ struct TransactionClassificationSheet: View {
     @State private var editedMerchant: String
     @State private var editedAmount: String
     @State private var editedDate: Date
+    @State private var isEditing = false
     @Environment(\.dismiss) private var dismiss
 
     private var categories: [String] {
@@ -412,18 +430,17 @@ struct TransactionClassificationSheet: View {
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
-                ScrollView {
-                    VStack(spacing: 16) {
-                        headerCard
-                        categorySection
-                        TransactionItemsSection(items: $localItems)
-                            .onChange(of: localItems) { _, _ in localItemsModified = true }
+            ScrollView {
+                VStack(spacing: 16) {
+                    headerCard
+                    categorySection
+                    TransactionItemsSection(items: $localItems, readOnly: !isEditing)
+                        .onChange(of: localItems) { _, _ in localItemsModified = true }
+                    if isEditing {
                         deleteTransactionSection
                     }
-                    .padding(.vertical, 16)
                 }
-                saveButton
+                .padding(.vertical, 16)
             }
             .background(Color.appBackground)
             .navigationTitle("Transaction Details")
@@ -431,8 +448,34 @@ struct TransactionClassificationSheet: View {
             .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
-                        .foregroundStyle(Color.textSecondary)
+                    Button(isEditing ? "Cancel" : "Done") {
+                        if isEditing {
+                            isEditing = false
+                        } else {
+                            dismiss()
+                        }
+                    }
+                    .foregroundStyle(Color.textSecondary)
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    if isEditing {
+                        Button {
+                            saveChanges()
+                        } label: {
+                            Text(isSaving ? "Saving..." : "Save")
+                                .font(.roundedHeadline)
+                                .foregroundStyle(Color.accent)
+                        }
+                        .disabled(isSaving || selectedCategory.isEmpty)
+                    } else {
+                        Button {
+                            isEditing = true
+                        } label: {
+                            Text("Edit")
+                                .font(.roundedHeadline)
+                                .foregroundStyle(Color.accent)
+                        }
+                    }
                 }
             }
         }
@@ -449,10 +492,16 @@ struct TransactionClassificationSheet: View {
                     .foregroundStyle(Color.textSecondary)
                     .frame(width: 72, alignment: .leading)
                 Spacer()
-                TextField("Merchant name", text: $editedMerchant)
-                    .font(.roundedBody)
-                    .foregroundStyle(Color.textPrimary)
-                    .multilineTextAlignment(.trailing)
+                if isEditing {
+                    TextField("Merchant name", text: $editedMerchant)
+                        .font(.roundedBody)
+                        .foregroundStyle(Color.textPrimary)
+                        .multilineTextAlignment(.trailing)
+                } else {
+                    Text(editedMerchant)
+                        .font(.roundedBody)
+                        .foregroundStyle(Color.textPrimary)
+                }
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 13)
@@ -466,17 +515,24 @@ struct TransactionClassificationSheet: View {
                     .foregroundStyle(Color.textSecondary)
                     .frame(width: 72, alignment: .leading)
                 Spacer()
-                HStack(alignment: .firstTextBaseline, spacing: 3) {
-                    Text("$")
+                if isEditing {
+                    HStack(alignment: .firstTextBaseline, spacing: 3) {
+                        Text("$")
+                            .font(.rounded(.title3, weight: .bold))
+                            .foregroundStyle(Color.accent)
+                        TextField("0.00", text: $editedAmount)
+                            .font(.rounded(.title3, weight: .bold))
+                            .foregroundStyle(Color.accent)
+                            .keyboardType(.decimalPad)
+                            .multilineTextAlignment(.trailing)
+                            .monospacedDigit()
+                            .fixedSize()
+                    }
+                } else {
+                    Text("$\(editedAmount)")
                         .font(.rounded(.title3, weight: .bold))
                         .foregroundStyle(Color.accent)
-                    TextField("0.00", text: $editedAmount)
-                        .font(.rounded(.title3, weight: .bold))
-                        .foregroundStyle(Color.accent)
-                        .keyboardType(.decimalPad)
-                        .multilineTextAlignment(.trailing)
                         .monospacedDigit()
-                        .fixedSize()
                 }
             }
             .padding(.horizontal, 16)
@@ -491,10 +547,16 @@ struct TransactionClassificationSheet: View {
                     .foregroundStyle(Color.textSecondary)
                     .frame(width: 72, alignment: .leading)
                 Spacer()
-                DatePicker("", selection: $editedDate, displayedComponents: [.date])
-                    .datePickerStyle(.compact)
-                    .labelsHidden()
-                    .tint(Color.accent)
+                if isEditing {
+                    DatePicker("", selection: $editedDate, displayedComponents: [.date])
+                        .datePickerStyle(.compact)
+                        .labelsHidden()
+                        .tint(Color.accent)
+                } else {
+                    Text(editedDate, style: .date)
+                        .font(.roundedBody)
+                        .foregroundStyle(Color.textPrimary)
+                }
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 13)
@@ -549,15 +611,15 @@ struct TransactionClassificationSheet: View {
             default:        return ("building.columns", "Plaid", Color.indigo)
             }
         }()
-        return HStack(spacing: 4) {
+        return HStack(spacing: 5) {
             Image(systemName: icon)
-                .font(.system(size: 9))
+                .font(.system(size: 12))
             Text(label)
-                .font(.system(size: 10, weight: .semibold, design: .rounded))
+                .font(.system(size: 13, weight: .semibold, design: .rounded))
         }
         .foregroundStyle(.white)
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 5)
         .background(color)
         .clipShape(Capsule())
     }
@@ -578,10 +640,12 @@ struct TransactionClassificationSheet: View {
             ], spacing: 10) {
                 ForEach(CategoryManager.shared.categories) { cat in
                     Button {
-                        selectedCategory = cat.displayName
+                        if isEditing {
+                            selectedCategory = cat.displayName
+                        }
                     } label: {
                         VStack(spacing: 6) {
-                            Text(cat.emoji)
+                            Image(systemName: cat.icon)
                                 .font(.system(size: 20))
                             Text(cat.displayName)
                                 .font(.roundedCaption)
@@ -596,8 +660,10 @@ struct TransactionClassificationSheet: View {
                                 .stroke(selectedCategory == cat.displayName ? categoryColor(for: cat.name) : Color.clear, lineWidth: 2)
                         )
                     }
+                    .opacity(isEditing ? 1.0 : (selectedCategory == cat.displayName ? 1.0 : 0.5))
                 }
             }
+            .allowsHitTesting(isEditing)
             .padding(.horizontal)
         }
     }
@@ -630,58 +696,45 @@ struct TransactionClassificationSheet: View {
         }
     }
 
-    // MARK: - Save button
+    // MARK: - Save
 
-    private var saveButton: some View {
-        Button {
-            guard !isSaving, !selectedCategory.isEmpty else { return }
-            isSaving = true
-            Task {
-                do {
-                    // Sync any item changes (edits, adds, deletes) first
-                    if localItemsModified {
-                        let payload = localItems.map {
-                            EditableReceiptItem(name: $0.name, price: $0.price, category: $0.category)
-                        }
-                        try await viewModel.addItemsToTransaction(
-                            transactionId: transaction.id, items: payload, replace: true)
+    private func saveChanges() {
+        guard !isSaving, !selectedCategory.isEmpty else { return }
+        isSaving = true
+        Task {
+            do {
+                // Sync any item changes (edits, adds, deletes) first
+                if localItemsModified {
+                    let payload = localItems.map {
+                        EditableReceiptItem(name: $0.name, price: $0.price, category: $0.category)
                     }
-                    // Compute changed fields — only send overrides if actually different
-                    let newAmount = Double(editedAmount)
-                    let amountChanged = newAmount != nil && newAmount != transaction.amount
-                    let merchantChanged = editedMerchant != (transaction.merchantName ?? transaction.name)
-
-                    let dateFmt = DateFormatter()
-                    dateFmt.dateFormat = "yyyy-MM-dd"
-                    let newDateStr = dateFmt.string(from: editedDate)
-                    let dateChanged = newDateStr != transaction.date
-
-                    _ = try await viewModel.classifyTransactionForSheet(
-                        transactionId: transaction.id,
-                        subCategory: selectedCategory.lowercased(),
-                        amount: amountChanged ? newAmount : nil,
-                        merchantName: merchantChanged ? editedMerchant : nil,
-                        date: dateChanged ? newDateStr : nil
-                    )
-                    dismiss()
-                } catch {
-                    print("Failed to save: \(error)")
+                    try await viewModel.addItemsToTransaction(
+                        transactionId: transaction.id, items: payload, replace: true)
                 }
-                isSaving = false
+                // Compute changed fields — only send overrides if actually different
+                let newAmount = Double(editedAmount)
+                let amountChanged = newAmount != nil && newAmount != transaction.amount
+                let merchantChanged = editedMerchant != (transaction.merchantName ?? transaction.name)
+
+                let dateFmt = DateFormatter()
+                dateFmt.dateFormat = "yyyy-MM-dd"
+                let newDateStr = dateFmt.string(from: editedDate)
+                let dateChanged = newDateStr != transaction.date
+
+                _ = try await viewModel.classifyTransactionForSheet(
+                    transactionId: transaction.id,
+                    subCategory: selectedCategory.lowercased(),
+                    amount: amountChanged ? newAmount : nil,
+                    merchantName: merchantChanged ? editedMerchant : nil,
+                    date: dateChanged ? newDateStr : nil
+                )
+                isEditing = false
+                dismiss()
+            } catch {
+                print("Failed to save: \(error)")
             }
-        } label: {
-            Text(isSaving ? "Saving..." : "Save")
-                .font(.roundedHeadline).fontWeight(.semibold)
-                .foregroundStyle(.white)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 14)
-                .background(isSaving || selectedCategory.isEmpty ? Color.accent.opacity(0.3) : Color.accent)
-                .clipShape(RoundedRectangle(cornerRadius: 14))
+            isSaving = false
         }
-        .disabled(isSaving || selectedCategory.isEmpty)
-        .padding(.horizontal)
-        .padding(.vertical, 12)
-        .background(Color.surface)
     }
 }
 

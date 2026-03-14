@@ -12,6 +12,8 @@ struct TransactionItemsSection: View {
     @Binding var items: [EditableReceiptItem]
     /// When true, item rows show editable TextFields for name and price (receipt scan review).
     var editable: Bool = false
+    /// When true, hides all edit controls (Edit/Done button, add item, delete).
+    var readOnly: Bool = false
     /// Optional callback fired after a new item is appended (e.g. to auto-adjust a total).
     var onAdd: ((EditableReceiptItem) -> Void)? = nil
 
@@ -40,71 +42,73 @@ struct TransactionItemsSection: View {
                     .font(.roundedCaption)
                     .foregroundStyle(Color.textSecondary)
                 Spacer()
-                if isEditMode && !showAddForm {
+                if !readOnly {
+                    if isEditMode && !showAddForm {
+                        Button {
+                            withAnimation(.spring(duration: 0.25)) {
+                                newName = ""; newPrice = ""; newCategory = "food"
+                                editingItemId = nil
+                                showAddForm = true
+                            }
+                        } label: {
+                            Label("Add Item", systemImage: "plus")
+                                .font(.roundedCaption)
+                                .foregroundStyle(Color.accent)
+                        }
+                    }
                     Button {
-                        withAnimation(.spring(duration: 0.25)) {
-                            newName = ""; newPrice = ""; newCategory = "food"
-                            editingItemId = nil
-                            showAddForm = true
+                        if isEditMode && showAddForm {
+                            let trimmedName = newName.trimmingCharacters(in: .whitespaces)
+                            let parsedPrice = Double(newPrice.trimmingCharacters(in: .whitespaces))
+                            let hasName = !trimmedName.isEmpty
+                            let hasPrice = parsedPrice != nil && parsedPrice! > 0
+                            if hasName && hasPrice {
+                                // Auto-save: both fields valid
+                                let newItem = EditableReceiptItem(name: trimmedName, price: parsedPrice!, category: newCategory)
+                                withAnimation(.spring(duration: 0.25)) {
+                                    items.append(newItem)
+                                    newName = ""; newPrice = ""; showAddForm = false
+                                    isEditMode = false; editingItemId = nil
+                                }
+                                onAdd?(newItem)
+                            } else if hasName || hasPrice {
+                                // Partially filled — confirm discard
+                                showDiscardConfirm = true
+                            } else {
+                                // Empty form — just close
+                                withAnimation(.spring(duration: 0.25)) {
+                                    showAddForm = false; isEditMode = false; editingItemId = nil
+                                }
+                            }
+                        } else {
+                            withAnimation(.spring(duration: 0.25)) {
+                                isEditMode.toggle()
+                                if !isEditMode { editingItemId = nil; showAddForm = false }
+                            }
                         }
                     } label: {
-                        Label("Add Item", systemImage: "plus")
+                        Label(isEditMode ? "Done" : "Edit",
+                              systemImage: isEditMode ? "checkmark" : "pencil")
                             .font(.roundedCaption)
-                            .foregroundStyle(Color.accent)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(isEditMode ? .white : Color.textSecondary)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 5)
+                            .background(isEditMode ? Color.accent : Color.surface)
+                            .clipShape(Capsule())
                     }
-                }
-                Button {
-                    if isEditMode && showAddForm {
-                        let trimmedName = newName.trimmingCharacters(in: .whitespaces)
-                        let parsedPrice = Double(newPrice.trimmingCharacters(in: .whitespaces))
-                        let hasName = !trimmedName.isEmpty
-                        let hasPrice = parsedPrice != nil && parsedPrice! > 0
-                        if hasName && hasPrice {
-                            // Auto-save: both fields valid
-                            let newItem = EditableReceiptItem(name: trimmedName, price: parsedPrice!, category: newCategory)
+                    .padding(.leading, 4)
+                    .confirmationDialog("Discard unsaved item?", isPresented: $showDiscardConfirm, titleVisibility: .visible) {
+                        Button("Discard", role: .destructive) {
                             withAnimation(.spring(duration: 0.25)) {
-                                items.append(newItem)
                                 newName = ""; newPrice = ""; showAddForm = false
                                 isEditMode = false; editingItemId = nil
                             }
-                            onAdd?(newItem)
-                        } else if hasName || hasPrice {
-                            // Partially filled — confirm discard
-                            showDiscardConfirm = true
-                        } else {
-                            // Empty form — just close
-                            withAnimation(.spring(duration: 0.25)) {
-                                showAddForm = false; isEditMode = false; editingItemId = nil
-                            }
                         }
-                    } else {
-                        withAnimation(.spring(duration: 0.25)) {
-                            isEditMode.toggle()
-                            if !isEditMode { editingItemId = nil; showAddForm = false }
-                        }
+                        Button("Keep Editing", role: .cancel) {}
+                    } message: {
+                        Text("You entered a price but no item name.")
                     }
-                } label: {
-                    Label(isEditMode ? "Done" : "Edit",
-                          systemImage: isEditMode ? "checkmark" : "pencil")
-                        .font(.roundedCaption)
-                        .fontWeight(.semibold)
-                        .foregroundStyle(isEditMode ? .white : Color.textSecondary)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 5)
-                        .background(isEditMode ? Color.accent : Color.surface)
-                        .clipShape(Capsule())
-                }
-                .padding(.leading, 4)
-                .confirmationDialog("Discard unsaved item?", isPresented: $showDiscardConfirm, titleVisibility: .visible) {
-                    Button("Discard", role: .destructive) {
-                        withAnimation(.spring(duration: 0.25)) {
-                            newName = ""; newPrice = ""; showAddForm = false
-                            isEditMode = false; editingItemId = nil
-                        }
-                    }
-                    Button("Keep Editing", role: .cancel) {}
-                } message: {
-                    Text("You entered a price but no item name.")
                 }
             }
             .padding(.horizontal)

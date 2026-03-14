@@ -357,15 +357,17 @@ def classify_single_transaction(transaction_id):
     sub_category = data.get("subCategory")
 
     # Accept both built-in and user-custom categories
-    user_id_hint = data.get("userId")  # optional — for validating custom categories
+    user_id_hint = data.get("userId")
     if user_id_hint:
         from services.classification_service import get_valid_categories_for_user
         valid = get_valid_categories_for_user(user_id_hint)
     else:
         valid = VALID_CATEGORIES
 
+    print(f"[classify] subCategory={sub_category!r}, valid={valid}, userId={user_id_hint!r}")
+
     if not sub_category or sub_category not in valid:
-        return jsonify({"error": f"subCategory must be one of: {', '.join(valid)}"}), 400
+        return jsonify({"error": f"subCategory '{sub_category}' must be one of: {', '.join(valid)}"}), 400
 
     # Optional field overrides for editing transaction details
     new_amount = data.get("amount")

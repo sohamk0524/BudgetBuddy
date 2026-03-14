@@ -530,6 +530,7 @@ actor APIService {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
         var body: [String: Any] = ["subCategory": subCategory]
+        if let userId = AuthManager.shared.authToken { body["userId"] = userId }
         if let essentialRatio { body["essentialRatio"] = essentialRatio }
         if let amount { body["amount"] = amount }
         if let merchantName { body["merchantName"] = merchantName }

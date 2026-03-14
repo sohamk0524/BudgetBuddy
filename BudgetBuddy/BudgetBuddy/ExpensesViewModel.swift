@@ -54,6 +54,9 @@ class ExpensesViewModel {
             return allTransactions
         } else if selectedFilter == .unclassified {
             return allTransactions.filter { isUnclassified($0) }
+        } else if selectedFilter.name == "other" {
+            // "Other" includes actual "other" + orphaned categories from deleted custom categories
+            return allTransactions.filter { $0.subCategory.lowercased() == "other" || isOrphaned($0) }
         } else {
             return allTransactions.filter { $0.subCategory.lowercased() == selectedFilter.name }
         }
@@ -63,9 +66,16 @@ class ExpensesViewModel {
     var summary: ExpensesSummary {
         var totals = [String: Double]()
         for cat in CategoryManager.shared.categories {
-            totals[cat.name] = allTransactions
-                .filter { $0.subCategory.lowercased() == cat.name }
-                .reduce(0) { $0 + $1.amount }
+            if cat.name == "other" {
+                // "Other" total includes orphaned categories
+                totals[cat.name] = allTransactions
+                    .filter { $0.subCategory.lowercased() == "other" || isOrphaned($0) }
+                    .reduce(0) { $0 + $1.amount }
+            } else {
+                totals[cat.name] = allTransactions
+                    .filter { $0.subCategory.lowercased() == cat.name }
+                    .reduce(0) { $0 + $1.amount }
+            }
         }
         let unclassified = allTransactions.filter { isUnclassified($0) }.reduce(0.0) { $0 + $1.amount }
         return ExpensesSummary(
@@ -379,9 +389,17 @@ class ExpensesViewModel {
         saveToCache()
     }
 
-    /// Returns true if a transaction has not been categorized yet.
+    /// Returns true if a transaction has never been categorized (empty subCategory).
+    /// Orphaned categories (from deleted custom categories) are treated as "other", not unclassified.
     private func isUnclassified(_ txn: ExpenseTransaction) -> Bool {
-        !CategoryManager.shared.isValidCategory(txn.subCategory)
+        txn.subCategory.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    /// Returns true if this transaction's category is not in the current valid list
+    /// (orphaned from a deleted custom category). These show under "Other".
+    private func isOrphaned(_ txn: ExpenseTransaction) -> Bool {
+        let cat = txn.subCategory.trimmingCharacters(in: .whitespacesAndNewlines)
+        return !cat.isEmpty && !CategoryManager.shared.isValidCategory(cat)
     }
 
     private func applyClassificationLocally(

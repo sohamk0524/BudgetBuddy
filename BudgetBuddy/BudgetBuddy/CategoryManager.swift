@@ -14,17 +14,17 @@ struct UserCategory: Identifiable, Codable, Equatable, Hashable {
     var id: UUID
     var name: String        // lowercase key: "food", "coffee"
     var displayName: String // title case: "Food", "Coffee"
-    var emoji: String       // emoji character: "🍔", "☕"
+    var icon: String        // SF Symbol name: "fork.knife", "tag.fill"
     var isBuiltin: Bool
     var displayOrder: Int
 
     static let builtins: [UserCategory] = [
-        .init(id: UUID(), name: "food", displayName: "Food", emoji: "🍔", isBuiltin: true, displayOrder: 0),
-        .init(id: UUID(), name: "drink", displayName: "Drink", emoji: "☕", isBuiltin: true, displayOrder: 1),
-        .init(id: UUID(), name: "groceries", displayName: "Groceries", emoji: "🛒", isBuiltin: true, displayOrder: 2),
-        .init(id: UUID(), name: "transportation", displayName: "Transportation", emoji: "🚗", isBuiltin: true, displayOrder: 3),
-        .init(id: UUID(), name: "entertainment", displayName: "Entertainment", emoji: "🎬", isBuiltin: true, displayOrder: 4),
-        .init(id: UUID(), name: "other", displayName: "Other", emoji: "📦", isBuiltin: true, displayOrder: 5),
+        .init(id: UUID(), name: "food", displayName: "Food", icon: "fork.knife", isBuiltin: true, displayOrder: 0),
+        .init(id: UUID(), name: "drink", displayName: "Drink", icon: "cup.and.saucer.fill", isBuiltin: true, displayOrder: 1),
+        .init(id: UUID(), name: "groceries", displayName: "Groceries", icon: "cart.fill", isBuiltin: true, displayOrder: 2),
+        .init(id: UUID(), name: "transportation", displayName: "Transportation", icon: "car.fill", isBuiltin: true, displayOrder: 3),
+        .init(id: UUID(), name: "entertainment", displayName: "Entertainment", icon: "film.fill", isBuiltin: true, displayOrder: 4),
+        .init(id: UUID(), name: "other", displayName: "Other", icon: "ellipsis.circle.fill", isBuiltin: true, displayOrder: 5),
     ]
 }
 
@@ -50,6 +50,16 @@ class CategoryManager {
     var canAddMore: Bool {
         customCategories.count < maxCustomCategories
     }
+
+    /// SF Symbol options for custom categories.
+    static let iconOptions = [
+        "tag.fill", "briefcase.fill", "house.fill", "cross.case.fill",
+        "graduationcap.fill", "airplane", "tshirt.fill", "scissors",
+        "pawprint.fill", "gift.fill", "iphone", "banknote.fill",
+        "dumbbell.fill", "music.note", "book.fill", "paintbrush.fill",
+        "sparkles", "soccerball", "gamecontroller.fill", "bag.fill",
+        "lightbulb.fill", "wrench.and.screwdriver.fill", "leaf.fill", "heart.fill",
+    ]
 
     // MARK: - Init
 
@@ -86,7 +96,7 @@ class CategoryManager {
                         id: UUID(),
                         name: name,
                         displayName: pref.categoryName.capitalized,
-                        emoji: pref.emoji ?? defaultEmoji(for: name),
+                        icon: pref.emoji ?? defaultIcon(for: name),
                         isBuiltin: isBuiltin,
                         displayOrder: pref.displayOrder ?? idx
                     )
@@ -101,7 +111,7 @@ class CategoryManager {
     func saveCategories() async {
         guard let userId = AuthManager.shared.authToken else { return }
         let payload = categories.map { cat -> [String: Any] in
-            ["name": cat.name, "emoji": cat.emoji, "isBuiltin": cat.isBuiltin]
+            ["name": cat.name, "emoji": cat.icon, "isBuiltin": cat.isBuiltin]
         }
         do {
             try await APIService.shared.updateCategoryPreferences(userId: userId, categories: payload)
@@ -113,7 +123,7 @@ class CategoryManager {
 
     // MARK: - Mutations
 
-    func addCategory(name: String, emoji: String) {
+    func addCategory(name: String, icon: String) {
         guard canAddMore else { return }
         let lowerName = name.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
         guard !lowerName.isEmpty,
@@ -123,11 +133,17 @@ class CategoryManager {
             id: UUID(),
             name: lowerName,
             displayName: name.trimmingCharacters(in: .whitespacesAndNewlines),
-            emoji: emoji,
+            icon: icon,
             isBuiltin: false,
             displayOrder: categories.count
         )
-        categories.append(newCat)
+        // Insert right above "Other" so it's always last
+        if let otherIdx = categories.firstIndex(where: { $0.name == "other" }) {
+            categories.insert(newCat, at: otherIdx)
+        } else {
+            categories.append(newCat)
+        }
+        reindex()
         saveToCache()
     }
 
@@ -176,8 +192,8 @@ class CategoryManager {
         categories.first { $0.name == category.lowercased() }?.displayName ?? category.capitalized
     }
 
-    func emoji(for category: String) -> String {
-        categories.first { $0.name == category.lowercased() }?.emoji ?? defaultEmoji(for: category)
+    func icon(for category: String) -> String {
+        categories.first { $0.name == category.lowercased() }?.icon ?? defaultIcon(for: category)
     }
 
     func color(for category: String) -> Color {
@@ -196,7 +212,7 @@ class CategoryManager {
         }
     }
 
-    func icon(for category: String) -> String {
+    private func defaultIcon(for category: String) -> String {
         switch category.lowercased() {
         case "food": return "fork.knife"
         case "drink": return "cup.and.saucer.fill"
@@ -205,18 +221,6 @@ class CategoryManager {
         case "entertainment": return "film.fill"
         case "other": return "ellipsis.circle.fill"
         default: return "tag.fill"
-        }
-    }
-
-    private func defaultEmoji(for category: String) -> String {
-        switch category.lowercased() {
-        case "food": return "🍔"
-        case "drink": return "☕"
-        case "groceries": return "🛒"
-        case "transportation": return "🚗"
-        case "entertainment": return "🎬"
-        case "other": return "📦"
-        default: return "🏷️"
         }
     }
 }
