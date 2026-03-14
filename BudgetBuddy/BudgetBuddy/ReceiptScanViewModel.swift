@@ -88,7 +88,11 @@ class ReceiptScanViewModel {
             )
             attachResponse = response
             state = .done
-            NotificationCenter.default.post(name: .transactionAdded, object: nil)
+            NotificationCenter.default.post(
+                name: .transactionAdded,
+                object: nil,
+                userInfo: response.transaction.map { ["transaction": $0] }
+            )
         } catch {
             state = .error("Failed to save receipt: \(error.localizedDescription)")
         }
