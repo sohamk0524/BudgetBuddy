@@ -122,8 +122,10 @@ def get_expenses(user_id):
         else:
             filtered = [t for t in filtered if t.get('sub_category') == sub_category]
 
-    # Compute summary by category
-    summary_totals = {cat: 0.0 for cat in VALID_CATEGORIES}
+    # Compute summary by category — include user custom categories
+    from services.classification_service import get_valid_categories_for_user
+    user_valid = get_valid_categories_for_user(user_id)
+    summary_totals = {cat: 0.0 for cat in user_valid}
     summary_totals['unclassified'] = 0.0
 
     for t in filtered:
@@ -218,17 +220,22 @@ def get_expenses(user_id):
     total = len(result)
     result = result[offset:offset + limit]
 
+    # Build summary with backward-compat keys + dynamic categoryTotals
+    summary = {
+        "totalFood": round(summary_totals.get('food', 0), 2),
+        "totalDrink": round(summary_totals.get('drink', 0), 2),
+        "totalGroceries": round(summary_totals.get('groceries', 0), 2),
+        "totalTransportation": round(summary_totals.get('transportation', 0), 2),
+        "totalEntertainment": round(summary_totals.get('entertainment', 0), 2),
+        "totalOther": round(summary_totals.get('other', 0), 2),
+        "totalUnclassified": round(summary_totals.get('unclassified', 0), 2),
+        # Dynamic totals including custom categories
+        "categoryTotals": {cat: round(amt, 2) for cat, amt in summary_totals.items()},
+    }
+
     return jsonify({
         "transactions": result,
-        "summary": {
-            "totalFood": round(summary_totals['food'], 2),
-            "totalDrink": round(summary_totals['drink'], 2),
-            "totalGroceries": round(summary_totals['groceries'], 2),
-            "totalTransportation": round(summary_totals['transportation'], 2),
-            "totalEntertainment": round(summary_totals['entertainment'], 2),
-            "totalOther": round(summary_totals['other'], 2),
-            "totalUnclassified": round(summary_totals['unclassified'], 2),
-        },
+        "summary": summary,
         "total": total,
         "hasMore": offset + limit < total,
     })
@@ -253,13 +260,25 @@ def get_spending_summary(user_id):
         return jsonify({"error": "User not found"}), 404
 
     from datetime import date
+    from services.classification_service import get_valid_categories_for_user
     today = date.today()
     start_of_month = today.replace(day=1).isoformat()
 
     account_ids, _ = _get_account_ids_and_map(user_id)
 
-    # Aggregate Plaid transactions
-    totals = {cat: {"amount": 0.0, "count": 0} for cat in VALID_CATEGORIES}
+    # Aggregate transactions — use dynamic categories (builtin + custom)
+    valid_cats = get_valid_categories_for_user(user_id)
+    totals = {}
+
+    def _add(sub, amount):
+        if not sub or sub == 'unclassified':
+            return
+        # Fold unknown categories into 'other'
+        cat = sub if sub in valid_cats else 'other'
+        if cat not in totals:
+            totals[cat] = {"amount": 0.0, "count": 0}
+        totals[cat]["amount"] += amount
+        totals[cat]["count"] += 1
 
     if account_ids:
         all_txns, _ = get_transactions_for_accounts(account_ids, limit=10000)
@@ -268,10 +287,7 @@ def get_spending_summary(user_id):
                 continue
             if (t.get('date') or '') < start_of_month:
                 continue
-            sub = t.get('sub_category') or 'unclassified'
-            if sub in totals:
-                totals[sub]["amount"] += t.get('amount') or 0
-                totals[sub]["count"] += 1
+            _add(t.get('sub_category'), t.get('amount') or 0)
 
     # Merge manual/voice transactions
     for mt in get_manual_transactions(user_id):
@@ -279,20 +295,22 @@ def get_spending_summary(user_id):
             continue
         if (mt.get('date') or '') < start_of_month:
             continue
-        sub = mt.get('sub_category') or 'unclassified'
-        if sub in totals:
-            totals[sub]["amount"] += mt.get('amount') or 0
-            totals[sub]["count"] += 1
+        _add(mt.get('sub_category'), mt.get('amount') or 0)
 
     # Build response: non-zero categories sorted by amount descending
+    # Look up icons from user's category preferences, falling back to CATEGORY_ICONS
+    from db_models import get_category_prefs
+    user_prefs = {p.get('category_name', '').lower(): p.get('emoji') for p in get_category_prefs(user_id)}
+
     categories = []
-    for cat in VALID_CATEGORIES:
-        if totals[cat]["amount"] > 0:
+    for cat, data in totals.items():
+        if data["amount"] > 0:
+            icon = user_prefs.get(cat) or CATEGORY_ICONS.get(cat, "tag.fill")
             categories.append({
                 "category": cat,
-                "amount": round(totals[cat]["amount"], 2),
-                "transactionCount": totals[cat]["count"],
-                "icon": CATEGORY_ICONS.get(cat, "ellipsis.circle"),
+                "amount": round(data["amount"], 2),
+                "transactionCount": data["count"],
+                "icon": icon,
             })
 
     categories.sort(key=lambda c: c["amount"], reverse=True)
@@ -349,8 +367,23 @@ def classify_single_transaction(transaction_id):
 
     sub_category = data.get("subCategory")
 
-    if not sub_category or sub_category not in VALID_CATEGORIES:
-        return jsonify({"error": f"subCategory must be one of: {', '.join(VALID_CATEGORIES)}"}), 400
+    # Accept both built-in and user-custom categories
+    user_id_hint = data.get("userId")
+    if user_id_hint:
+        from services.classification_service import get_valid_categories_for_user
+        valid = get_valid_categories_for_user(user_id_hint)
+    else:
+        valid = VALID_CATEGORIES
+
+    print(f"[classify] subCategory={sub_category!r}, valid={valid}, userId={user_id_hint!r}")
+
+    if not sub_category or sub_category not in valid:
+        return jsonify({"error": f"subCategory '{sub_category}' must be one of: {', '.join(valid)}"}), 400
+
+    # Optional field overrides for editing transaction details
+    new_amount = data.get("amount")
+    new_merchant = data.get("merchantName")
+    new_date = data.get("date")
 
     client = get_client()
 
@@ -366,6 +399,18 @@ def classify_single_transaction(transaction_id):
     txn['sub_category'] = sub_category
     txn['essential_amount'] = None
     txn['discretionary_amount'] = None
+
+    # Apply optional field overrides
+    if new_amount is not None:
+        txn['amount'] = float(new_amount)
+    if new_date is not None:
+        txn['date'] = new_date
+    if new_merchant is not None:
+        if is_manual:
+            txn['store'] = new_merchant
+        else:
+            txn['merchant_name'] = new_merchant
+
     client.put(txn)
 
     # Manual transactions: just save classification, no merchant-level propagation
@@ -377,6 +422,9 @@ def classify_single_transaction(transaction_id):
                 "subCategory": txn.get('sub_category'),
                 "essentialAmount": None,
                 "discretionaryAmount": None,
+                "amount": txn.get('amount'),
+                "merchantName": txn.get('store'),
+                "date": txn.get('date'),
             },
             "updatedMerchantRatio": 0.0,
             "autoApplied": 0,
@@ -437,6 +485,9 @@ def classify_single_transaction(transaction_id):
             "subCategory": txn.get('sub_category'),
             "essentialAmount": None,
             "discretionaryAmount": None,
+            "amount": txn.get('amount'),
+            "merchantName": txn.get('merchant_name'),
+            "date": txn.get('date'),
         },
         "updatedMerchantRatio": 0.0,
         "autoApplied": auto_applied,

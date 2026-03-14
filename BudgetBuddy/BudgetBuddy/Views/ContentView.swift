@@ -33,6 +33,19 @@ struct ContentView: View {
             // authenticateWithBiometrics() calls restoreSession() after a successful unlock.
             guard authManager.authState != .biometricPrompt else { return }
             await authManager.restoreSession()
+            if authManager.isAuthenticated {
+                await CategoryManager.shared.loadCategories()
+            }
+        }
+        .onChange(of: authManager.authToken) { oldToken, newToken in
+            if oldToken != newToken {
+                expensesViewModel.clearData()
+                insightsViewModel.clearData()
+                CategoryManager.shared.clearData()
+                if newToken != nil {
+                    Task { await CategoryManager.shared.loadCategories() }
+                }
+            }
         }
     }
 

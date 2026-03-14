@@ -98,7 +98,10 @@ class VoiceTransactionViewModel {
 
     private func parseTranscription() async {
         do {
-            let group = try await apiService.parseTransaction(statement: transcribedText)
+            let group = try await apiService.parseTransaction(
+                statement: transcribedText,
+                userId: AuthManager.shared.authToken
+            )
             applyParsedGroup(group)
             state = .confirming
         } catch {
@@ -121,7 +124,7 @@ class VoiceTransactionViewModel {
         pendingTransactions = source.map { parsed in
             var txn = VoiceTransaction()
             txn.amount = parsed.amount
-            txn.category = parsed.category
+            txn.category = parsed.category?.capitalized
             txn.store = parsed.store
             txn.notes = parsed.notes
 
@@ -193,7 +196,11 @@ class VoiceTransactionViewModel {
             }
 
             if response.success {
-                NotificationCenter.default.post(name: .transactionAdded, object: nil)
+                NotificationCenter.default.post(
+                    name: .transactionAdded,
+                    object: nil,
+                    userInfo: response.transaction.map { ["transaction": $0] }
+                )
                 if isLastTransaction {
                     state = .success
                 } else {

@@ -384,6 +384,8 @@ def get_category_preferences(user_id):
                 "id": p.key.id,
                 "categoryName": p.get('category_name'),
                 "displayOrder": p.get('display_order'),
+                "emoji": p.get('emoji'),
+                "isBuiltin": p.get('is_builtin', True),
             }
             for p in prefs
         ]
@@ -401,8 +403,77 @@ def update_category_preferences(user_id):
     if not data or "categories" not in data:
         return jsonify({"error": "categories field is required"}), 400
 
-    set_category_prefs(user_id, data["categories"])
+    categories = data["categories"]
+
+    # Validate: max 10 total, unique names
+    if len(categories) > 10:
+        return jsonify({"error": "Maximum 10 categories allowed"}), 400
+
+    seen = set()
+    for cat in categories:
+        name = cat.get('name', cat) if isinstance(cat, dict) else cat
+        lower = name.lower()
+        if lower in seen:
+            return jsonify({"error": f"Duplicate category name: {name}"}), 400
+        seen.add(lower)
+
+    set_category_prefs(user_id, categories)
     return jsonify({"status": "success"})
+
+
+@user_bp.route("/user/category-preferences/<user_id>/<category_name>", methods=["DELETE"])
+@require_auth
+def delete_custom_category(user_id, category_name):
+    """Delete a custom category and migrate all its transactions to another category."""
+    from db_models import get_client
+    from google.cloud.datastore import query as ds_query
+    PropertyFilter = ds_query.PropertyFilter
+
+    user = get_user(user_id)
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
+    migrate_to = request.args.get("migrate_to", "other")
+    builtin = ('food', 'drink', 'groceries', 'transportation', 'entertainment', 'other')
+    if category_name.lower() in builtin:
+        return jsonify({"error": "Cannot delete built-in categories"}), 400
+
+    # Remove the preference entity
+    prefs = get_category_prefs(user_id)
+    remaining = [p for p in prefs if (p.get('category_name') or '').lower() != category_name.lower()]
+
+    # Rebuild preferences without the deleted category
+    rebuilt = []
+    for p in remaining:
+        rebuilt.append({
+            'name': p.get('category_name'),
+            'emoji': p.get('emoji'),
+            'isBuiltin': p.get('is_builtin', True),
+        })
+    set_category_prefs(user_id, rebuilt)
+
+    # Migrate transactions with the deleted category
+    client = get_client()
+    migrated = 0
+
+    # Migrate ManualTransactions
+    query = client.query(kind='ManualTransaction')
+    query.add_filter(filter=PropertyFilter('user_id', '=', user_id))
+    query.add_filter(filter=PropertyFilter('sub_category', '=', category_name.lower()))
+    for txn in query.fetch():
+        txn['sub_category'] = migrate_to
+        client.put(txn)
+        migrated += 1
+
+    # Migrate MerchantClassifications
+    mc_query = client.query(kind='MerchantClassification')
+    mc_query.add_filter(filter=PropertyFilter('user_id', '=', user_id))
+    mc_query.add_filter(filter=PropertyFilter('classification', '=', category_name.lower()))
+    for mc in mc_query.fetch():
+        mc['classification'] = migrate_to
+        client.put(mc)
+
+    return jsonify({"status": "success", "migratedCount": migrated})
 
 
 @user_bp.route("/user/nudges/<user_id>", methods=["GET"])
@@ -427,9 +498,28 @@ def parse_transaction():
     if not statement:
         return jsonify({"error": "statement is required"}), 400
 
+    # Optional userId — if provided, include custom categories in the LLM prompt
+    user_id = data.get("userId")
+
     from services.llm_service import Agent
     from datetime import date as date_type
     today = date_type.today().strftime("%Y-%m-%d")
+
+    # Build category list — include user's custom categories if available
+    category_names_title = ["Food", "Drink", "Groceries", "Transportation", "Entertainment", "Other"]
+    category_names_lower = ["food", "drink", "groceries", "transportation", "entertainment", "other"]
+    custom_context = ""
+    if user_id:
+        from services.classification_service import get_valid_categories_for_user
+        all_cats = get_valid_categories_for_user(user_id)
+        extra = [c for c in all_cats if c not in category_names_lower]
+        if extra:
+            category_names_title += [c.capitalize() for c in extra]
+            category_names_lower += extra
+            custom_context = f"\nThis user also has custom categories: {', '.join(extra)}. Use these if they are a better fit.\n"
+
+    cats_title_str = ", ".join(category_names_title)
+    cats_lower_str = ", ".join(category_names_lower)
 
     parse_agent = Agent(
         name="TransactionParser",
@@ -437,16 +527,17 @@ def parse_transaction():
             "You are a transaction parser. Extract transaction details from the user's spoken statement.\n"
             "Group items by merchant/store — create one transaction object per merchant.\n"
             f"Today's date is {today}.\n"
+            f"{custom_context}"
             "Return ONLY a JSON object with this exact structure:\n"
             '{"transactions": [\n'
             '  {\n'
             '    "store": <merchant name as string, or null>,\n'
             '    "amount": <total amount for this store as a positive number>,\n'
-            '    "category": <one of: Food, Drink, Groceries, Transportation, Entertainment, Other>,\n'
+            f'    "category": <one of: {cats_title_str}>,\n'
             '    "date": <YYYY-MM-DD string, use today if not mentioned>,\n'
             '    "notes": <string or null>,\n'
             '    "items": [\n'
-            '      {"name": <item name string>, "price": <item price as number>, "classification": <one of: food, drink, groceries, transportation, entertainment, other>}\n'
+            f'      {{"name": <item name string>, "price": <item price as number>, "classification": <one of: {cats_lower_str}>}}\n'
             '    ]\n'
             '  }\n'
             ']}\n'
@@ -455,7 +546,7 @@ def parse_transaction():
             "- amount: total amount for that store as a positive number. Convert words like 'ten' to 10.\n"
             "- category: choose based on dominant item type or store name (e.g. coffee shop -> Drink, restaurant -> Food, clothing store -> Other).\n"
             "- items: list each item mentioned. If per-item prices are not stated, divide the store total evenly among items (round to 2 decimal places, put any remainder in the last item).\n"
-            "- classification: lowercase category for each item (food, drink, groceries, transportation, entertainment, or other).\n"
+            f"- classification: lowercase category for each item ({cats_lower_str}).\n"
             "- date: use the date mentioned, or today if not specified.\n"
             "- Return ONLY the JSON object. No markdown code blocks, no explanation."
         ),
@@ -504,7 +595,8 @@ def save_manual_transaction():
         return jsonify({"error": "amount must be greater than 0"}), 400
 
     # Determine classification — use category as sub_category for the new system
-    valid_categories = ('food', 'drink', 'groceries', 'transportation', 'entertainment', 'other')
+    from services.classification_service import get_valid_categories_for_user
+    valid_categories = get_valid_categories_for_user(user_id)
     category_value = data.get("category", "Other")
     sub_category = category_value.lower() if category_value.lower() in valid_categories else "unclassified"
 
@@ -548,9 +640,42 @@ def save_manual_transaction():
         receipt_items=receipt_items_json,
     )
 
+    # Build full transaction object matching GET /expenses response format
+    mt_source = entity.get('source') or 'manual'
+    mt_date = entity.get('date') or ''
+    receipt_items_str = entity.get('receipt_items')
+    parsed_items = None
+    if receipt_items_str:
+        try:
+            parsed_items = json.loads(receipt_items_str)
+        except (json.JSONDecodeError, TypeError):
+            parsed_items = None
+
+    transaction_obj = {
+        "id": entity.key.id,
+        "transactionId": f"manual-{entity.key.id}",
+        "accountId": "",
+        "amount": entity.get('amount') or 0,
+        "date": mt_date,
+        "authorizedDate": mt_date,
+        "name": entity.get('notes') or entity.get('store') or entity.get('category') or 'Transaction',
+        "merchantName": entity.get('store'),
+        "categoryPrimary": entity.get('category'),
+        "categoryDetailed": entity.get('category'),
+        "pending": False,
+        "paymentChannel": mt_source,
+        "subCategory": entity.get('sub_category') or 'unclassified',
+        "essentialAmount": None,
+        "discretionaryAmount": None,
+        "source": mt_source,
+        "notes": entity.get('notes'),
+        "receiptItems": parsed_items,
+    }
+
     return jsonify({
         "success": True,
         "transactionId": str(entity.key.id),
+        "transaction": transaction_obj,
     }), 201
 
 

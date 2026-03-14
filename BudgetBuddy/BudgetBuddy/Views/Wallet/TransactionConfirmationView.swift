@@ -22,7 +22,9 @@ struct TransactionConfirmationView: View {
     @State private var showCategoryError: Bool = false
     @State private var showDiscardConfirm: Bool = false
 
-    private let categories = ["Food", "Drink", "Groceries", "Transportation", "Entertainment", "Other"]
+    private var categories: [String] {
+        CategoryManager.shared.categories.map { $0.displayName }
+    }
 
     private var itemsTotal: Double { items.reduce(0) { $0 + $1.price } }
 
@@ -319,8 +321,9 @@ struct TransactionConfirmationView: View {
         } else {
             amountText = ""
         }
-        if let category = viewModel.transaction.category, categories.contains(category) {
-            selectedCategory = category
+        if let category = viewModel.transaction.category,
+           let match = categories.first(where: { $0.caseInsensitiveCompare(category) == .orderedSame }) {
+            selectedCategory = match
         } else {
             selectedCategory = ""
         }

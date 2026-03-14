@@ -93,7 +93,7 @@ class WalletViewModel {
 
         do {
             let response = try await apiService.getCategoryPreferences(userId: userId)
-            customCategories = response.categories.map { $0.categoryName }
+            customCategories = response.map { $0.categoryName }
         } catch {
             print("Failed to load category preferences: \(error)")
         }
@@ -104,7 +104,10 @@ class WalletViewModel {
         guard let userId = AuthManager.shared.authToken else { return }
 
         do {
-            try await apiService.updateCategoryPreferences(userId: userId, categories: categories)
+            let payload = categories.map { name -> [String: Any] in
+                ["name": name, "emoji": "", "isBuiltin": false]
+            }
+            try await apiService.updateCategoryPreferences(userId: userId, categories: payload)
             customCategories = categories
         } catch {
             print("Failed to update category preferences: \(error)")

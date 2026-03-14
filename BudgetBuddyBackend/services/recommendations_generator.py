@@ -196,6 +196,27 @@ ACTION_PROMPTS = {
     ),
 }
 
+
+def _get_action_prompt(action: str) -> str:
+    """Return the prompt for a given action. Falls back to a dynamic prompt for custom categories."""
+    if action in ACTION_PROMPTS:
+        return ACTION_PROMPTS[action]
+
+    # Dynamic prompt for custom categories using known keywords
+    from services.classification_service import KNOWN_CATEGORY_KEYWORDS
+    keywords = KNOWN_CATEGORY_KEYWORDS.get(action.lower(), [action])
+    keyword_str = ", ".join(keywords[:6])
+    display_name = action.capitalize()
+
+    return (
+        f"Focus exclusively on the user's {display_name.upper()} spending ({keyword_str}).\n\n"
+        f"STEP 1: Call get_plaid_transactions and filter to {display_name.lower()}-related transactions.\n"
+        f"STEP 2: Identify top {display_name.lower()} merchants by spend.\n"
+        f"STEP 3: Call search_local_deals to find student {display_name.lower()} discounts, deals, and cheaper alternatives near their school.\n\n"
+        f"Only return {display_name.lower()}-related recommendations. Find specific local deals, not generic advice."
+    )
+
+
 # Tool definitions for the recommendations agent (subset — no render_visual)
 _RECO_TOOLS = [
     {
@@ -421,7 +442,7 @@ def generate_recommendations(user_id: int, action: str = "general") -> Dict[str,
     """
     # Pre-fetch financial context
     context = _build_user_context(user_id)
-    action_prompt = ACTION_PROMPTS.get(action, ACTION_PROMPTS["general"])
+    action_prompt = _get_action_prompt(action)
 
     user_message = (
         f"{action_prompt}\n\n"

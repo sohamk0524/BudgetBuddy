@@ -25,6 +25,9 @@ struct ProfileView: View {
                 // MARK: - Notification Settings
                 notificationSettingsSection
 
+                // MARK: - Categories
+                categorySettingsSection
+
                 // MARK: - Face ID
                 biometricSection
 
@@ -269,6 +272,29 @@ struct ProfileView: View {
         } label: {
             HStack {
                 Label("Notifications", systemImage: "bell")
+                    .font(.roundedHeadline)
+                    .foregroundStyle(Color.textPrimary)
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .font(.roundedCaption)
+                    .foregroundStyle(Color.textSecondary)
+            }
+            .padding()
+            .background(Color.surface)
+            .clipShape(RoundedRectangle(cornerRadius: 16))
+        }
+    }
+
+    // MARK: - Category Settings Section
+
+    private var categorySettingsSection: some View {
+        NavigationLink {
+            CategorySettingsView()
+        } label: {
+            HStack {
+                Label("Categories", systemImage: "tag")
                     .font(.roundedHeadline)
                     .foregroundStyle(Color.textPrimary)
 

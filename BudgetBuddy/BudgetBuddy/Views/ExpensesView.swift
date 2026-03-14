@@ -26,11 +26,15 @@ struct ExpensesView: View {
                         // Filter chips (horizontally scrollable)
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 8) {
-                                ForEach(ExpenseFilter.allCases, id: \.self) { filter in
+                                ForEach(ExpenseFilter.allFilters(hasUnclassified: viewModel.hasUnclassified), id: \.self) { filter in
                                     Button {
-                                        viewModel.selectedFilter = filter
+                                        if filter != .all && viewModel.selectedFilter == filter {
+                                            viewModel.selectedFilter = .all
+                                        } else {
+                                            viewModel.selectedFilter = filter
+                                        }
                                     } label: {
-                                        Text(filter.rawValue)
+                                        Text(filter.displayName)
                                             .font(.roundedCaption)
                                             .foregroundStyle(viewModel.selectedFilter == filter ? Color.appBackground : Color.textPrimary)
                                             .padding(.horizontal, 14)
@@ -150,6 +154,7 @@ struct ExpensesView: View {
             .sheet(isPresented: $showVoiceRecording) {
                 VoiceTransactionFlowView(viewModel: voiceViewModel) {
                     showVoiceRecording = false
+                    // Background sync for eventual consistency
                     Task { await viewModel.refresh() }
                 }
             }
@@ -157,13 +162,14 @@ struct ExpensesView: View {
                 ReceiptScanView(viewModel: receiptViewModel) {
                     showReceiptScan = false
                     receiptViewModel.reset()
-                    Task { await viewModel.refreshWithRetry() }
+                    // Background sync for eventual consistency
+                    Task { await viewModel.refresh() }
                 }
             }
-            .onChange(of: voiceViewModel.state) { _, newState in
-                if newState == .success {
-                    // Refresh with retries to handle Datastore propagation delay
-                    Task { await viewModel.refreshWithRetry() }
+            .onReceive(NotificationCenter.default.publisher(for: .transactionAdded)) { notification in
+                // Optimistic local insert — transaction appears instantly
+                if let txn = notification.userInfo?["transaction"] as? ExpenseTransaction {
+                    viewModel.insertTransactionLocally(txn)
                 }
             }
         }
@@ -223,35 +229,16 @@ struct ExpensesView: View {
 // MARK: - Category Helpers
 
 /// Maps legacy or unknown category strings to valid display categories.
-func normalizedItemCategory(_ raw: String) -> String {
-    switch raw.lowercased() {
-    case "food", "drink", "groceries", "transportation", "entertainment", "other": return raw.lowercased()
-    default: return "other"
-    }
+@MainActor func normalizedItemCategory(_ raw: String) -> String {
+    CategoryManager.shared.isValidCategory(raw) ? raw.lowercased() : "other"
 }
 
-func categoryColor(for category: String) -> Color {
-    switch category.lowercased() {
-    case "food":            return .orange
-    case "drink":           return .purple
-    case "groceries":       return .green
-    case "transportation":  return .cyan
-    case "entertainment":   return .pink
-    case "other":           return .indigo
-    default:                return .gray
-    }
+@MainActor func categoryColor(for category: String) -> Color {
+    CategoryManager.shared.color(for: category)
 }
 
-func categoryIcon(for category: String) -> String {
-    switch category.lowercased() {
-    case "food":            return "fork.knife"
-    case "drink":           return "cup.and.saucer.fill"
-    case "groceries":       return "cart.fill"
-    case "transportation":  return "car.fill"
-    case "entertainment":   return "film.fill"
-    case "other":           return "ellipsis.circle.fill"
-    default:                return "questionmark.circle"
-    }
+@MainActor func categoryIcon(for category: String) -> String {
+    CategoryManager.shared.icon(for: category)
 }
 
 // MARK: - Summary Card (category-based)
@@ -260,15 +247,11 @@ struct ExpensesSummaryCard: View {
     let summary: ExpensesSummary
 
     private var segments: [(label: String, amount: Double, color: Color)] {
-        [
-            ("Food", summary.totalFood, .orange),
-            ("Drink", summary.totalDrink, .purple),
-            ("Groceries", summary.totalGroceries, .green),
-            ("Transportation", summary.totalTransportation, .cyan),
-            ("Entertainment", summary.totalEntertainment, .pink),
-            ("Other", summary.totalOther, .indigo),
-            ("Unclassified", summary.totalUnclassified, .gray),
-        ].filter { $0.amount > 0 }
+        var result: [(String, Double, Color)] = CategoryManager.shared.categories.map { cat in
+            (cat.displayName, summary.categoryTotals[cat.name] ?? 0, categoryColor(for: cat.name))
+        }
+        result.append(("Unclassified", summary.totalUnclassified, .gray))
+        return result.filter { $0.1 > 0 }
     }
 
     var body: some View {
@@ -277,35 +260,49 @@ struct ExpensesSummaryCard: View {
                 .font(.roundedHeadline)
                 .foregroundStyle(Color.textPrimary)
 
-            // Colored segment bar
-            if summary.total > 0 {
-                GeometryReader { geometry in
-                    HStack(spacing: 2) {
-                        let width = geometry.size.width - CGFloat(max(segments.count - 1, 0)) * 2
-                        ForEach(segments, id: \.label) { seg in
-                            RoundedRectangle(cornerRadius: 4)
-                                .fill(seg.color)
-                                .frame(width: max(seg.amount / summary.total * width, 4))
+            if segments.isEmpty {
+                // Empty state
+                VStack(spacing: 8) {
+                    Image(systemName: "chart.bar")
+                        .font(.system(size: 28))
+                        .foregroundStyle(Color.textSecondary.opacity(0.5))
+                    Text("No spending data yet")
+                        .font(.roundedCaption)
+                        .foregroundStyle(Color.textSecondary)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+            } else {
+                // Colored segment bar
+                if summary.total > 0 {
+                    GeometryReader { geometry in
+                        HStack(spacing: 2) {
+                            let width = geometry.size.width - CGFloat(max(segments.count - 1, 0)) * 2
+                            ForEach(segments, id: \.label) { seg in
+                                RoundedRectangle(cornerRadius: 4)
+                                    .fill(seg.color)
+                                    .frame(width: max(seg.amount / summary.total * width, 4))
+                            }
                         }
                     }
+                    .frame(height: 12)
+                    .clipShape(Capsule())
                 }
-                .frame(height: 12)
-                .clipShape(Capsule())
-            }
 
-            // Legend — wrap into rows of 3
-            let row1 = segments.prefix(3)
-            let row2 = segments.dropFirst(3)
+                // Legend — wrap into rows of 3
+                let row1 = segments.prefix(3)
+                let row2 = segments.dropFirst(3)
 
-            HStack(spacing: 16) {
-                ForEach(Array(row1), id: \.label) { seg in
-                    legendItem(color: seg.color, label: seg.label, amount: seg.amount)
-                }
-            }
-            if !row2.isEmpty {
                 HStack(spacing: 16) {
-                    ForEach(Array(row2), id: \.label) { seg in
+                    ForEach(Array(row1), id: \.label) { seg in
                         legendItem(color: seg.color, label: seg.label, amount: seg.amount)
+                    }
+                }
+                if !row2.isEmpty {
+                    HStack(spacing: 16) {
+                        ForEach(Array(row2), id: \.label) { seg in
+                            legendItem(color: seg.color, label: seg.label, amount: seg.amount)
+                        }
                     }
                 }
             }
@@ -370,11 +367,13 @@ struct ExpenseTransactionRow: View {
     @ViewBuilder
     private var categoryBadge: some View {
         let cat = transaction.subCategory.lowercased()
-        let known = ["food", "drink", "groceries", "transportation", "entertainment", "other"]
-        if known.contains(cat) {
-            textBadge(transaction.subCategory.capitalized, color: categoryColor(for: cat))
-        } else {
+        if cat.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             textBadge("Unclassified", color: .gray)
+        } else if CategoryManager.shared.isValidCategory(cat) {
+            textBadge(CategoryManager.shared.displayName(for: cat), color: categoryColor(for: cat))
+        } else {
+            // Orphaned category (deleted custom) — show as Other
+            textBadge("Other", color: categoryColor(for: "other"))
         }
     }
 
@@ -404,36 +403,48 @@ struct TransactionClassificationSheet: View {
     @State private var showDeleteTxnConfirm = false
     @State private var localItems: [EditableReceiptItem]   // draft — synced to backend on Save
     @State private var localItemsModified = false
+    @State private var editedMerchant: String
+    @State private var editedAmount: String
+    @State private var editedDate: Date
+    @State private var isEditing = false
     @Environment(\.dismiss) private var dismiss
 
-    private let categories = ["Food", "Drink", "Groceries", "Transportation", "Entertainment", "Other"]
+    private var categories: [String] {
+        CategoryManager.shared.categories.map { $0.displayName }
+    }
 
     init(transaction: ExpenseTransaction, viewModel: ExpensesViewModel) {
         self.transaction = transaction
         self.viewModel = viewModel
-        let known = ["food", "drink", "groceries", "transportation", "entertainment", "other"]
         let current = transaction.subCategory.lowercased()
-        _selectedCategory = State(initialValue: known.contains(current) ? transaction.subCategory.capitalized : "")
+        _selectedCategory = State(initialValue: CategoryManager.shared.isValidCategory(current) ? CategoryManager.shared.displayName(for: current) : "")
         _localItems = State(initialValue: (transaction.receiptItems ?? []).map {
             EditableReceiptItem(name: $0.name, price: $0.price,
                                 category: normalizedItemCategory($0.category))
         })
+        _editedMerchant = State(initialValue: transaction.merchantName ?? transaction.name)
+        _editedAmount = State(initialValue: String(format: "%.2f", transaction.amount))
+
+        // Parse ISO date string into Date for DatePicker
+        let dateFmt = DateFormatter()
+        dateFmt.dateFormat = "yyyy-MM-dd"
+        let parsedDate = transaction.date.flatMap { dateFmt.date(from: $0) } ?? Date()
+        _editedDate = State(initialValue: parsedDate)
     }
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
-                ScrollView {
-                    VStack(spacing: 16) {
-                        headerCard
-                        categorySection
-                        TransactionItemsSection(items: $localItems)
-                            .onChange(of: localItems) { _, _ in localItemsModified = true }
+            ScrollView {
+                VStack(spacing: 16) {
+                    headerCard
+                    categorySection
+                    TransactionItemsSection(items: $localItems, readOnly: !isEditing)
+                        .onChange(of: localItems) { _, _ in localItemsModified = true }
+                    if isEditing {
                         deleteTransactionSection
                     }
-                    .padding(.vertical, 16)
                 }
-                saveButton
+                .padding(.vertical, 16)
             }
             .background(Color.appBackground)
             .navigationTitle("Transaction Details")
@@ -441,57 +452,154 @@ struct TransactionClassificationSheet: View {
             .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
-                        .foregroundStyle(Color.textSecondary)
+                    Button(isEditing ? "Cancel" : "Done") {
+                        if isEditing {
+                            isEditing = false
+                        } else {
+                            dismiss()
+                        }
+                    }
+                    .foregroundStyle(Color.textSecondary)
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    if isEditing {
+                        Button {
+                            saveChanges()
+                        } label: {
+                            Text(isSaving ? "Saving..." : "Save")
+                                .font(.roundedHeadline)
+                                .foregroundStyle(Color.accent)
+                        }
+                        .disabled(isSaving || selectedCategory.isEmpty)
+                    } else {
+                        Button {
+                            isEditing = true
+                        } label: {
+                            Text("Edit")
+                                .font(.roundedHeadline)
+                                .foregroundStyle(Color.accent)
+                        }
+                    }
                 }
             }
         }
     }
 
-    // MARK: - Header card
+    // MARK: - Header card (editable fields)
 
     private var headerCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(transaction.merchantName ?? transaction.name)
-                        .font(.roundedHeadline)
-                        .foregroundStyle(Color.textPrimary)
-                    if let dateStr = transaction.date {
-                        Text(expensesFormatDate(dateStr))
-                            .font(.roundedCaption)
-                            .foregroundStyle(Color.textSecondary)
-                    }
-                }
+        VStack(spacing: 0) {
+            // Merchant name
+            HStack {
+                Text("Merchant")
+                    .font(.roundedCaption)
+                    .foregroundStyle(Color.textSecondary)
+                    .frame(width: 72, alignment: .leading)
                 Spacer()
-                VStack(alignment: .trailing, spacing: 6) {
-                    Text("$\(transaction.amount, specifier: "%.2f")")
-                        .font(.rounded(.title2, weight: .bold))
-                        .foregroundStyle(Color.accent)
-                        .monospacedDigit()
-                    sourceBadge
+                if isEditing {
+                    TextField("Merchant name", text: $editedMerchant)
+                        .font(.roundedBody)
+                        .foregroundStyle(Color.textPrimary)
+                        .multilineTextAlignment(.trailing)
+                } else {
+                    Text(editedMerchant)
+                        .font(.roundedBody)
+                        .foregroundStyle(Color.textPrimary)
                 }
             }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 13)
 
-            // Plaid category
+            Divider().padding(.horizontal, 16)
+
+            // Amount
+            HStack {
+                Text("Amount")
+                    .font(.roundedCaption)
+                    .foregroundStyle(Color.textSecondary)
+                    .frame(width: 72, alignment: .leading)
+                Spacer()
+                if isEditing {
+                    HStack(alignment: .firstTextBaseline, spacing: 3) {
+                        Text("$")
+                            .font(.rounded(.title3, weight: .bold))
+                            .foregroundStyle(Color.accent)
+                        TextField("0.00", text: $editedAmount)
+                            .font(.rounded(.title3, weight: .bold))
+                            .foregroundStyle(Color.accent)
+                            .keyboardType(.decimalPad)
+                            .multilineTextAlignment(.trailing)
+                            .monospacedDigit()
+                            .fixedSize()
+                    }
+                } else {
+                    Text("$\(editedAmount)")
+                        .font(.rounded(.title3, weight: .bold))
+                        .foregroundStyle(Color.accent)
+                        .monospacedDigit()
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 13)
+
+            Divider().padding(.horizontal, 16)
+
+            // Date
+            HStack {
+                Text("Date")
+                    .font(.roundedCaption)
+                    .foregroundStyle(Color.textSecondary)
+                    .frame(width: 72, alignment: .leading)
+                Spacer()
+                if isEditing {
+                    DatePicker("", selection: $editedDate, displayedComponents: [.date])
+                        .datePickerStyle(.compact)
+                        .labelsHidden()
+                        .tint(Color.accent)
+                } else {
+                    Text(editedDate, style: .date)
+                        .font(.roundedBody)
+                        .foregroundStyle(Color.textPrimary)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 13)
+
+            // Source badge
+            if transaction.source != nil {
+                Divider().padding(.horizontal, 16)
+                HStack {
+                    Spacer()
+                    sourceBadge
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+            }
+
+            // Plaid category hint
             if let cat = transaction.categoryDetailed ?? transaction.categoryPrimary,
                !cat.isEmpty, transaction.source == nil || transaction.source == "plaid" {
+                Divider().padding(.horizontal, 16)
                 Text(cat.replacingOccurrences(of: "_", with: " ").capitalized)
                     .font(.roundedCaption)
                     .foregroundStyle(Color.textSecondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
             }
 
-            // Voice notes (not shown for receipts — merchant name already displayed above)
+            // Voice notes
             if let notes = transaction.notes, !notes.isEmpty,
                transaction.source != "receipt" {
-                Divider()
+                Divider().padding(.horizontal, 16)
                 Text(notes)
                     .font(.roundedBody)
                     .foregroundStyle(Color.textSecondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
             }
         }
-        .padding(16)
         .background(Color.surface)
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .padding(.horizontal)
@@ -507,21 +615,22 @@ struct TransactionClassificationSheet: View {
             default:        return ("building.columns", "Plaid", Color.indigo)
             }
         }()
-        return HStack(spacing: 4) {
+        return HStack(spacing: 5) {
             Image(systemName: icon)
-                .font(.system(size: 9))
+                .font(.system(size: 12))
             Text(label)
-                .font(.system(size: 10, weight: .semibold, design: .rounded))
+                .font(.system(size: 13, weight: .semibold, design: .rounded))
         }
         .foregroundStyle(.white)
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 5)
         .background(color)
         .clipShape(Capsule())
     }
 
     // MARK: - Category picker
 
+    @ViewBuilder
     private var categorySection: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Category")
@@ -529,34 +638,58 @@ struct TransactionClassificationSheet: View {
                 .foregroundStyle(Color.textSecondary)
                 .padding(.horizontal)
 
-            LazyVGrid(columns: [
-                GridItem(.flexible()),
-                GridItem(.flexible()),
-                GridItem(.flexible())
-            ], spacing: 10) {
-                ForEach(categories, id: \.self) { cat in
-                    Button {
-                        selectedCategory = cat
-                    } label: {
-                        VStack(spacing: 6) {
-                            Image(systemName: categoryIcon(for: cat))
-                                .font(.system(size: 20))
-                            Text(cat)
-                                .font(.roundedCaption)
+            if isEditing {
+                LazyVGrid(columns: [
+                    GridItem(.flexible()),
+                    GridItem(.flexible()),
+                    GridItem(.flexible())
+                ], spacing: 10) {
+                    ForEach(CategoryManager.shared.categories) { cat in
+                        Button {
+                            selectedCategory = cat.displayName
+                        } label: {
+                            VStack(spacing: 6) {
+                                Image(systemName: cat.icon)
+                                    .font(.system(size: 20))
+                                Text(cat.displayName)
+                                    .font(.roundedCaption)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                            .background(selectedCategory == cat.displayName ? categoryColor(for: cat.name).opacity(0.2) : Color.surface)
+                            .foregroundStyle(selectedCategory == cat.displayName ? categoryColor(for: cat.name) : Color.textSecondary)
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(selectedCategory == cat.displayName ? categoryColor(for: cat.name) : Color.clear, lineWidth: 2)
+                            )
                         }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 12)
-                        .background(selectedCategory == cat ? categoryColor(for: cat).opacity(0.2) : Color.surface)
-                        .foregroundStyle(selectedCategory == cat ? categoryColor(for: cat) : Color.textSecondary)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12)
-                                .stroke(selectedCategory == cat ? categoryColor(for: cat) : Color.clear, lineWidth: 2)
-                        )
                     }
                 }
+                .padding(.horizontal)
+            } else if let cat = CategoryManager.shared.categories.first(where: { $0.displayName == selectedCategory }) {
+                // Match the grid cell size: 1/3 width minus padding/spacing
+                let columnWidth = (UIScreen.main.bounds.width - 32 - 20) / 3
+                HStack {
+                    VStack(spacing: 6) {
+                        Image(systemName: cat.icon)
+                            .font(.system(size: 20))
+                        Text(cat.displayName)
+                            .font(.roundedCaption)
+                    }
+                    .foregroundStyle(categoryColor(for: cat.name))
+                    .frame(width: columnWidth)
+                    .padding(.vertical, 12)
+                    .background(categoryColor(for: cat.name).opacity(0.2))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(categoryColor(for: cat.name), lineWidth: 2)
+                    )
+                    Spacer()
+                }
+                .padding(.horizontal)
             }
-            .padding(.horizontal)
         }
     }
 
@@ -588,45 +721,45 @@ struct TransactionClassificationSheet: View {
         }
     }
 
-    // MARK: - Save button
+    // MARK: - Save
 
-    private var saveButton: some View {
-        Button {
-            guard !isSaving, !selectedCategory.isEmpty else { return }
-            isSaving = true
-            Task {
-                do {
-                    // Sync any item changes (edits, adds, deletes) first
-                    if localItemsModified {
-                        let payload = localItems.map {
-                            EditableReceiptItem(name: $0.name, price: $0.price, category: $0.category)
-                        }
-                        try await viewModel.addItemsToTransaction(
-                            transactionId: transaction.id, items: payload, replace: true)
+    private func saveChanges() {
+        guard !isSaving, !selectedCategory.isEmpty else { return }
+        isSaving = true
+        Task {
+            do {
+                // Sync any item changes (edits, adds, deletes) first
+                if localItemsModified {
+                    let payload = localItems.map {
+                        EditableReceiptItem(name: $0.name, price: $0.price, category: $0.category)
                     }
-                    _ = try await viewModel.classifyTransactionForSheet(
-                        transactionId: transaction.id,
-                        subCategory: selectedCategory.lowercased()
-                    )
-                    dismiss()
-                } catch {
-                    print("Failed to save: \(error)")
+                    try await viewModel.addItemsToTransaction(
+                        transactionId: transaction.id, items: payload, replace: true)
                 }
-                isSaving = false
+                // Compute changed fields — only send overrides if actually different
+                let newAmount = Double(editedAmount)
+                let amountChanged = newAmount != nil && newAmount != transaction.amount
+                let merchantChanged = editedMerchant != (transaction.merchantName ?? transaction.name)
+
+                let dateFmt = DateFormatter()
+                dateFmt.dateFormat = "yyyy-MM-dd"
+                let newDateStr = dateFmt.string(from: editedDate)
+                let dateChanged = newDateStr != transaction.date
+
+                _ = try await viewModel.classifyTransactionForSheet(
+                    transactionId: transaction.id,
+                    subCategory: selectedCategory.lowercased(),
+                    amount: amountChanged ? newAmount : nil,
+                    merchantName: merchantChanged ? editedMerchant : nil,
+                    date: dateChanged ? newDateStr : nil
+                )
+                isEditing = false
+                dismiss()
+            } catch {
+                print("Failed to save: \(error)")
             }
-        } label: {
-            Text(isSaving ? "Saving..." : "Save")
-                .font(.roundedHeadline).fontWeight(.semibold)
-                .foregroundStyle(.white)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 14)
-                .background(isSaving || selectedCategory.isEmpty ? Color.accent.opacity(0.3) : Color.accent)
-                .clipShape(RoundedRectangle(cornerRadius: 14))
+            isSaving = false
         }
-        .disabled(isSaving || selectedCategory.isEmpty)
-        .padding(.horizontal)
-        .padding(.vertical, 12)
-        .background(Color.surface)
     }
 }
 

@@ -420,23 +420,46 @@ def get_category_prefs(user_id: int) -> List[datastore.Entity]:
     return results
 
 
-def set_category_prefs(user_id: int, categories: List[str]):
+def set_category_prefs(user_id: int, categories: list):
+    """
+    Replace all category preferences for a user.
+
+    Each item in `categories` can be either:
+    - A plain string (backward compatible): just the category name.
+    - A dict with keys: name, emoji (optional), isBuiltin (optional).
+    """
     client = get_client()
     query = client.query(kind='UserCategoryPreference')
     query.add_filter(filter=PropertyFilter('user_id', '=', user_id))
     keys = [e.key for e in query.fetch()]
     if keys:
         client.delete_multi(keys)
-    for i, cat_name in enumerate(categories):
+    for i, cat in enumerate(categories):
         key = client.key('UserCategoryPreference')
         entity = datastore.Entity(key=key)
-        entity.update({
-            'user_id': user_id,
-            'category_name': cat_name,
-            'display_order': i,
-            'created_at': datetime.utcnow(),
-        })
+        if isinstance(cat, dict):
+            entity.update({
+                'user_id': user_id,
+                'category_name': cat.get('name', ''),
+                'emoji': cat.get('emoji'),
+                'is_builtin': cat.get('isBuiltin', True),
+                'display_order': i,
+                'created_at': datetime.utcnow(),
+            })
+        else:
+            entity.update({
+                'user_id': user_id,
+                'category_name': cat,
+                'display_order': i,
+                'created_at': datetime.utcnow(),
+            })
         client.put(entity)
+
+
+def get_user_custom_categories(user_id: int) -> List[str]:
+    """Return just the custom (non-builtin) category names for a user."""
+    prefs = get_category_prefs(user_id)
+    return [p.get('category_name') for p in prefs if p.get('is_builtin') is False]
 
 
 # ---------------------------------------------------------------------------

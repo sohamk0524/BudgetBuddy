@@ -51,7 +51,9 @@ struct ReceiptLineItemsView: View {
     @State private var totalIsAutoComputed: Bool
     @State private var selectedCategory: String
 
-    private let allCategories = ["food", "drink", "groceries", "transportation", "entertainment", "other"]
+    private var allCategories: [String] {
+        CategoryManager.shared.categories.map { $0.name }
+    }
 
     init(result: ReceiptAnalysisResult,
          onConfirm: @escaping (_ category: String, _ items: [EditableReceiptItem], _ date: String, _ merchant: String) -> Void) {

@@ -67,7 +67,10 @@ def analyze_receipt_endpoint():
     media_type = _detect_media_type(file)
 
     try:
-        result = analyze_receipt(image_data, media_type)
+        # Pass user's custom categories to the receipt analyzer
+        from db_models import get_user_custom_categories
+        custom_cats = get_user_custom_categories(user_id)
+        result = analyze_receipt(image_data, media_type, custom_categories=custom_cats or None)
     except Exception as e:
         print(f"Receipt analysis error: {e}")
         return jsonify({"error": f"Failed to analyze receipt: {str(e)}"}), 500
@@ -153,8 +156,31 @@ def attach_receipt():
         source='receipt',
     )
 
+    # Build full transaction object for optimistic client-side insert
+    transaction_obj = {
+        "id": manual_txn.key.id,
+        "transactionId": f"manual-{manual_txn.key.id}",
+        "accountId": "",
+        "amount": round(total, 2),
+        "date": date_str,
+        "authorizedDate": date_str,
+        "name": merchant or 'Receipt',
+        "merchantName": merchant,
+        "categoryPrimary": category,
+        "categoryDetailed": category,
+        "pending": False,
+        "paymentChannel": "receipt",
+        "subCategory": sub_category,
+        "essentialAmount": None,
+        "discretionaryAmount": None,
+        "source": "receipt",
+        "notes": None,
+        "receiptItems": items,
+    }
+
     return jsonify({
         "transactionId": manual_txn.key.id,
         "source": "manual",
         "enriched": False,
+        "transaction": transaction_obj,
     }), 201

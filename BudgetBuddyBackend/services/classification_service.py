@@ -14,6 +14,52 @@ CONFIDENCE_THRESHOLD = 3
 
 VALID_CATEGORIES = ('food', 'drink', 'groceries', 'transportation', 'entertainment', 'other')
 
+# Known category registry — keywords help the LLM classify into custom categories.
+# When a user adds a custom category whose name matches a key here, the LLM prompt
+# includes these keywords so it can accurately map merchants/transactions.
+KNOWN_CATEGORY_KEYWORDS = {
+    "food":            ["food", "restaurant", "dining", "eat", "meal", "lunch", "dinner", "breakfast", "fast food"],
+    "drink":           ["drink", "coffee", "cafe", "tea", "starbucks", "boba", "bar", "smoothie", "juice", "beer", "wine"],
+    "groceries":       ["grocery", "groceries", "supermarket", "trader joe", "walmart", "costco", "aldi", "whole foods"],
+    "transportation":  ["transport", "gas", "uber", "lyft", "ride", "bus", "transit", "parking", "fuel", "taxi", "toll"],
+    "entertainment":   ["entertainment", "movie", "streaming", "spotify", "netflix", "gaming", "concert", "theater"],
+    "other":           ["miscellaneous"],
+    "cosmetics":       ["cosmetics", "makeup", "beauty", "skincare", "sephora", "ulta", "mascara", "lipstick", "foundation"],
+    "subscriptions":   ["subscription", "recurring", "monthly", "annual", "netflix", "spotify", "hulu", "apple", "membership"],
+    "health":          ["health", "medical", "doctor", "pharmacy", "hospital", "dental", "therapy", "prescription", "cvs", "walgreens"],
+    "fitness":         ["fitness", "gym", "workout", "yoga", "pilates", "peloton", "crossfit", "training"],
+    "shopping":        ["shopping", "clothes", "shoes", "apparel", "fashion", "mall", "retail", "zara", "nordstrom"],
+    "education":       ["education", "tuition", "school", "university", "course", "textbook", "udemy", "coursera"],
+    "travel":          ["travel", "flight", "hotel", "airbnb", "booking", "vacation", "trip", "airline"],
+    "pets":            ["pet", "pets", "vet", "veterinary", "dog", "cat", "petco", "petsmart", "grooming"],
+    "home":            ["home", "rent", "mortgage", "utilities", "electric", "furniture", "ikea", "maintenance"],
+    "gifts":           ["gift", "gifts", "present", "birthday", "holiday", "donation", "charity"],
+    "tech":            ["tech", "electronics", "computer", "phone", "apple store", "best buy", "software"],
+    "music":           ["music", "concert", "vinyl", "instrument", "guitar", "piano", "tickets", "festival"],
+    "books":           ["book", "books", "kindle", "audible", "bookstore", "library", "reading"],
+    "gaming":          ["gaming", "game", "playstation", "xbox", "nintendo", "steam", "twitch"],
+    "utilities":       ["utility", "utilities", "electric", "water", "gas bill", "internet", "phone bill", "power"],
+    "insurance":       ["insurance", "premium", "coverage", "deductible", "geico", "state farm"],
+    "savings":         ["savings", "investment", "stock", "401k", "ira", "deposit", "robinhood", "vanguard"],
+    "personal care":   ["personal care", "haircut", "salon", "barber", "spa", "nails", "manicure", "massage"],
+    "clothing":        ["clothing", "clothes", "shoes", "apparel", "fashion", "dress", "jacket"],
+    "repairs":         ["repair", "fix", "maintenance", "mechanic", "plumber", "electrician", "handyman"],
+}
+
+
+def get_valid_categories_for_user(user_id) -> tuple:
+    """Return VALID_CATEGORIES + any custom categories the user has defined."""
+    if not user_id:
+        return VALID_CATEGORIES
+    try:
+        from db_models import get_user_custom_categories
+        custom = get_user_custom_categories(user_id)
+        if custom:
+            return VALID_CATEGORIES + tuple(c.lower() for c in custom)
+    except Exception:
+        pass
+    return VALID_CATEGORIES
+
 # Pre-seeded defaults by Plaid detailed category (personal_finance_category.detailed)
 # Maps Plaid categories to our 5 categories.
 # See: https://plaid.com/documents/transactions-personal-finance-category-taxonomy.csv
@@ -255,6 +301,27 @@ def _get_user_classification_context(user_id: int) -> str:
     return "\n".join(lines)
 
 
+def _build_custom_category_context(user_id: int) -> str:
+    """Build additional LLM context about user's custom categories, with keyword hints."""
+    try:
+        from db_models import get_user_custom_categories
+        custom = get_user_custom_categories(user_id)
+        if not custom:
+            return ""
+        lines = ["\nThis user also has custom categories. Use these if they are a better fit than the standard categories:"]
+        for cat_name in custom:
+            key = cat_name.lower()
+            keywords = KNOWN_CATEGORY_KEYWORDS.get(key)
+            if keywords:
+                lines.append(f"  - {cat_name}: includes {', '.join(keywords[:8])}")
+            else:
+                lines.append(f"  - {cat_name}")
+        return "\n".join(lines)
+    except Exception:
+        pass
+    return ""
+
+
 def llm_classify_merchant(
     merchant_name: str,
     category_primary: Optional[str],
@@ -269,6 +336,8 @@ def llm_classify_merchant(
         from services.llm_service import Agent
 
         user_context = _get_user_classification_context(user_id)
+        user_context += _build_custom_category_context(user_id)
+        valid_cats = get_valid_categories_for_user(user_id)
         system_prompt = LLM_CLASSIFICATION_PROMPT.format(user_context=user_context)
 
         agent = Agent(
@@ -296,7 +365,7 @@ def llm_classify_merchant(
         classification = data.get("classification", "").lower()
         essential_ratio = float(data.get("essential_ratio", 0.5))
 
-        if classification not in VALID_CATEGORIES:
+        if classification not in valid_cats:
             return None
 
         essential_ratio = max(0.0, min(1.0, essential_ratio))
@@ -344,8 +413,11 @@ def llm_classify_merchants_batch(
         from services.llm_service import Agent
 
         user_context = _get_user_classification_context(user_id)
+        custom_context = _build_custom_category_context(user_id)
+        valid_cats = get_valid_categories_for_user(user_id)
+        cats_str = "|".join(valid_cats)
 
-        system_prompt = f"""You are a financial transaction classifier. Classify each merchant into one of these categories: food, drink, groceries, transportation, entertainment, or other.
+        system_prompt = f"""You are a financial transaction classifier. Classify each merchant into one of these categories: {", ".join(valid_cats)}.
 
 Definitions:
 - **groceries**: Supermarkets, grocery stores, wholesale clubs (Walmart, Costco, Trader Joe's, Whole Foods, Safeway, Kroger, etc.)
@@ -355,10 +427,10 @@ Definitions:
 - **entertainment**: Movies, music, games, concerts, events, streaming services
 - **other**: Everything else (rent, utilities, medical, insurance, shopping, personal care, travel, etc.)
 
-{user_context}
+{user_context}{custom_context}
 
 Respond with ONLY a JSON array:
-[{{"name": "merchant", "classification": "food|drink|groceries|transportation|entertainment|other", "essential_ratio": 0.0}}]"""
+[{{"name": "merchant", "classification": "{cats_str}", "essential_ratio": 0.0}}]"""
 
         agent = Agent(
             name="BatchMerchantClassifier",
@@ -392,7 +464,7 @@ Respond with ONLY a JSON array:
         validated = []
         for item in results:
             classification = item.get("classification", "").lower()
-            if classification in VALID_CATEGORIES:
+            if classification in valid_cats:
                 validated.append({
                     "name": item.get("name", ""),
                     "classification": classification,

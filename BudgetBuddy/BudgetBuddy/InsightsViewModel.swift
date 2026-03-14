@@ -15,9 +15,9 @@ final class InsightsViewModel {
     // MARK: - Enums
 
     enum DateRange: String, CaseIterable, Identifiable {
-        case week = "7D"
-        case month = "30D"
-        case quarter = "90D"
+        case week = "7 Days"
+        case month = "30 Days"
+        case quarter = "90 Days"
 
         var id: String { rawValue }
 
@@ -180,6 +180,18 @@ final class InsightsViewModel {
         return weekBuckets
             .sorted { $0.key < $1.key }
             .map { BarEntry(id: weekFmt.string(from: $0.key), date: $0.key, label: weekFmt.string(from: $0.key), amount: $0.value) }
+    }
+
+    // MARK: - Clear (called on sign-out / account switch)
+
+    func clearData() {
+        allTransactions = []
+        selectedDateRange = .month
+        selectedPieCategory = nil
+        barGrouping = .daily
+        selectedBarDate = nil
+        isLoading = false
+        errorMessage = nil
     }
 
     // MARK: - Actions

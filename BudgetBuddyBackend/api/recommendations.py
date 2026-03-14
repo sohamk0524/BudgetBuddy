@@ -40,12 +40,17 @@ def generate_fresh_recommendations():
         return jsonify({"error": "User not found"}), 404
 
     action = data.get("action", "general")
-    valid_actions = (
+    # Allow builtin actions + any custom category the user has defined
+    builtin_actions = {
         "general", "budget_balance", "spending_habits",
         "food", "drink", "groceries", "transportation", "entertainment", "other",
-    )
-    if action not in valid_actions:
-        action = "general"
+    }
+    if action not in builtin_actions:
+        # Check if it's a valid custom category for this user
+        from services.classification_service import get_valid_categories_for_user
+        user_cats = set(get_valid_categories_for_user(user_id))
+        if action.lower() not in user_cats:
+            action = "general"
 
     result = generate_recommendations(user_id, action=action)
     return jsonify(result)
