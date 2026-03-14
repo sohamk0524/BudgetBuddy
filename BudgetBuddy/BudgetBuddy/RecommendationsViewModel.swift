@@ -78,22 +78,24 @@ class RecommendationsViewModel {
 
     var activeCategoryDisplayName: String {
         guard let category = activeCategory else { return "All" }
-        return category.prefix(1).uppercased() + category.dropFirst()
+        return CategoryManager.shared.displayName(for: category)
     }
 
     var activeCategoryIcon: String {
         guard let category = activeCategory else { return "lightbulb" }
-        return moneyMovesCards.first { $0.category == category }?.icon ?? "lightbulb"
+        return moneyMovesCards.first { $0.category == category }?.icon
+            ?? CategoryManager.shared.icon(for: category)
     }
 
-    private static let categoryKeywords: [String: [String]] = [
-        "food": ["food", "restaurant", "dining", "eat", "meal", "lunch", "dinner", "breakfast", "fast food", "chipotle", "mcdonald"],
-        "drink": ["drink", "coffee", "cafe", "tea", "starbucks", "boba", "bar", "smoothie"],
-        "groceries": ["grocery", "groceries", "supermarket", "trader joe", "walmart", "costco", "aldi"],
-        "transportation": ["transport", "gas", "uber", "lyft", "ride", "bus", "transit", "parking", "fuel"],
-        "entertainment": ["entertainment", "movie", "streaming", "spotify", "netflix", "gaming", "concert", "event"],
-        "other": ["subscription", "recurring", "amazon", "online"]
-    ]
+    /// Keywords for category filtering — pulls from the known category registry
+    /// so both builtins and custom categories get rich keyword matching.
+    private static var categoryKeywords: [String: [String]] {
+        var keywords: [String: [String]] = [:]
+        for cat in CategoryManager.shared.categories {
+            keywords[cat.name] = CategoryManager.shared.keywords(for: cat.name)
+        }
+        return keywords
+    }
 
     // MARK: - Actions
 

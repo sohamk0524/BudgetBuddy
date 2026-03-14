@@ -27,11 +27,11 @@ struct CategorySettingsView: View {
                         Text(cat.displayName)
                             .font(.roundedBody)
                             .foregroundStyle(Color.textPrimary)
-                    }
-                    .listRowBackground(Color.surface)
-                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+
+                        Spacer()
+
                         if !cat.isBuiltin {
-                            Button(role: .destructive) {
+                            Button {
                                 if let idx = categoryManager.categories.firstIndex(of: cat) {
                                     Task {
                                         await categoryManager.deleteCategory(at: idx)
@@ -39,16 +39,21 @@ struct CategorySettingsView: View {
                                     }
                                 }
                             } label: {
-                                Label("Delete", systemImage: "trash")
+                                Image(systemName: "trash")
+                                    .font(.system(size: 14))
+                                    .foregroundStyle(Color.danger)
                             }
+                            .buttonStyle(.plain)
                         }
                     }
+                    .listRowBackground(Color.surface)
+                    .moveDisabled(cat.name == "other")
                 }
                 .onMove { source, destination in
                     categoryManager.reorder(from: source, to: destination)
                 }
             } header: {
-                Text("Drag to reorder. Swipe left to delete custom categories.")
+                Text("Drag to reorder categories.")
                     .font(.roundedCaption)
                     .foregroundStyle(Color.textSecondary)
                     .textCase(nil)
@@ -87,7 +92,7 @@ struct CategorySettingsView: View {
                 categoryManager.addCategory(name: name, icon: icon)
                 Task { await categoryManager.saveCategories() }
             }
-            .presentationDetents([.medium])
+            .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)
         }
         .onDisappear {
@@ -114,64 +119,116 @@ struct AddCategorySheet: View {
             .capitalized
     }
 
+    /// Fuzzy-matched suggestions based on what the user is typing.
+    private var filteredSuggestions: [(name: String, info: KnownCategoryInfo)] {
+        let query = name.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return [] }
+        let activeNames = Set(CategoryManager.shared.categories.map { $0.name })
+        return knownCategoryRegistry
+            .filter { entry in
+                guard !activeNames.contains(entry.key) else { return false }
+                // Match on category name or any keyword
+                if entry.value.displayName.lowercased().contains(query) { return true }
+                if entry.key.contains(query) { return true }
+                return entry.value.keywords.contains { $0.contains(query) }
+            }
+            .sorted { $0.value.displayName < $1.value.displayName }
+            .map { (name: $0.key, info: $0.value) }
+    }
+
+    private func selectSuggestion(_ key: String, _ info: KnownCategoryInfo) {
+        name = info.displayName
+        selectedIcon = info.icon
+    }
+
     var body: some View {
         NavigationStack {
-            VStack(spacing: 20) {
-                // Name field
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Category Name")
-                        .font(.roundedCaption)
-                        .foregroundStyle(Color.textSecondary)
-
-                    TextField("e.g. Subscriptions", text: $name)
-                        .font(.roundedBody)
-                        .foregroundStyle(Color.textPrimary)
-                        .padding(12)
-                        .background(Color.surface)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                }
-
-                // Icon picker
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack(spacing: 6) {
-                        Text("Choose an Icon")
+            ScrollView {
+                VStack(spacing: 20) {
+                    // Name field
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Category Name")
                             .font(.roundedCaption)
                             .foregroundStyle(Color.textSecondary)
-                        Text("— \(iconLabel(selectedIcon))")
-                            .font(.roundedCaption)
-                            .foregroundStyle(Color.accent)
+
+                        TextField("e.g. Subscriptions", text: $name)
+                            .font(.roundedBody)
+                            .foregroundStyle(Color.textPrimary)
+                            .padding(12)
+                            .background(Color.surface)
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
                     }
 
-                    LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 6), spacing: 10) {
-                        ForEach(CategoryManager.iconOptions, id: \.self) { icon in
-                            Button {
-                                selectedIcon = icon
-                            } label: {
-                                Image(systemName: icon)
-                                    .font(.system(size: 18))
-                                    .foregroundStyle(selectedIcon == icon ? Color.accent : Color.textSecondary)
-                                    .frame(width: 44, height: 44)
-                                    .background(selectedIcon == icon ? Color.accent.opacity(0.2) : Color.surface)
+                    // Fuzzy suggestions (appear as user types)
+                    if !filteredSuggestions.isEmpty {
+                        VStack(alignment: .leading, spacing: 6) {
+                            ForEach(filteredSuggestions, id: \.name) { item in
+                                Button {
+                                    selectSuggestion(item.name, item.info)
+                                } label: {
+                                    HStack(spacing: 10) {
+                                        Image(systemName: item.info.icon)
+                                            .font(.system(size: 14))
+                                            .foregroundStyle(Color.accent)
+                                            .frame(width: 24)
+                                        Text(item.info.displayName)
+                                            .font(.roundedBody)
+                                            .foregroundStyle(Color.textPrimary)
+                                        Spacer()
+                                        Image(systemName: "arrow.up.left")
+                                            .font(.system(size: 12))
+                                            .foregroundStyle(Color.textSecondary)
+                                    }
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 10)
+                                    .background(Color.surface)
                                     .clipShape(RoundedRectangle(cornerRadius: 10))
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 10)
-                                            .stroke(selectedIcon == icon ? Color.accent : Color.clear, lineWidth: 2)
-                                    )
+                                }
+                                .buttonStyle(.plain)
                             }
-                            .buttonStyle(.plain)
                         }
                     }
-                }
 
-                if showError {
-                    Text("Name must be unique and non-empty.")
-                        .font(.roundedCaption)
-                        .foregroundStyle(Color.danger)
-                }
+                    // Icon picker
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack(spacing: 6) {
+                            Text("Choose an Icon")
+                                .font(.roundedCaption)
+                                .foregroundStyle(Color.textSecondary)
+                            Text("— \(iconLabel(selectedIcon))")
+                                .font(.roundedCaption)
+                                .foregroundStyle(Color.accent)
+                        }
 
-                Spacer()
+                        LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 6), spacing: 10) {
+                            ForEach(CategoryManager.iconOptions, id: \.self) { icon in
+                                Button {
+                                    selectedIcon = icon
+                                } label: {
+                                    Image(systemName: icon)
+                                        .font(.system(size: 18))
+                                        .foregroundStyle(selectedIcon == icon ? Color.accent : Color.textSecondary)
+                                        .frame(width: 44, height: 44)
+                                        .background(selectedIcon == icon ? Color.accent.opacity(0.2) : Color.surface)
+                                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 10)
+                                                .stroke(selectedIcon == icon ? Color.accent : Color.clear, lineWidth: 2)
+                                        )
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+
+                    if showError {
+                        Text("Name must be unique and non-empty.")
+                            .font(.roundedCaption)
+                            .foregroundStyle(Color.danger)
+                    }
+                }
+                .padding()
             }
-            .padding()
             .background(Color.appBackground)
             .navigationTitle("New Category")
             .navigationBarTitleDisplayMode(.inline)

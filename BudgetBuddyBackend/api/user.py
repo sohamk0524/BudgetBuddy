@@ -426,6 +426,8 @@ def update_category_preferences(user_id):
 def delete_custom_category(user_id, category_name):
     """Delete a custom category and migrate all its transactions to another category."""
     from db_models import get_client
+    from google.cloud.datastore import query as ds_query
+    PropertyFilter = ds_query.PropertyFilter
 
     user = get_user(user_id)
     if not user:

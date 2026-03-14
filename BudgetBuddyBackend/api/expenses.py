@@ -260,13 +260,25 @@ def get_spending_summary(user_id):
         return jsonify({"error": "User not found"}), 404
 
     from datetime import date
+    from services.classification_service import get_valid_categories_for_user
     today = date.today()
     start_of_month = today.replace(day=1).isoformat()
 
     account_ids, _ = _get_account_ids_and_map(user_id)
 
-    # Aggregate Plaid transactions
-    totals = {cat: {"amount": 0.0, "count": 0} for cat in VALID_CATEGORIES}
+    # Aggregate transactions — use dynamic categories (builtin + custom)
+    valid_cats = get_valid_categories_for_user(user_id)
+    totals = {}
+
+    def _add(sub, amount):
+        if not sub or sub == 'unclassified':
+            return
+        # Fold unknown categories into 'other'
+        cat = sub if sub in valid_cats else 'other'
+        if cat not in totals:
+            totals[cat] = {"amount": 0.0, "count": 0}
+        totals[cat]["amount"] += amount
+        totals[cat]["count"] += 1
 
     if account_ids:
         all_txns, _ = get_transactions_for_accounts(account_ids, limit=10000)
@@ -275,10 +287,7 @@ def get_spending_summary(user_id):
                 continue
             if (t.get('date') or '') < start_of_month:
                 continue
-            sub = t.get('sub_category') or 'unclassified'
-            if sub in totals:
-                totals[sub]["amount"] += t.get('amount') or 0
-                totals[sub]["count"] += 1
+            _add(t.get('sub_category'), t.get('amount') or 0)
 
     # Merge manual/voice transactions
     for mt in get_manual_transactions(user_id):
@@ -286,20 +295,22 @@ def get_spending_summary(user_id):
             continue
         if (mt.get('date') or '') < start_of_month:
             continue
-        sub = mt.get('sub_category') or 'unclassified'
-        if sub in totals:
-            totals[sub]["amount"] += mt.get('amount') or 0
-            totals[sub]["count"] += 1
+        _add(mt.get('sub_category'), mt.get('amount') or 0)
 
     # Build response: non-zero categories sorted by amount descending
+    # Look up icons from user's category preferences, falling back to CATEGORY_ICONS
+    from db_models import get_category_prefs
+    user_prefs = {p.get('category_name', '').lower(): p.get('emoji') for p in get_category_prefs(user_id)}
+
     categories = []
-    for cat in VALID_CATEGORIES:
-        if totals[cat]["amount"] > 0:
+    for cat, data in totals.items():
+        if data["amount"] > 0:
+            icon = user_prefs.get(cat) or CATEGORY_ICONS.get(cat, "tag.fill")
             categories.append({
                 "category": cat,
-                "amount": round(totals[cat]["amount"], 2),
-                "transactionCount": totals[cat]["count"],
-                "icon": CATEGORY_ICONS.get(cat, "ellipsis.circle"),
+                "amount": round(data["amount"], 2),
+                "transactionCount": data["count"],
+                "icon": icon,
             })
 
     categories.sort(key=lambda c: c["amount"], reverse=True)
