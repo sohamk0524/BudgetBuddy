@@ -2,7 +2,7 @@
 
 ## Context
 
-This branch (`categories-edit-expenses`) addresses several UX issues and feature requests: transactions can't be fully edited (only category/items), new transactions don't appear immediately, cache persists across account switches, categories are limited to 6 hardcoded options, and voice/receipt LLM responses sometimes fail to pre-select the correct category.
+This branch (`categories-edit-expenses`) addresses several UX issues and feature requests: transactions can't be fully edited (only category/items), new transactions don't appear immediately, cache persists across account switches, categories are limited to 6 hardcoded options, voice/receipt LLM responses sometimes fail to pre-select the correct category, and the Insights tab doesn't refresh when returning to it.
 
 All changes are backward-compatible with the existing production Google Cloud Datastore database — no breaking entity changes, additive-only API responses, and safe defaults for all new fields.
 
@@ -39,14 +39,17 @@ Previously, `TransactionClassificationSheet` showed merchant, date, and amount a
 
 **`BudgetBuddy/BudgetBuddy/Views/ExpensesView.swift`**
 
-- Add `@State` properties: `editedMerchant`, `editedAmount`, `editedDate` to `TransactionClassificationSheet`
-- Replace read-only header with editable fields:
-  - `TextField` for merchant name
-  - `TextField` with `.keyboardType(.decimalPad)` for amount (with `$` prefix)
-  - `DatePicker` (compact style) for date
-  - Source badge section (voice/manual/receipt/plaid)
+- Add `@State` properties: `editedMerchant`, `editedAmount`, `editedDate`, `isEditing` to `TransactionClassificationSheet`
+- **Edit/Save toggle mode**: Sheet opens in read-only mode by default
+  - Toolbar left: "Done" button (dismisses sheet) when viewing, "Cancel" (exits edit mode) when editing
+  - Toolbar right: "Edit" button to enter edit mode, becomes "Save" button when editing
+  - Bottom save button removed — saving handled by toolbar Save button via `saveChanges()` method
+- **Header card**: Merchant, amount, date show as read-only `Text` views by default. Switch to `TextField`/`DatePicker` only when `isEditing = true`
+- **Category grid**: Non-interactive when not editing (`allowsHitTesting(isEditing)`), unselected categories dimmed to 50% opacity
+- **Delete transaction section**: Only visible when in edit mode
+- **Source badge**: Icon size 12pt, text size 13pt (`.system(size: 13, weight: .semibold, design: .rounded)`), padding `.horizontal(10)` `.vertical(5)`
 - Init parses ISO date string into `Date` for DatePicker
-- Save button computes which fields actually changed and passes only changed values as optional overrides
+- `saveChanges()` computes which fields actually changed and passes only changed values as optional overrides
 
 ---
 
@@ -113,7 +116,7 @@ func refresh() async {
 
 ## Feature 4: Custom User Categories
 
-Users can add up to 4 custom categories (with emoji and reordering) in Settings. Custom categories appear in all pickers, filters, summary cards, badges, and charts. Backend auto-classification maps to user-specific categories.
+Users can add up to 4 custom categories (with SF Symbol icons and reordering) in Settings. Custom categories appear in all pickers, filters, summary cards, badges, and charts. Backend auto-classification maps to user-specific categories.
 
 ### Feature 4 — Backend
 
@@ -155,11 +158,13 @@ Users can add up to 4 custom categories (with emoji and reordering) in Settings.
 
 `@Observable @MainActor` singleton managing all categories:
 
-- `UserCategory` struct: `name`, `displayName`, `emoji`, `isBuiltin`, `displayOrder`
-- 6 builtins: food, drink, groceries, transportation, entertainment, other
+- `UserCategory` struct: `name`, `displayName`, `icon` (SF Symbol name), `isBuiltin`, `displayOrder`
+- 6 builtins with SF Symbols: food (`fork.knife`), drink (`cup.and.saucer.fill`), groceries (`cart.fill`), transportation (`car.fill`), entertainment (`film.fill`), other (`ellipsis.circle.fill`)
 - Methods: `loadCategories()`, `saveCategories()`, `addCategory()`, `deleteCategory()`, `reorder()`, `clearData()`
-- Helpers: `isValidCategory()`, `displayName(for:)`, `emoji(for:)`, `color(for:)`, `icon(for:)`
+- `addCategory()` inserts new categories above "Other" so it always stays last
+- Helpers: `isValidCategory()`, `displayName(for:)`, `icon(for:)`, `color(for:)`, `defaultIcon(for:)`
 - Custom category colors from palette: `[.pink, .cyan, .mint, .indigo]` (assigned by index)
+- `static let iconOptions`: 24 SF Symbols for the custom category icon picker (tag.fill, briefcase.fill, house.fill, cross.case.fill, graduationcap.fill, airplane, tshirt.fill, scissors, pawprint.fill, gift.fill, iphone, banknote.fill, dumbbell.fill, music.note, book.fill, paintbrush.fill, sparkles, soccerball, gamecontroller.fill, bag.fill, lightbulb.fill, wrench.and.screwdriver.fill, leaf.fill, heart.fill)
 - `UserDefaults` cache for offline use
 - Max 4 custom categories
 
@@ -167,11 +172,12 @@ Users can add up to 4 custom categories (with emoji and reordering) in Settings.
 
 **New file: `BudgetBuddy/BudgetBuddy/Views/CategorySettingsView.swift`**
 
-- Reorderable `List` with drag handles (edit mode always active)
-- Built-in categories show "Built-in" label, not deletable
-- Custom categories show "Custom" label, swipe-to-delete
+- Reorderable `List` with edit mode always active (standard drag handles from `.onMove`)
+- Unified list — no "Built-in" / "Custom" section labels, just a header: "Drag to reorder categories."
+- Each row shows: SF Symbol icon in a rounded colored box + category display name
+- Custom categories have a visible trash button (not swipe-to-delete) — deleting removes the category and orphaned transactions show under "Other" without DB changes
 - "Add Category" button (disabled at 4 custom) — presents `AddCategorySheet`
-- `AddCategorySheet`: name TextField + emoji grid picker (24 common emojis)
+- `AddCategorySheet`: name TextField + SF Symbol grid picker (6-column LazyVGrid), shows selected icon name next to "Choose an Icon" header (e.g. "Choose an Icon — Tag")
 - Saves on disappear and after mutations
 
 **`BudgetBuddy/BudgetBuddy/Views/ProfileView.swift`**
@@ -193,21 +199,27 @@ Users can add up to 4 custom categories (with emoji and reordering) in Settings.
 
 **`BudgetBuddy/BudgetBuddy/ExpensesViewModel.swift`**
 
-- Replace `ExpenseFilter` enum with a `Hashable` struct — `allFilters` computed from `CategoryManager.shared.categories`
+- Replace `ExpenseFilter` enum with a `Hashable` struct — `allFilters(hasUnclassified:)` static method computed from `CategoryManager.shared.categories`
+- "Unclassified" filter only included when `hasUnclassified` is true (i.e., there are actually unclassified transactions)
+- `hasUnclassified` computed property: checks if any transaction has an empty subCategory
 - Update `transactions` computed property to filter by `selectedFilter.name`
-- Update `summary` computed property to build `categoryTotals` from `CategoryManager`
-- Update `isUnclassified()` to use `CategoryManager.shared.isValidCategory()` instead of hardcoded list
+- "Other" filter includes both actual "other" transactions + orphaned categories from deleted custom categories
+- `isOrphaned()` private helper: detects transactions whose category is not in the current valid list
+- `isUnclassified()` only matches truly empty subCategories (not orphaned custom categories)
+- Update `summary` computed property to build `categoryTotals` from `CategoryManager`, with orphaned category totals folded into "other"
 
 **`BudgetBuddy/BudgetBuddy/Views/ExpensesView.swift`**
 
-- Filter pills: `ExpenseFilter.allCases` → `ExpenseFilter.allFilters`, `.rawValue` → `.displayName`
-- Global category helpers (`normalizedItemCategory`, `categoryColor`, `categoryIcon`): delegate to `CategoryManager`
-- `ExpensesSummaryCard` segments: dynamic from `CategoryManager.shared.categories` + unclassified
-- `ExpenseTransactionRow` badge: uses `CategoryManager.shared.isValidCategory()` and `displayName(for:)`
+- Filter pills: use `ExpenseFilter.allFilters(hasUnclassified: viewModel.hasUnclassified)`, `.displayName` for labels
+- **Filter deselection**: Tapping an already-selected filter (except "All") deselects it back to "All"
+- Global category helpers (`normalizedItemCategory`, `categoryColor`, `categoryIcon`): `@MainActor` functions delegating to `CategoryManager`
+- `ExpensesSummaryCard` segments: dynamic from `CategoryManager.shared.categories` + unclassified, with empty state when no spending data
+- `ExpenseTransactionRow` badge: empty → "Unclassified", valid → display name, orphaned → "Other"
 - `TransactionClassificationSheet`:
   - `categories` computed property from `CategoryManager.shared.categories.map { $0.displayName }`
   - Init uses `CategoryManager.shared.isValidCategory()` for pre-selection
-  - Category picker grid shows emoji (from `UserCategory.emoji`) instead of SF Symbols
+  - Category picker grid shows SF Symbol icons (`Image(systemName: cat.icon)`)
+  - Items section receives `readOnly: !isEditing` to hide edit controls when not editing
 
 **`BudgetBuddy/BudgetBuddy/Views/Wallet/TransactionConfirmationView.swift`**
 
@@ -216,6 +228,7 @@ Users can add up to 4 custom categories (with emoji and reordering) in Settings.
 **`BudgetBuddy/BudgetBuddy/Views/Components/TransactionItemsSection.swift`**
 
 - Replace hardcoded `allCategories` constant with computed property from `CategoryManager`
+- Add `readOnly: Bool = false` parameter — when true, hides Edit/Done button, Add Item button, and all edit controls
 
 **`BudgetBuddy/BudgetBuddy/Views/Receipt/ReceiptLineItemsView.swift`**
 
@@ -227,6 +240,7 @@ Users can add up to 4 custom categories (with emoji and reordering) in Settings.
 - Update `updateCategoryPreferences()` to accept `[[String: Any]]` with rich structure
 - Add `deleteCustomCategory(userId:categoryName:migrateTo:)`
 - Update `parseTransaction()` to accept optional `userId` parameter
+- Add `userId` to classify transaction request body
 
 **`BudgetBuddy/BudgetBuddy/VoiceTransactionViewModel.swift`**
 
@@ -263,6 +277,26 @@ Users can add up to 4 custom categories (with emoji and reordering) in Settings.
 
 ---
 
+## Feature 6: Insights Auto-Refresh & Date Range Labels
+
+### Problem
+
+Insights tab only fetched data on tab switch (`onChange(of: selectedTab)`). If the user was already on the tab and added transactions, or navigated back to it, data wouldn't refresh. The "no spending data" empty state persisted until the date selector was changed.
+
+### Solution
+
+**`BudgetBuddy/BudgetBuddy/Views/InsightsView.swift`**
+
+- Add `.task { await viewModel.fetchTransactions() }` for initial load
+- Add `.onAppear { Task { await viewModel.fetchTransactions() } }` to refresh every time the view appears (e.g., returning from another tab)
+- Existing `.refreshable` and `.onChange(of: selectedTab)` remain as additional triggers
+
+**`BudgetBuddy/BudgetBuddy/InsightsViewModel.swift`**
+
+- Rename `DateRange` enum raw values from abbreviated ("7D", "30D", "90D") to full labels ("7 Days", "30 Days", "90 Days")
+
+---
+
 ## Implementation Order
 
 | Step | Feature | Size |
@@ -272,6 +306,7 @@ Users can add up to 4 custom categories (with emoji and reordering) in Settings.
 | 3 | Feature 2: Optimistic insert + refresh fix | Medium — backend response expansion + client-side insert |
 | 4 | Feature 1: Editable transaction fields | Medium — new editable UI + backend support |
 | 5 | Feature 4: Custom categories | Largest — new files, touches most existing files |
+| 6 | Feature 6: Insights auto-refresh & labels | Small — view lifecycle + string rename |
 
 ---
 
@@ -290,6 +325,7 @@ Users can add up to 4 custom categories (with emoji and reordering) in Settings.
 - `BudgetBuddy/BudgetBuddy/InsightsViewModel.swift`
 - `BudgetBuddy/BudgetBuddy/VoiceTransactionViewModel.swift`
 - `BudgetBuddy/BudgetBuddy/Views/ExpensesView.swift`
+- `BudgetBuddy/BudgetBuddy/Views/InsightsView.swift`
 - `BudgetBuddy/BudgetBuddy/Views/ContentView.swift`
 - `BudgetBuddy/BudgetBuddy/Views/ProfileView.swift`
 - `BudgetBuddy/BudgetBuddy/Views/Wallet/TransactionConfirmationView.swift`
@@ -307,10 +343,14 @@ Users can add up to 4 custom categories (with emoji and reordering) in Settings.
 1. **Feature 5**: Add voice transaction saying "ten dollars at Starbucks for coffee" → verify category pre-selects "Drink" (or "Food"). Test with receipt scan.
 2. **Feature 3**: Sign out → sign into different account → verify expenses screen is empty, then loads new user's data. Verify categories also reset.
 3. **Feature 2**: Add voice transaction → verify it appears immediately in expenses list without polling. Pull down to refresh → verify spinner completes and data refreshes without canceling.
-4. **Feature 1**: Tap a transaction → edit merchant name, amount, date → save → verify changes persist after pull-to-refresh.
+4. **Feature 1**: Tap a transaction → verify it opens in read-only mode. Tap "Edit" → verify merchant/amount/date become editable, category grid becomes interactive, items section shows edit controls. Tap "Save" → verify changes persist after pull-to-refresh. Tap "Cancel" while editing → verify it exits edit mode without saving.
 5. **Feature 4**:
-   - Settings → Categories → add custom category "Coffee" with ☕ emoji → verify it appears in all category pickers (classification sheet, voice confirmation, receipt review, item-level picker)
-   - Filter pills on Expenses tab show the new category
+   - Settings → Categories → add custom category "Coffee" with a tag SF Symbol icon → verify it appears in all category pickers (classification sheet, voice confirmation, receipt review, item-level picker)
+   - New category inserts above "Other" in the list
+   - Filter pills on Expenses tab show the new category; tapping a selected filter deselects it back to "All"
+   - "Unclassified" filter only appears when there are actually unclassified transactions
    - Summary card shows spending for the custom category
    - Voice transaction → verify LLM can classify into custom category
-   - Delete custom category → verify transactions migrate to "Other"
+   - Delete custom category → verify transactions show under "Other" without DB changes (orphaned category handling)
+   - Source badge (Receipt/Voice/Manual/Plaid) is legible and sized consistently with surrounding text
+6. **Feature 6**: Add transactions → navigate to Insights tab → verify data loads automatically without changing the date selector. Verify date range buttons show "7 Days" / "30 Days" / "90 Days".
