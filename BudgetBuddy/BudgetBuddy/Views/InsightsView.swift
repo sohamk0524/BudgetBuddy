@@ -44,7 +44,11 @@ struct InsightsView: View {
             .navigationTitle("Insights")
             .navigationBarTitleDisplayMode(.large)
             .toolbarColorScheme(.dark, for: .navigationBar)
+            .task { await viewModel.fetchTransactions() }
             .refreshable { await viewModel.fetchTransactions() }
+            .onAppear {
+                Task { await viewModel.fetchTransactions() }
+            }
             .onChange(of: selectedTab) { _, newTab in
                 if newTab == 2 {
                     AnalyticsManager.logInsightsViewed()
