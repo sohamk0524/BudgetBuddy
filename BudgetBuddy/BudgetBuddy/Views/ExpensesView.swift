@@ -26,9 +26,13 @@ struct ExpensesView: View {
                         // Filter chips (horizontally scrollable)
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 8) {
-                                ForEach(ExpenseFilter.allFilters, id: \.self) { filter in
+                                ForEach(ExpenseFilter.allFilters(hasUnclassified: viewModel.hasUnclassified), id: \.self) { filter in
                                     Button {
-                                        viewModel.selectedFilter = filter
+                                        if filter != .all && viewModel.selectedFilter == filter {
+                                            viewModel.selectedFilter = .all
+                                        } else {
+                                            viewModel.selectedFilter = filter
+                                        }
                                     } label: {
                                         Text(filter.displayName)
                                             .font(.roundedCaption)

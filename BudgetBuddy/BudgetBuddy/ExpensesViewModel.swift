@@ -19,12 +19,15 @@ struct ExpenseFilter: Hashable {
     static let unclassified = ExpenseFilter(name: "unclassified", displayName: "Unclassified")
 
     /// Generates the full filter list from CategoryManager.
-    @MainActor static var allFilters: [ExpenseFilter] {
+    /// "Unclassified" only appears when there are actually unclassified transactions.
+    @MainActor static func allFilters(hasUnclassified: Bool) -> [ExpenseFilter] {
         var filters = [ExpenseFilter.all]
         filters += CategoryManager.shared.categories.map {
             ExpenseFilter(name: $0.name, displayName: $0.displayName)
         }
-        filters.append(.unclassified)
+        if hasUnclassified {
+            filters.append(.unclassified)
+        }
         return filters
     }
 }
@@ -387,6 +390,11 @@ class ExpensesViewModel {
         guard !allTransactions.contains(where: { $0.id == transaction.id }) else { return }
         allTransactions.insert(transaction, at: 0)
         saveToCache()
+    }
+
+    /// Whether any transactions currently lack a category.
+    var hasUnclassified: Bool {
+        allTransactions.contains { isUnclassified($0) }
     }
 
     /// Returns true if a transaction has never been categorized (empty subCategory).
