@@ -10,6 +10,8 @@
 		A31372052F5E807A00EA1833 /* FirebaseAnalytics in Frameworks */ = {isa = PBXBuildFile; productRef = A31372042F5E807A00EA1833 /* FirebaseAnalytics */; };
 		A31372072F5E809A00EA1833 /* FirebaseAnalyticsCore in Frameworks */ = {isa = PBXBuildFile; productRef = A31372062F5E809A00EA1833 /* FirebaseAnalyticsCore */; };
 		A31372092F5E817D00EA1833 /* AnalyticsManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A31372082F5E817D00EA1833 /* AnalyticsManager.swift */; };
+		A38BAC6C2F653CC4004F41F2 /* CategoryManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A38BAC6B2F653CC4004F41F2 /* CategoryManager.swift */; };
+		A38BAC6E2F653CE2004F41F2 /* CategorySettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A38BAC6D2F653CE2004F41F2 /* CategorySettingsView.swift */; };
 		A3E3160D2F5A12D9005BF54C /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = A3E3160C2F5A12D9005BF54C /* FirebaseAuth */; };
 		A3E3160F2F5A12D9005BF54C /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = A3E3160E2F5A12D9005BF54C /* FirebaseCore */; };
 		A3E316112F5A14B3005BF54C /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = A3E316102F5A14B2005BF54C /* GoogleService-Info.plist */; };
@@ -90,6 +92,8 @@
 /* Begin PBXFileReference section */
 		2DBC54B57156481394404728 /* BiometricUnlockView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BiometricUnlockView.swift; sourceTree = "<group>"; };
 		A31372082F5E817D00EA1833 /* AnalyticsManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnalyticsManager.swift; sourceTree = "<group>"; };
+		A38BAC6B2F653CC4004F41F2 /* CategoryManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoryManager.swift; sourceTree = "<group>"; };
+		A38BAC6D2F653CE2004F41F2 /* CategorySettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategorySettingsView.swift; sourceTree = "<group>"; };
 		A3E316102F5A14B2005BF54C /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
 		ACDFE30F2F5CCE0E00EDF3AE /* InsightsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InsightsView.swift; sourceTree = "<group>"; };
 		ACDFE3112F5CCE1800EDF3AE /* InsightsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InsightsViewModel.swift; sourceTree = "<group>"; };
@@ -196,6 +200,7 @@
 		E18C836E2F54305800E66577 /* BudgetBuddy */ = {
 			isa = PBXGroup;
 			children = (
+				A38BAC6B2F653CC4004F41F2 /* CategoryManager.swift */,
 				A3E316102F5A14B2005BF54C /* GoogleService-Info.plist */,
 				E19B24982F55295A005C18DA /* ReceiptScanViewModel.swift */,
 				E18C83842F54330100E66577 /* APIService.swift */,
@@ -272,6 +277,7 @@
 		E18C83942F54330700E66577 /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				A38BAC6D2F653CE2004F41F2 /* CategorySettingsView.swift */,
 				ACDFE30F2F5CCE0E00EDF3AE /* InsightsView.swift */,
 				E19B249A2F5529F1005C18DA /* Receipt */,
 				E18C83952F54330700E66577 /* ProfileView.swift */,
@@ -452,6 +458,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				E18C83DD2F54330900E66577 /* VoiceTransactionSuccessView.swift in Sources */,
+				A38BAC6C2F653CC4004F41F2 /* CategoryManager.swift in Sources */,
 				E18C83B92F54330900E66577 /* ChatBubbleView.swift in Sources */,
 				E18C83D52F54330900E66577 /* PulseHeaderView.swift in Sources */,
 				E18C83C32F54330900E66577 /* SpendingPlanViewModel.swift in Sources */,
@@ -465,6 +472,7 @@
 				E18C83D42F54330900E66577 /* BurndownWidgetView.swift in Sources */,
 				E18C83C82F54330900E66577 /* AuthManager.swift in Sources */,
 				E18C83C22F54330900E66577 /* BudgetBuddyApp.swift in Sources */,
+				A38BAC6E2F653CE2004F41F2 /* CategorySettingsView.swift in Sources */,
 				E18C83D62F54330900E66577 /* PlanDashboardCards.swift in Sources */,
 				E18C83BB2F54330900E66577 /* Theme.swift in Sources */,
 				E19B24992F55295B005C18DA /* ReceiptScanViewModel.swift in Sources */,
