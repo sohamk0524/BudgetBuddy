@@ -140,6 +140,56 @@ final class InsightsViewModel {
             .map { $0 }
     }
 
+    // MARK: - Category Budget Data
+
+    struct CategoryBudgetEntry: Identifiable {
+        let id: String
+        let category: String
+        let displayName: String
+        let spent: Double
+        let limit: Double
+        let color: Color
+        let icon: String
+        var isOverBudget: Bool { spent > limit }
+    }
+
+    /// Categories that have a weekly limit set, with their spending in the last 7 days.
+    var categoryBudgetData: [CategoryBudgetEntry] {
+        let cal = Calendar.current
+        let fmt = Self.isoFmt
+        let sevenDaysAgo = cal.date(byAdding: .day, value: -7, to: Date())!
+
+        // Sum spending per category for the last 7 days
+        var weeklyTotals: [String: Double] = [:]
+        for tx in allTransactions {
+            let cat = tx.subCategory.lowercased()
+            guard !cat.isEmpty else { continue }
+            if let dateStr = tx.date, let d = fmt.date(from: dateStr), d >= sevenDaysAgo {
+                weeklyTotals[cat, default: 0] += abs(tx.amount)
+            }
+        }
+
+        // Only include categories that have a weekly limit
+        return CategoryManager.shared.categories
+            .compactMap { userCat -> CategoryBudgetEntry? in
+                guard let limit = userCat.weeklyLimit, limit > 0 else { return nil }
+                let spent = weeklyTotals[userCat.name] ?? 0
+                return CategoryBudgetEntry(
+                    id: userCat.name,
+                    category: userCat.name,
+                    displayName: userCat.displayName,
+                    spent: spent,
+                    limit: limit,
+                    color: categoryColor(for: userCat.name),
+                    icon: userCat.icon
+                )
+            }
+    }
+
+    var categoryBudgetOverCount: Int {
+        categoryBudgetData.filter { $0.isOverBudget }.count
+    }
+
     // MARK: - Bar Chart Computed Data
 
     var barData: [BarEntry] {

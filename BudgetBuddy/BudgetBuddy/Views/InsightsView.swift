@@ -36,6 +36,9 @@ struct InsightsView: View {
 
                         barChartCard
                             .padding(.horizontal)
+
+                        categoryBudgetsCard
+                            .padding(.horizontal)
                     }
                 }
                 .padding(.vertical)
@@ -367,10 +370,9 @@ struct InsightsView: View {
             }
 
             // Budget summary callout
-            if let limit = viewModel.barBudgetLimit {
+            if viewModel.barBudgetLimit != nil {
                 let overCount = viewModel.overBudgetCount
                 let total = viewModel.barsWithSpending
-                let unit = viewModel.barGrouping == .daily ? "day" : "week"
                 let units = viewModel.barGrouping == .daily ? "days" : "weeks"
 
                 HStack(spacing: 6) {
@@ -466,6 +468,160 @@ struct InsightsView: View {
                     }
                 }
                 .frame(height: 200)
+            }
+        }
+        .walletCard()
+    }
+
+    // MARK: - Category Budgets Card
+
+    private var categoryBudgetsCard: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Text("Category Budgets")
+                    .font(.roundedHeadline)
+                    .foregroundStyle(Color.textPrimary)
+                Spacer()
+                Text("Weekly")
+                    .font(.roundedCaption)
+                    .foregroundStyle(Color.textSecondary)
+            }
+
+            let data = viewModel.categoryBudgetData
+
+            if data.isEmpty {
+                NavigationLink {
+                    CategorySettingsView()
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "target")
+                            .font(.system(size: 12))
+                            .foregroundStyle(Color.accent)
+                        Text("Set weekly limits per category in Categories settings")
+                            .font(.roundedCaption)
+                            .foregroundStyle(Color.textSecondary)
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 10))
+                            .foregroundStyle(Color.textSecondary)
+                    }
+                }
+            } else {
+                // Budget status summary
+                let overCount = viewModel.categoryBudgetOverCount
+                let total = data.count
+                let statusColor: Color = {
+                    if overCount == 0 { return .green }
+                    if overCount >= total { return .danger }
+                    return .yellow
+                }()
+
+                HStack(spacing: 6) {
+                    Image(systemName: overCount == 0 ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                        .font(.system(size: 12))
+                        .foregroundStyle(statusColor)
+
+                    if overCount == 0 {
+                        Text("All categories within budget")
+                            .font(.roundedCaption)
+                            .foregroundStyle(statusColor)
+                    } else if overCount >= total {
+                        Text("All categories over budget")
+                            .font(.roundedCaption)
+                            .foregroundStyle(statusColor)
+                    } else {
+                        Text("\(overCount) of \(total) categories over budget")
+                            .font(.roundedCaption)
+                            .foregroundStyle(statusColor)
+                    }
+
+                    Spacer()
+
+                    NavigationLink {
+                        CategorySettingsView()
+                    } label: {
+                        Text("Edit Limits")
+                            .font(.roundedCaption)
+                            .foregroundStyle(Color.accent)
+                    }
+                }
+
+                Chart {
+                    ForEach(data) { entry in
+                        // Spending bar
+                        BarMark(
+                            x: .value("Category", entry.displayName),
+                            y: .value("Spent", entry.spent)
+                        )
+                        .foregroundStyle(entry.isOverBudget ? Color.danger : Color.green)
+                        .cornerRadius(3)
+                        .annotation(position: .top, spacing: 4) {
+                            Text("$\(entry.spent, specifier: "%.0f")")
+                                .font(.system(size: 10, weight: .semibold, design: .rounded))
+                                .foregroundStyle(entry.isOverBudget ? Color.danger : Color.green)
+                                .monospacedDigit()
+                        }
+
+                        // Limit indicator — thin horizontal line at the limit level
+                        BarMark(
+                            x: .value("Category", entry.displayName),
+                            yStart: .value("Lo", entry.limit * 0.98),
+                            yEnd: .value("Hi", entry.limit * 1.02)
+                        )
+                        .foregroundStyle(Color.textPrimary.opacity(0.8))
+                    }
+                }
+                .chartYAxis {
+                    AxisMarks(position: .leading) { value in
+                        AxisGridLine()
+                            .foregroundStyle(Color.textSecondary.opacity(0.15))
+                        AxisValueLabel {
+                            if let amount = value.as(Double.self) {
+                                Text("$\(Int(amount))")
+                                    .font(.system(size: 10, design: .rounded))
+                                    .foregroundStyle(Color.textSecondary)
+                            }
+                        }
+                    }
+                }
+                .chartXAxis {
+                    AxisMarks { _ in
+                        AxisValueLabel()
+                            .foregroundStyle(Color.textSecondary)
+                    }
+                }
+                .frame(height: 200)
+
+                // Per-category spent / limit breakdown
+                ForEach(data) { entry in
+                    HStack(spacing: 8) {
+                        Image(systemName: entry.icon)
+                            .font(.system(size: 12))
+                            .foregroundStyle(entry.color)
+                            .frame(width: 20)
+
+                        Text(entry.displayName)
+                            .font(.roundedCaption)
+                            .foregroundStyle(Color.textPrimary)
+
+                        Spacer()
+
+                        Text("$\(entry.spent, specifier: "%.0f")")
+                            .font(.system(size: 12, weight: .semibold, design: .rounded))
+                            .foregroundStyle(entry.isOverBudget ? Color.danger : Color.green)
+                            .monospacedDigit()
+
+                        Text("/")
+                            .font(.system(size: 12, design: .rounded))
+                            .foregroundStyle(Color.textSecondary)
+
+                        Text("$\(entry.limit, specifier: "%.0f")")
+                            .font(.system(size: 12, design: .rounded))
+                            .foregroundStyle(Color.textSecondary)
+                            .monospacedDigit()
+                    }
+                    .padding(.vertical, 2)
+                }
             }
         }
         .walletCard()

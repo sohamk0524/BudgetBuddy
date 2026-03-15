@@ -444,6 +444,7 @@ def set_category_prefs(user_id: int, categories: list):
                 'emoji': cat.get('emoji'),
                 'is_builtin': cat.get('isBuiltin', True),
                 'display_order': i,
+                'weekly_limit': cat.get('weeklyLimit'),
                 'created_at': datetime.utcnow(),
             })
         else:
