@@ -40,6 +40,8 @@ def generate_fresh_recommendations():
         return jsonify({"error": "User not found"}), 404
 
     action = data.get("action", "general")
+    search_query = data.get("searchQuery")
+
     # Allow builtin actions + any custom category the user has defined
     builtin_actions = {
         "general", "budget_balance", "spending_habits",
@@ -52,5 +54,5 @@ def generate_fresh_recommendations():
         if action.lower() not in user_cats:
             action = "general"
 
-    result = generate_recommendations(user_id, action=action)
+    result = generate_recommendations(user_id, action=action, search_query=search_query)
     return jsonify(result)

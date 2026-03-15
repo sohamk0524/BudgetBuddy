@@ -748,17 +748,20 @@ actor APIService {
     }
 
     /// Force-generates fresh recommendations
-    func generateRecommendations(userId: String, action: String = "general") async throws -> RecommendationsResponse {
+    func generateRecommendations(userId: String, action: String = "general", searchQuery: String? = nil) async throws -> RecommendationsResponse {
         let url = baseURL.appendingPathComponent("recommendations/generate")
 
         var request = try await authenticatedRequest(url: url, method: "POST")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.timeoutInterval = 120
 
-        let body: [String: Any] = [
+        var body: [String: Any] = [
             "userId": userId,
             "action": action
         ]
+        if let searchQuery, !searchQuery.isEmpty {
+            body["searchQuery"] = searchQuery
+        }
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
         let (data, response) = try await URLSession.shared.data(for: request)
