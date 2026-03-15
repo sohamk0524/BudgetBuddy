@@ -82,6 +82,36 @@ final class InsightsViewModel {
     var barGrouping: BarGrouping = .daily
     var selectedBarDate: Date? = nil
 
+    // MARK: - Budget Limit
+
+    /// Weekly spending budget read from the user's profile (cached in UserDefaults).
+    var weeklyBudget: Double {
+        UserDefaults.standard.double(forKey: "profile_weeklyLimit")
+    }
+
+    /// The per-bar spending limit based on current grouping.
+    var barBudgetLimit: Double? {
+        guard weeklyBudget > 0 else { return nil }
+        return barGrouping == .daily ? weeklyBudget / 7.0 : weeklyBudget
+    }
+
+    /// Returns true if the given bar entry exceeds the budget limit.
+    func isOverBudget(_ entry: BarEntry) -> Bool {
+        guard let limit = barBudgetLimit else { return false }
+        return entry.amount > limit
+    }
+
+    /// Number of bars that exceeded the budget limit (only counting bars with spending).
+    var overBudgetCount: Int {
+        guard barBudgetLimit != nil else { return 0 }
+        return barData.filter { $0.amount > 0 && isOverBudget($0) }.count
+    }
+
+    /// Total number of bars with spending.
+    var barsWithSpending: Int {
+        barData.filter { $0.amount > 0 }.count
+    }
+
     // MARK: - Pie Chart Computed Data
 
     var pieData: [CategorySlice] {
@@ -230,7 +260,7 @@ final class InsightsViewModel {
 
     func fetchTransactions() async {
         guard let userId = AuthManager.shared.authToken else {
-            print("[Insights] ❌ No auth token, skipping fetch")
+            print("[Insights] No auth token, skipping fetch")
             return
         }
         isLoading = true
@@ -239,7 +269,7 @@ final class InsightsViewModel {
         let start = Self.isoFmt.string(from: Calendar.current.date(byAdding: .day, value: -selectedDateRange.days, to: Date())!)
         let end = Self.isoFmt.string(from: Date())
 
-        print("[Insights] 📡 Fetching: userId=\(userId) start=\(start) end=\(end) range=\(selectedDateRange.rawValue)")
+        print("[Insights] Fetching: userId=\(userId) start=\(start) end=\(end) range=\(selectedDateRange.rawValue)")
 
         do {
             let response = try await APIService.shared.getExpenses(
@@ -249,7 +279,7 @@ final class InsightsViewModel {
                 limit: 1000
             )
             allTransactions = response.transactions
-            print("[Insights] ✅ Got \(response.transactions.count) transactions")
+            print("[Insights] Got \(response.transactions.count) transactions")
             for tx in response.transactions.prefix(10) {
                 print("[Insights]   - \(tx.name) | $\(tx.amount) | cat=\(tx.subCategory) | date=\(tx.date ?? "nil") | src=\(tx.source ?? "nil")")
             }
@@ -257,11 +287,11 @@ final class InsightsViewModel {
                 print("[Insights]   ... and \(response.transactions.count - 10) more")
             }
             let chartEligible = response.transactions.filter { !$0.subCategory.isEmpty }
-            print("[Insights] 📊 Chart-eligible (has category): \(chartEligible.count) of \(response.transactions.count)")
+            print("[Insights] Chart-eligible (has category): \(chartEligible.count) of \(response.transactions.count)")
             saveToCache(for: selectedDateRange)
         } catch {
             errorMessage = "Unable to load spending data"
-            print("[Insights] ❌ Error: \(error)")
+            print("[Insights] Error: \(error)")
         }
         isLoading = false
     }

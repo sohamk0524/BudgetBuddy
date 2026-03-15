@@ -342,14 +342,73 @@ struct InsightsView: View {
                 .transition(.opacity)
             } else if viewModel.barAverage > 0 {
                 HStack(spacing: 4) {
-                    Text("Average:")
+                    let unit = viewModel.barGrouping == .daily ? "Daily" : "Weekly"
+                    Text("\(unit) Average:")
                         .font(.roundedCaption)
                         .foregroundStyle(Color.textSecondary)
-                    Text("$\(viewModel.barAverage, specifier: "%.0f") / \(viewModel.barGrouping == .daily ? "day" : "week")")
+                    Text("$\(viewModel.barAverage, specifier: "%.0f")")
                         .font(.roundedCaption)
                         .fontWeight(.semibold)
                         .foregroundStyle(Color.textPrimary)
                         .monospacedDigit()
+
+                    if let limit = viewModel.barBudgetLimit {
+                        Spacer()
+                        Text("\(unit) Target:")
+                            .font(.roundedCaption)
+                            .foregroundStyle(Color.textSecondary)
+                        Text("$\(limit, specifier: "%.0f")")
+                            .font(.roundedCaption)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(budgetStatusColor)
+                            .monospacedDigit()
+                    }
+                }
+            }
+
+            // Budget summary callout
+            if let limit = viewModel.barBudgetLimit {
+                let overCount = viewModel.overBudgetCount
+                let total = viewModel.barsWithSpending
+                let unit = viewModel.barGrouping == .daily ? "day" : "week"
+                let units = viewModel.barGrouping == .daily ? "days" : "weeks"
+
+                HStack(spacing: 6) {
+                    Image(systemName: overCount == 0 ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                        .font(.system(size: 12))
+                        .foregroundStyle(budgetStatusColor)
+
+                    if overCount >= total && total > 0 {
+                        Text("All \(units) over budget")
+                            .font(.roundedCaption)
+                            .foregroundStyle(budgetStatusColor)
+                    } else if overCount > 0 {
+                        Text("\(overCount) of \(total) \(units) over budget")
+                            .font(.roundedCaption)
+                            .foregroundStyle(budgetStatusColor)
+                    } else if total > 0 {
+                        Text("All \(units) within budget")
+                            .font(.roundedCaption)
+                            .foregroundStyle(budgetStatusColor)
+                    }
+
+                }
+            } else {
+                NavigationLink {
+                    ProfileView()
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "target")
+                            .font(.system(size: 12))
+                            .foregroundStyle(Color.accent)
+                        Text("Set a weekly budget to track spending limits")
+                            .font(.roundedCaption)
+                            .foregroundStyle(Color.textSecondary)
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 10))
+                            .foregroundStyle(Color.textSecondary)
+                    }
                 }
             }
 
@@ -367,18 +426,14 @@ struct InsightsView: View {
                             x: .value("Date", entry.date, unit: viewModel.barGrouping == .daily ? .day : .weekOfYear),
                             y: .value("Amount", entry.amount)
                         )
-                        .foregroundStyle(
-                            viewModel.selectedBarDate != nil && Calendar.current.isDate(entry.date, inSameDayAs: viewModel.selectedBarDate!)
-                                ? Color.accent
-                                : Color.accent.opacity(0.5)
-                        )
+                        .foregroundStyle(barColor(for: entry))
                         .cornerRadius(3)
                     }
 
-                    if viewModel.barAverage > 0 {
-                        RuleMark(y: .value("Average", viewModel.barAverage))
-                            .foregroundStyle(Color.textSecondary.opacity(0.6))
-                            .lineStyle(StrokeStyle(lineWidth: 1, dash: [5, 3]))
+                    if let limit = viewModel.barBudgetLimit {
+                        RuleMark(y: .value("Budget", limit))
+                            .foregroundStyle(Color.danger.opacity(0.7))
+                            .lineStyle(StrokeStyle(lineWidth: 1.5, dash: [6, 4]))
                     }
                 }
                 .chartXSelection(value: $viewModel.selectedBarDate)
@@ -397,6 +452,15 @@ struct InsightsView: View {
                                 Text("$\(Int(amount))")
                                     .font(.system(size: 10, design: .rounded))
                                     .foregroundStyle(Color.textSecondary)
+                            }
+                        }
+                    }
+                    if let limit = viewModel.barBudgetLimit {
+                        AxisMarks(position: .leading, values: [limit]) { _ in
+                            AxisValueLabel {
+                                Text("Budget")
+                                    .font(.system(size: 9, weight: .semibold, design: .rounded))
+                                    .foregroundStyle(Color.danger)
                             }
                         }
                     }
@@ -432,6 +496,30 @@ struct InsightsView: View {
         case .month, .quarter:
             return .dateTime.month(.abbreviated).day()
         }
+    }
+
+    // MARK: - Bar Color Helper
+
+    private func barColor(for entry: InsightsViewModel.BarEntry) -> Color {
+        let isSelected = viewModel.selectedBarDate != nil
+            && Calendar.current.isDate(entry.date, inSameDayAs: viewModel.selectedBarDate!)
+        let isOver = viewModel.isOverBudget(entry)
+
+        if isOver {
+            return isSelected ? Color.danger : Color.danger.opacity(0.6)
+        }
+        return isSelected ? Color.accent : Color.accent.opacity(0.5)
+    }
+
+    // MARK: - Budget Status Color
+
+    /// Green when all within budget, yellow when some over, red when all over.
+    private var budgetStatusColor: Color {
+        let overCount = viewModel.overBudgetCount
+        let total = viewModel.barsWithSpending
+        if total == 0 || overCount == 0 { return .green }
+        if overCount >= total { return .danger }
+        return .yellow
     }
 
     // MARK: - Date Formatter

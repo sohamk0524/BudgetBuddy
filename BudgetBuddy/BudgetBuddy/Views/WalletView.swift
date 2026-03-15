@@ -289,8 +289,10 @@ extension View {
         self
             .padding()
             .frame(maxWidth: .infinity, minHeight: minHeight, alignment: .leading)
-            .background(Color.surface)
-            .clipShape(RoundedRectangle(cornerRadius: 16))
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color.surface)
+            )
     }
 }
 
