@@ -16,24 +16,18 @@ final class InsightsViewModel {
 
     enum DateRange: String, CaseIterable, Identifiable {
         case week = "7 Days"
-        case month = "30 Days"
-        case quarter = "90 Days"
 
         var id: String { rawValue }
 
         var days: Int {
             switch self {
             case .week: return 7
-            case .month: return 30
-            case .quarter: return 90
             }
         }
 
         var label: String {
             switch self {
             case .week: return "Last 7 Days"
-            case .month: return "Last 30 Days"
-            case .quarter: return "Last 90 Days"
             }
         }
     }
@@ -74,10 +68,10 @@ final class InsightsViewModel {
     private var allTransactions: [ExpenseTransaction] = []
 
     init() {
-        loadFromCache(for: .month)   // pre-populate default range instantly
+        loadFromCache(for: .week)   // pre-populate default range instantly
     }
 
-    var selectedDateRange: DateRange = .month
+    var selectedDateRange: DateRange = .week
     var selectedPieCategory: String? = nil
     var barGrouping: BarGrouping = .daily
     var selectedBarDate: Date? = nil
@@ -266,7 +260,7 @@ final class InsightsViewModel {
 
     func clearData() {
         allTransactions = []
-        selectedDateRange = .month
+        selectedDateRange = .week
         selectedPieCategory = nil
         barGrouping = .daily
         selectedBarDate = nil

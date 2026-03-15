@@ -25,6 +25,13 @@ class RecommendationsViewModel {
     // Money Moves
     var moneyMovesCards: [MoneyMovesCard] = []
     var activeCategory: String?
+
+    // Search
+    var searchQuery: String = ""
+    var searchResults: [RecommendationItem] = []
+    var isSearching = false
+    var isSearchActive = false
+
     private var cancellables = Set<AnyCancellable>()
 
     init() {
@@ -168,6 +175,36 @@ class RecommendationsViewModel {
     func clearCategoryFilter() {
         withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
             activeCategory = nil
+        }
+    }
+
+    func searchDeals() async {
+        let query = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return }
+        guard let userId = AuthManager.shared.authToken else { return }
+
+        isSearching = true
+        isSearchActive = true
+        searchResults = []
+
+        do {
+            let response = try await APIService.shared.generateRecommendations(
+                userId: userId,
+                searchQuery: query
+            )
+            searchResults = response.recommendations
+        } catch {
+            errorMessage = "Search failed. Please try again."
+        }
+
+        isSearching = false
+    }
+
+    func clearSearch() {
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+            searchQuery = ""
+            searchResults = []
+            isSearchActive = false
         }
     }
 

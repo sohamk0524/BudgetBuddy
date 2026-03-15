@@ -18,9 +18,6 @@ struct InsightsView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 20) {
-                    dateRangePicker
-                        .padding(.horizontal)
-
                     if viewModel.isLoading && viewModel.pieData.isEmpty {
                         loadingState
                     } else if viewModel.pieData.isEmpty && viewModel.barData.allSatisfy({ $0.amount == 0 }) {
@@ -635,23 +632,14 @@ struct InsightsView: View {
 
     private var xAxisStrideCount: Int {
         if viewModel.barGrouping == .weekly { return 1 }
-        switch viewModel.selectedDateRange {
-        case .week: return 1
-        case .month: return 5
-        case .quarter: return 14
-        }
+        return 1
     }
 
     private var xAxisFormat: Date.FormatStyle {
         if viewModel.barGrouping == .weekly {
             return .dateTime.month(.abbreviated).day()
         }
-        switch viewModel.selectedDateRange {
-        case .week:
-            return .dateTime.weekday(.abbreviated)
-        case .month, .quarter:
-            return .dateTime.month(.abbreviated).day()
-        }
+        return .dateTime.weekday(.abbreviated)
     }
 
     // MARK: - Bar Color Helper
