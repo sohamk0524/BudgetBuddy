@@ -47,11 +47,16 @@ struct RecommendationsView: View {
                 // Search bar
                 searchBar
 
+                // Filter toggle (All / Saved)
+                if !viewModel.isSearchActive && (!viewModel.savedTips.isEmpty || viewModel.filterMode == .saved) {
+                    filterToggle
+                }
+
                 // Money Moves or category indicator (hidden during search)
                 if !viewModel.isSearchActive {
                     if viewModel.activeCategory != nil {
                         categoryChip
-                    } else if !viewModel.moneyMovesCards.isEmpty {
+                    } else if !viewModel.moneyMovesCards.isEmpty && viewModel.filterMode == .all {
                         moneyMovesRow
                     }
                 }
@@ -83,6 +88,8 @@ struct RecommendationsView: View {
                     Spacer()
                 } else if viewModel.isGenerating && viewModel.displayedRecommendations.isEmpty {
                     generatingPlaceholder
+                } else if viewModel.filterMode == .saved && viewModel.displayedRecommendations.isEmpty {
+                    savedEmptyState
                 } else if viewModel.displayedRecommendations.isEmpty && viewModel.activeCategory != nil && !viewModel.isGenerating {
                     Spacer()
                     VStack(spacing: 12) {
@@ -102,6 +109,33 @@ struct RecommendationsView: View {
 
                 // Action buttons pinned to bottom
                 actionButtons
+            }
+
+            // Undo toast
+            if viewModel.undoableDismissal != nil {
+                VStack {
+                    Spacer()
+                    HStack {
+                        Text("Tip removed")
+                            .font(.system(.caption, design: .rounded))
+                            .foregroundStyle(Color.textPrimary)
+                        Spacer()
+                        Button("Undo") {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                viewModel.undoDislike()
+                            }
+                        }
+                        .font(.system(.caption, design: .rounded, weight: .semibold))
+                        .foregroundStyle(Color.accent)
+                    }
+                    .padding(12)
+                    .background(Color.surface)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 60)
+                }
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+                .animation(.spring(response: 0.3, dampingFraction: 0.8), value: viewModel.undoableDismissal != nil)
             }
 
             // Error banner
@@ -129,6 +163,39 @@ struct RecommendationsView: View {
             await viewModel.loadSpendingSummary()
             AnalyticsManager.logRecommendationsViewed()
         }
+    }
+
+    // MARK: - Filter Toggle
+
+    private var filterToggle: some View {
+        HStack(spacing: 0) {
+            filterPill("All", isActive: viewModel.filterMode == .all) {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                    viewModel.filterMode = .all
+                }
+            }
+            filterPill("Saved", isActive: viewModel.filterMode == .saved) {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                    viewModel.filterMode = .saved
+                }
+            }
+            Spacer()
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 10)
+    }
+
+    private func filterPill(_ title: String, isActive: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(.caption, design: .rounded, weight: .semibold))
+                .foregroundStyle(isActive ? Color.appBackground : Color.textSecondary)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 6)
+                .background(isActive ? Color.accent : Color.surface)
+                .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Search Bar
@@ -188,7 +255,16 @@ struct RecommendationsView: View {
                 }
 
                 ForEach(viewModel.searchResults) { item in
-                    RecommendationCardView(item: item)
+                    RecommendationCardView(
+                        item: item,
+                        isSaved: viewModel.savedTipIds.contains(item.id),
+                        onToggleSave: { viewModel.toggleSave(item) },
+                        onDislike: {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                viewModel.dislike(item)
+                            }
+                        }
+                    )
                 }
             }
             .padding(.horizontal, 16)
@@ -222,7 +298,16 @@ struct RecommendationsView: View {
         ScrollView {
             LazyVStack(spacing: 12) {
                 ForEach(viewModel.displayedRecommendations) { item in
-                    RecommendationCardView(item: item)
+                    RecommendationCardView(
+                        item: item,
+                        isSaved: viewModel.savedTipIds.contains(item.id),
+                        onToggleSave: { viewModel.toggleSave(item) },
+                        onDislike: {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                viewModel.dislike(item)
+                            }
+                        }
+                    )
                 }
             }
             .padding(.horizontal, 16)
@@ -279,7 +364,7 @@ struct RecommendationsView: View {
         .padding(.vertical, 10)
     }
 
-    // MARK: - Empty State
+    // MARK: - Empty States
 
     private var emptyState: some View {
         VStack(spacing: 16) {
@@ -294,6 +379,28 @@ struct RecommendationsView: View {
                 .foregroundStyle(Color.textPrimary)
 
             Text("Tap \"Refresh\" to get personalized financial tips based on your spending and budget.")
+                .font(.roundedCaption)
+                .foregroundStyle(Color.textSecondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 40)
+
+            Spacer()
+        }
+    }
+
+    private var savedEmptyState: some View {
+        VStack(spacing: 16) {
+            Spacer()
+
+            Image(systemName: "bookmark")
+                .font(.system(size: 48))
+                .foregroundStyle(Color.textSecondary.opacity(0.4))
+
+            Text("No saved tips yet")
+                .font(.roundedHeadline)
+                .foregroundStyle(Color.textPrimary)
+
+            Text("Tap the bookmark icon on any tip to save it for later.")
                 .font(.roundedCaption)
                 .foregroundStyle(Color.textSecondary)
                 .multilineTextAlignment(.center)
@@ -484,12 +591,15 @@ struct MoneyMovesCardView: View {
 
 struct RecommendationCardView: View {
     let item: RecommendationItem
+    let isSaved: Bool
+    let onToggleSave: () -> Void
+    let onDislike: () -> Void
     @State private var isExpanded = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
+            // Header — content only
             HStack(alignment: .top, spacing: 10) {
-                // Icon
                 ZStack {
                     Circle()
                         .fill(Color.accent.opacity(0.15))
@@ -529,6 +639,46 @@ struct RecommendationCardView: View {
             if isExpanded {
                 expandedContent
             }
+
+            // Action bar — save & dislike with comfortable tap targets
+            HStack(spacing: 0) {
+                Button {
+                    onToggleSave()
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: isSaved ? "bookmark.fill" : "bookmark")
+                            .font(.system(size: 14, weight: .medium))
+                        Text(isSaved ? "Saved" : "Save")
+                            .font(.system(.caption, design: .rounded, weight: .medium))
+                    }
+                    .foregroundStyle(isSaved ? Color.accent : Color.textSecondary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+
+                Divider()
+                    .frame(height: 16)
+                    .overlay(Color.textSecondary.opacity(0.2))
+
+                Button {
+                    onDislike()
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "hand.thumbsdown")
+                            .font(.system(size: 13, weight: .medium))
+                        Text("Not for me")
+                            .font(.system(.caption, design: .rounded, weight: .medium))
+                    }
+                    .foregroundStyle(Color.textSecondary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.top, 8)
         }
         .cardStyle()
         .contentShape(Rectangle())

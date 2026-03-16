@@ -8,6 +8,11 @@
 import SwiftUI
 import Combine
 
+enum RecommendationFilterMode {
+    case all
+    case saved
+}
+
 @Observable
 @MainActor
 class RecommendationsViewModel {
@@ -33,6 +38,14 @@ class RecommendationsViewModel {
     var isSearchActive = false
 
     private var cancellables = Set<AnyCancellable>()
+
+    // Save / Dislike
+    var filterMode: RecommendationFilterMode = .all
+    var savedTipIds: Set<String> = []
+    var savedTips: [RecommendationItem] = []
+    var dislikedTipIds: Set<String> = []
+    var undoableDismissal: (item: RecommendationItem, index: Int)?
+    private var undoTimer: Task<Void, Never>?
 
     init() {
         NotificationCenter.default.publisher(for: .transactionAdded)
@@ -69,17 +82,29 @@ class RecommendationsViewModel {
     }
 
     var displayedRecommendations: [RecommendationItem] {
-        guard let category = activeCategory else { return recommendations }
-        let keywords = Self.categoryKeywords[category] ?? [category]
-        return recommendations.filter { item in
-            // Exact tag match (set by backend when generating for a specific category)
-            if let tag = item.spendingCategory {
-                return tag == category
+        switch filterMode {
+        case .saved:
+            if let category = activeCategory {
+                let keywords = Self.categoryKeywords[category] ?? [category]
+                return savedTips.filter { item in
+                    if let tag = item.spendingCategory { return tag == category }
+                    let searchable = [item.title, item.description, item.spendingContext ?? ""]
+                        .joined(separator: " ").lowercased()
+                    return keywords.contains { searchable.contains($0) }
+                }
             }
-            // Keyword fallback for general recs that happen to cover this category
-            let searchable = [item.title, item.description, item.spendingContext ?? ""]
-                .joined(separator: " ").lowercased()
-            return keywords.contains { searchable.contains($0) }
+            return savedTips
+
+        case .all:
+            let filtered = recommendations.filter { !dislikedTipIds.contains($0.id) }
+            guard let category = activeCategory else { return filtered }
+            let keywords = Self.categoryKeywords[category] ?? [category]
+            return filtered.filter { item in
+                if let tag = item.spendingCategory { return tag == category }
+                let searchable = [item.title, item.description, item.spendingContext ?? ""]
+                    .joined(separator: " ").lowercased()
+                return keywords.contains { searchable.contains($0) }
+            }
         }
     }
 
@@ -115,8 +140,17 @@ class RecommendationsViewModel {
         errorMessage = nil
 
         do {
-            let response = try await APIService.shared.getRecommendations(userId: userId)
-            apply(response)
+            async let recsResponse = APIService.shared.getRecommendations(userId: userId)
+            async let prefsResponse = APIService.shared.getRecommendationPreferences(userId: userId)
+
+            let recs = try await recsResponse
+            apply(recs)
+
+            let prefs = try await prefsResponse
+            savedTips = prefs.savedTips
+            savedTipIds = Set(prefs.savedTips.map { $0.id })
+            dislikedTipIds = Set(prefs.dislikedTipIds)
+
             hasLoaded = true
 
             // Auto-generate if no cached recommendations exist
@@ -167,7 +201,7 @@ class RecommendationsViewModel {
         }
 
         // Auto-generate if no existing recs match this category
-        if displayedRecommendations.isEmpty {
+        if displayedRecommendations.isEmpty && filterMode == .all {
             Task { await generateRecommendations(action: category) }
         }
     }
@@ -220,10 +254,96 @@ class RecommendationsViewModel {
         }
     }
 
+    // MARK: - Save / Bookmark
+
+    func toggleSave(_ item: RecommendationItem) {
+        let wasSaved = savedTipIds.contains(item.id)
+
+        // Optimistic update
+        if wasSaved {
+            savedTipIds.remove(item.id)
+            savedTips.removeAll { $0.id == item.id }
+        } else {
+            savedTipIds.insert(item.id)
+            savedTips.append(item)
+        }
+
+        // Fire-and-forget API call
+        guard let userId = AuthManager.shared.authToken else { return }
+        Task {
+            do {
+                let _ = try await APIService.shared.saveRecommendation(userId: userId, recommendation: item)
+            } catch {
+                // Revert on failure
+                if wasSaved {
+                    savedTipIds.insert(item.id)
+                    savedTips.append(item)
+                } else {
+                    savedTipIds.remove(item.id)
+                    savedTips.removeAll { $0.id == item.id }
+                }
+            }
+        }
+    }
+
+    // MARK: - Dislike
+
+    func dislike(_ item: RecommendationItem) {
+        // If there's already a pending undo, commit it first
+        if undoableDismissal != nil {
+            commitDislike()
+        }
+
+        // Find the item's index in the current recommendations for undo reinsertion
+        let index = recommendations.firstIndex(where: { $0.id == item.id }) ?? recommendations.count
+
+        // Optimistic update
+        dislikedTipIds.insert(item.id)
+        savedTipIds.remove(item.id)
+        savedTips.removeAll { $0.id == item.id }
+
+        undoableDismissal = (item: item, index: index)
+
+        // Start undo timer (5 seconds)
+        undoTimer?.cancel()
+        undoTimer = Task {
+            try? await Task.sleep(nanoseconds: 5_000_000_000)
+            guard !Task.isCancelled else { return }
+            commitDislike()
+        }
+    }
+
+    func undoDislike() {
+        guard let dismissal = undoableDismissal else { return }
+        undoTimer?.cancel()
+        undoTimer = nil
+
+        // Revert
+        dislikedTipIds.remove(dismissal.item.id)
+        undoableDismissal = nil
+    }
+
+    func commitDislike() {
+        guard let dismissal = undoableDismissal else { return }
+        undoTimer?.cancel()
+        undoTimer = nil
+        undoableDismissal = nil
+
+        // Fire API call
+        guard let userId = AuthManager.shared.authToken else { return }
+        Task {
+            do {
+                try await APIService.shared.dislikeRecommendation(userId: userId, tipId: dismissal.item.id)
+            } catch {
+                // Silently fail — tip stays hidden locally
+            }
+        }
+    }
+
     // MARK: - Private
 
     private func apply(_ response: RecommendationsResponse) {
-        recommendations = response.recommendations
+        recommendations = response.recommendations.filter { !dislikedTipIds.contains($0.id) }
         safeToSpend = response.safeToSpend ?? safeToSpend
         status = response.status ?? status
         summary = response.summary ?? summary
@@ -232,7 +352,9 @@ class RecommendationsViewModel {
     /// Merges category-specific results into the existing list without removing other tips.
     private func merge(_ response: RecommendationsResponse) {
         let existingIds = Set(recommendations.map { $0.id })
-        let newRecs = response.recommendations.filter { !existingIds.contains($0.id) }
+        let newRecs = response.recommendations.filter {
+            !existingIds.contains($0.id) && !dislikedTipIds.contains($0.id)
+        }
         recommendations.append(contentsOf: newRecs)
         safeToSpend = response.safeToSpend ?? safeToSpend
         status = response.status ?? status

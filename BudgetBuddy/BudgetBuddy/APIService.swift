@@ -773,6 +773,60 @@ actor APIService {
         return try JSONDecoder().decode(RecommendationsResponse.self, from: data)
     }
 
+    /// Gets the user's recommendation preferences (saved tips + disliked IDs)
+    func getRecommendationPreferences(userId: String) async throws -> RecommendationPreferencesResponse {
+        let url = baseURL.appendingPathComponent("recommendations/preferences/\(userId)")
+
+        let request = try await authenticatedRequest(url: url)
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse,
+              httpResponse.statusCode == 200 else {
+            throw APIError.invalidResponse
+        }
+
+        return try JSONDecoder().decode(RecommendationPreferencesResponse.self, from: data)
+    }
+
+    /// Toggles save/unsave for a recommendation. Returns the new saved state.
+    func saveRecommendation(userId: String, recommendation: RecommendationItem) async throws -> Bool {
+        let url = baseURL.appendingPathComponent("recommendations/save")
+
+        var request = try await authenticatedRequest(url: url, method: "POST")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        let recData = try JSONEncoder().encode(recommendation)
+        let recDict = try JSONSerialization.jsonObject(with: recData) as? [String: Any] ?? [:]
+        let body: [String: Any] = ["userId": userId, "recommendation": recDict]
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse,
+              httpResponse.statusCode == 200 else {
+            throw APIError.invalidResponse
+        }
+
+        let result = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        return result?["saved"] as? Bool ?? false
+    }
+
+    /// Dislikes a recommendation
+    func dislikeRecommendation(userId: String, tipId: String) async throws {
+        let url = baseURL.appendingPathComponent("recommendations/dislike")
+
+        var request = try await authenticatedRequest(url: url, method: "POST")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        let body: [String: Any] = ["userId": userId, "tipId": tipId]
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        let (_, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse,
+              httpResponse.statusCode == 200 else {
+            throw APIError.invalidResponse
+        }
+    }
+
     /// Fetches spending summary by sub-category for Money Moves cards
     func getSpendingSummary(userId: String) async throws -> SpendingSummaryResponse {
         let url = baseURL.appendingPathComponent("expenses/spending-summary/\(userId)")

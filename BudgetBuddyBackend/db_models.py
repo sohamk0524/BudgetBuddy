@@ -95,6 +95,8 @@ def delete_user_cascade(user_id: str):
     for item in get_plaid_items(user_id):
         delete_plaid_item_cascade(item.key)
 
+    _delete_kind_for_user(client, 'RecommendationPreferences', user_id)
+
     # Revoke Plaid access tokens before deleting
     _revoke_plaid_tokens_for_user(user_id)
 
@@ -580,6 +582,34 @@ def upsert_device_token(user_id: int, token: str, **kwargs) -> datastore.Entity:
         entity['token'] = token
         entity['created_at'] = datetime.utcnow()
     entity.update(kwargs)
+    client.put(entity)
+    return entity
+
+
+# ---------------------------------------------------------------------------
+# RecommendationPreferences (saved/disliked tips)
+# ---------------------------------------------------------------------------
+
+def get_recommendation_prefs(user_id: str) -> Optional[datastore.Entity]:
+    client = get_client()
+    query = client.query(kind='RecommendationPreferences')
+    query.add_filter(filter=PropertyFilter('user_id', '=', user_id))
+    results = list(query.fetch(limit=1))
+    return results[0] if results else None
+
+
+def upsert_recommendation_prefs(user_id: str, **kwargs) -> datastore.Entity:
+    client = get_client()
+    existing = get_recommendation_prefs(user_id)
+    if existing:
+        entity = existing
+    else:
+        key = client.key('RecommendationPreferences')
+        entity = datastore.Entity(key=key, exclude_from_indexes=['saved_tips_json', 'disliked_tip_ids_json'])
+        entity['user_id'] = user_id
+        entity['created_at'] = datetime.utcnow()
+    entity.update(kwargs)
+    entity['updated_at'] = datetime.utcnow()
     client.put(entity)
     return entity
 
