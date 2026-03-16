@@ -694,6 +694,8 @@ struct RecommendationsResponse: Codable {
 struct RecommendationPreferencesResponse: Codable {
     let savedTips: [RecommendationItem]
     let dislikedTipIds: [String]
+    let seenTipIds: [String]?
+    let seenTips: [RecommendationItem]?
 }
 
 // MARK: - Money Moves Models

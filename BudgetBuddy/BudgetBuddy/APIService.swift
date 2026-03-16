@@ -827,6 +827,25 @@ actor APIService {
         }
     }
 
+    /// Marks a recommendation as used/already seen
+    func markRecommendationSeen(userId: String, recommendation: RecommendationItem) async throws {
+        let url = baseURL.appendingPathComponent("recommendations/seen")
+
+        var request = try await authenticatedRequest(url: url, method: "POST")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        let recData = try JSONEncoder().encode(recommendation)
+        let recDict = try JSONSerialization.jsonObject(with: recData) as? [String: Any] ?? [:]
+        let body: [String: Any] = ["userId": userId, "recommendation": recDict]
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        let (_, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse,
+              httpResponse.statusCode == 200 else {
+            throw APIError.invalidResponse
+        }
+    }
+
     /// Fetches spending summary by sub-category for Money Moves cards
     func getSpendingSummary(userId: String) async throws -> SpendingSummaryResponse {
         let url = baseURL.appendingPathComponent("expenses/spending-summary/\(userId)")

@@ -605,7 +605,7 @@ def upsert_recommendation_prefs(user_id: str, **kwargs) -> datastore.Entity:
         entity = existing
     else:
         key = client.key('RecommendationPreferences')
-        entity = datastore.Entity(key=key, exclude_from_indexes=['saved_tips_json', 'disliked_tip_ids_json'])
+        entity = datastore.Entity(key=key, exclude_from_indexes=['saved_tips_json', 'disliked_tip_ids_json', 'seen_tip_ids_json'])
         entity['user_id'] = user_id
         entity['created_at'] = datetime.utcnow()
     entity.update(kwargs)
