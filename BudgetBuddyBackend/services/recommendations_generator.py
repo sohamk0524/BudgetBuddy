@@ -392,11 +392,11 @@ def _parse_recommendations_json(raw: str) -> Optional[Dict[str, Any]]:
 
 
 def _get_user_recommendation_prefs(user_id: int):
-    """Return (saved_tip_titles, disliked_tip_ids) for the user."""
+    """Return (saved_tip_titles, disliked_tip_ids, seen_tip_ids) for the user."""
     from db_models import get_recommendation_prefs
     prefs = get_recommendation_prefs(user_id)
     if not prefs:
-        return [], []
+        return [], [], []
     try:
         saved_tips = json.loads(prefs.get("saved_tips_json", "[]"))
         saved_titles = [r.get("title", "") for r in saved_tips if r.get("title")]
@@ -406,15 +406,28 @@ def _get_user_recommendation_prefs(user_id: int):
         disliked_ids = json.loads(prefs.get("disliked_tip_ids_json", "[]"))
     except (json.JSONDecodeError, TypeError):
         disliked_ids = []
-    return saved_titles, disliked_ids
+    try:
+        seen_raw = json.loads(prefs.get("seen_tip_ids_json", "[]"))
+    except (json.JSONDecodeError, TypeError):
+        seen_raw = []
+    # Support both old format (string IDs) and new format (full objects)
+    seen_ids = []
+    for item in seen_raw:
+        if isinstance(item, dict):
+            seen_ids.append(item.get("category", "") + item.get("title", ""))
+        elif isinstance(item, str):
+            seen_ids.append(item)
+    return saved_titles, disliked_ids, seen_ids
 
 
-def _filter_disliked(recs: List[Dict], disliked_ids: List[str]) -> List[Dict]:
-    """Remove recommendations whose ID (category+title) is in the disliked set."""
-    if not disliked_ids:
+def _filter_hidden(recs: List[Dict], disliked_ids: List[str], seen_ids: List[str] = None) -> List[Dict]:
+    """Remove recommendations that are disliked or already seen."""
+    hidden = set(disliked_ids)
+    if seen_ids:
+        hidden.update(seen_ids)
+    if not hidden:
         return recs
-    disliked_set = set(disliked_ids)
-    return [r for r in recs if (r.get("category", "") + r.get("title", "")) not in disliked_set]
+    return [r for r in recs if (r.get("category", "") + r.get("title", "")) not in hidden]
 
 
 def _build_user_context(user_id: int) -> str:
@@ -428,11 +441,13 @@ def _build_user_context(user_id: int) -> str:
     context = _orch_context(user_id) or "No financial data available for this user."
     context = re.sub(r",?\s*strictness=[^,\n)]*", "", context)
 
-    saved_titles, disliked_ids = _get_user_recommendation_prefs(user_id)
+    saved_titles, disliked_ids, seen_ids = _get_user_recommendation_prefs(user_id)
     if saved_titles:
         context += f"\n\nSaved tips (user found these valuable — generate more like these): {', '.join(saved_titles)}"
     if disliked_ids:
-        context += f"\n\nDisliked tip IDs (do NOT regenerate similar tips): {', '.join(disliked_ids[:20])}"
+        context += f"\n\nDisliked tip IDs (do NOT regenerate similar tips — user doesn't want these): {', '.join(disliked_ids[:20])}"
+    if seen_ids:
+        context += f"\n\nAlready seen tip IDs (user already knows about these deals — do NOT recommend the same ones, but similar deals from different businesses are OK): {', '.join(seen_ids[:20])}"
 
     return context
 
@@ -534,9 +549,9 @@ def generate_recommendations(user_id: int, action: str = "general", search_query
         if not search_query and action != "general":
             recs = [{**r, "spendingCategory": action} for r in recs]
 
-        # Filter out disliked tips
-        _, disliked_ids = _get_user_recommendation_prefs(user_id)
-        recs = _filter_disliked(recs, disliked_ids)
+        # Filter out disliked and seen tips
+        _, disliked_ids, seen_ids = _get_user_recommendation_prefs(user_id)
+        recs = _filter_hidden(recs, disliked_ids, seen_ids)
 
         output = {
             "recommendations": recs,
@@ -623,9 +638,9 @@ def get_cached_or_generate(user_id: int) -> Dict[str, Any]:
                 # Always recompute safe-to-spend from weekly limit
                 sts = _compute_safe_to_spend(user_id)
 
-                # Filter out disliked tips from cached results
-                _, disliked_ids = _get_user_recommendation_prefs(user_id)
-                recommendations = _filter_disliked(recommendations, disliked_ids)
+                # Filter out disliked and seen tips from cached results
+                _, disliked_ids, seen_ids = _get_user_recommendation_prefs(user_id)
+                recommendations = _filter_hidden(recommendations, disliked_ids, seen_ids)
 
                 return {
                     "recommendations": recommendations,

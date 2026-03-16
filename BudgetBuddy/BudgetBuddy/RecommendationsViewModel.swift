@@ -8,9 +8,10 @@
 import SwiftUI
 import Combine
 
-enum RecommendationFilterMode {
-    case all
-    case saved
+enum RecommendationFilterMode: String, CaseIterable {
+    case all = "All"
+    case saved = "Saved"
+    case used = "Used"
 }
 
 @Observable
@@ -39,12 +40,21 @@ class RecommendationsViewModel {
 
     private var cancellables = Set<AnyCancellable>()
 
-    // Save / Dislike
+    // Save / Dislike / Used
     var filterMode: RecommendationFilterMode = .all
     var savedTipIds: Set<String> = []
     var savedTips: [RecommendationItem] = []
     var dislikedTipIds: Set<String> = []
-    var undoableDismissal: (item: RecommendationItem, index: Int)?
+    var usedTipIds: Set<String> = []
+    var usedTips: [RecommendationItem] = []
+
+    // Generic undo system
+    enum UndoAction: String {
+        case dislike = "Removed"
+        case saved = "Saved"
+        case used = "Marked as Used"
+    }
+    var pendingUndo: (action: UndoAction, item: RecommendationItem)?
     private var undoTimer: Task<Void, Never>?
 
     init() {
@@ -82,29 +92,25 @@ class RecommendationsViewModel {
     }
 
     var displayedRecommendations: [RecommendationItem] {
+        let base: [RecommendationItem]
         switch filterMode {
         case .saved:
-            if let category = activeCategory {
-                let keywords = Self.categoryKeywords[category] ?? [category]
-                return savedTips.filter { item in
-                    if let tag = item.spendingCategory { return tag == category }
-                    let searchable = [item.title, item.description, item.spendingContext ?? ""]
-                        .joined(separator: " ").lowercased()
-                    return keywords.contains { searchable.contains($0) }
-                }
-            }
-            return savedTips
+            base = savedTips
+
+        case .used:
+            base = usedTips
 
         case .all:
-            let filtered = recommendations.filter { !dislikedTipIds.contains($0.id) }
-            guard let category = activeCategory else { return filtered }
-            let keywords = Self.categoryKeywords[category] ?? [category]
-            return filtered.filter { item in
-                if let tag = item.spendingCategory { return tag == category }
-                let searchable = [item.title, item.description, item.spendingContext ?? ""]
-                    .joined(separator: " ").lowercased()
-                return keywords.contains { searchable.contains($0) }
-            }
+            base = recommendations.filter { !dislikedTipIds.contains($0.id) && !usedTipIds.contains($0.id) && !savedTipIds.contains($0.id) }
+        }
+
+        guard let category = activeCategory else { return base }
+        let keywords = Self.categoryKeywords[category] ?? [category]
+        return base.filter { item in
+            if let tag = item.spendingCategory { return tag == category }
+            let searchable = [item.title, item.description, item.spendingContext ?? ""]
+                .joined(separator: " ").lowercased()
+            return keywords.contains { searchable.contains($0) }
         }
     }
 
@@ -150,6 +156,8 @@ class RecommendationsViewModel {
             savedTips = prefs.savedTips
             savedTipIds = Set(prefs.savedTips.map { $0.id })
             dislikedTipIds = Set(prefs.dislikedTipIds)
+            usedTips = prefs.seenTips ?? []
+            usedTipIds = Set(prefs.seenTipIds ?? usedTips.map { $0.id })
 
             hasLoaded = true
 
@@ -259,13 +267,21 @@ class RecommendationsViewModel {
     func toggleSave(_ item: RecommendationItem) {
         let wasSaved = savedTipIds.contains(item.id)
 
-        // Optimistic update
+        // Commit any pending undo first
+        commitPendingAction()
+
         if wasSaved {
+            // Unsave — move back to all
             savedTipIds.remove(item.id)
             savedTips.removeAll { $0.id == item.id }
         } else {
+            // Save — enforce mutual exclusivity
+            removeFromAllStates(item)
             savedTipIds.insert(item.id)
             savedTips.append(item)
+
+            // Show undo toast
+            showUndo(.saved, item: item)
         }
 
         // Fire-and-forget API call
@@ -289,61 +305,104 @@ class RecommendationsViewModel {
     // MARK: - Dislike
 
     func dislike(_ item: RecommendationItem) {
-        // If there's already a pending undo, commit it first
-        if undoableDismissal != nil {
-            commitDislike()
-        }
+        commitPendingAction()
 
-        // Find the item's index in the current recommendations for undo reinsertion
-        let index = recommendations.firstIndex(where: { $0.id == item.id }) ?? recommendations.count
-
-        // Optimistic update
+        // Enforce mutual exclusivity
+        removeFromAllStates(item)
         dislikedTipIds.insert(item.id)
-        savedTipIds.remove(item.id)
-        savedTips.removeAll { $0.id == item.id }
 
-        undoableDismissal = (item: item, index: index)
-
-        // Start undo timer (5 seconds)
-        undoTimer?.cancel()
-        undoTimer = Task {
-            try? await Task.sleep(nanoseconds: 5_000_000_000)
-            guard !Task.isCancelled else { return }
-            commitDislike()
-        }
-    }
-
-    func undoDislike() {
-        guard let dismissal = undoableDismissal else { return }
-        undoTimer?.cancel()
-        undoTimer = nil
-
-        // Revert
-        dislikedTipIds.remove(dismissal.item.id)
-        undoableDismissal = nil
-    }
-
-    func commitDislike() {
-        guard let dismissal = undoableDismissal else { return }
-        undoTimer?.cancel()
-        undoTimer = nil
-        undoableDismissal = nil
+        showUndo(.dislike, item: item)
 
         // Fire API call
         guard let userId = AuthManager.shared.authToken else { return }
         Task {
             do {
-                try await APIService.shared.dislikeRecommendation(userId: userId, tipId: dismissal.item.id)
+                try await APIService.shared.dislikeRecommendation(userId: userId, tipId: item.id)
             } catch {
                 // Silently fail — tip stays hidden locally
             }
         }
     }
 
+    // MARK: - Mark Used
+
+    func markUsed(_ item: RecommendationItem) {
+        commitPendingAction()
+
+        // Enforce mutual exclusivity
+        removeFromAllStates(item)
+        usedTipIds.insert(item.id)
+        usedTips.append(item)
+
+        showUndo(.used, item: item)
+
+        // Fire API call
+        guard let userId = AuthManager.shared.authToken else { return }
+        Task {
+            do {
+                try await APIService.shared.markRecommendationSeen(userId: userId, recommendation: item)
+            } catch {
+                // Silently fail — tip stays hidden locally
+            }
+        }
+    }
+
+    func restoreFromUsed(_ item: RecommendationItem) {
+        usedTipIds.remove(item.id)
+        usedTips.removeAll { $0.id == item.id }
+    }
+
+    // MARK: - Generic Undo
+
+    func undoLastAction() {
+        guard let undo = pendingUndo else { return }
+        undoTimer?.cancel()
+        undoTimer = nil
+
+        switch undo.action {
+        case .dislike:
+            dislikedTipIds.remove(undo.item.id)
+        case .saved:
+            savedTipIds.remove(undo.item.id)
+            savedTips.removeAll { $0.id == undo.item.id }
+        case .used:
+            usedTipIds.remove(undo.item.id)
+            usedTips.removeAll { $0.id == undo.item.id }
+        }
+
+        pendingUndo = nil
+    }
+
+    func commitPendingAction() {
+        guard pendingUndo != nil else { return }
+        undoTimer?.cancel()
+        undoTimer = nil
+        pendingUndo = nil
+    }
+
     // MARK: - Private
 
+    private func removeFromAllStates(_ item: RecommendationItem) {
+        savedTipIds.remove(item.id)
+        savedTips.removeAll { $0.id == item.id }
+        dislikedTipIds.remove(item.id)
+        usedTipIds.remove(item.id)
+        usedTips.removeAll { $0.id == item.id }
+    }
+
+    private func showUndo(_ action: UndoAction, item: RecommendationItem) {
+        pendingUndo = (action: action, item: item)
+
+        undoTimer?.cancel()
+        undoTimer = Task {
+            try? await Task.sleep(nanoseconds: 5_000_000_000)
+            guard !Task.isCancelled else { return }
+            commitPendingAction()
+        }
+    }
+
     private func apply(_ response: RecommendationsResponse) {
-        recommendations = response.recommendations.filter { !dislikedTipIds.contains($0.id) }
+        recommendations = response.recommendations.filter { !dislikedTipIds.contains($0.id) && !usedTipIds.contains($0.id) }
         safeToSpend = response.safeToSpend ?? safeToSpend
         status = response.status ?? status
         summary = response.summary ?? summary
@@ -353,7 +412,7 @@ class RecommendationsViewModel {
     private func merge(_ response: RecommendationsResponse) {
         let existingIds = Set(recommendations.map { $0.id })
         let newRecs = response.recommendations.filter {
-            !existingIds.contains($0.id) && !dislikedTipIds.contains($0.id)
+            !existingIds.contains($0.id) && !dislikedTipIds.contains($0.id) && !usedTipIds.contains($0.id)
         }
         recommendations.append(contentsOf: newRecs)
         safeToSpend = response.safeToSpend ?? safeToSpend

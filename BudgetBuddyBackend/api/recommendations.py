@@ -70,7 +70,7 @@ def get_preferences(user_id):
 
     prefs = get_recommendation_prefs(user_id)
     if not prefs:
-        return jsonify({"savedTips": [], "dislikedTipIds": []})
+        return jsonify({"savedTips": [], "dislikedTipIds": [], "seenTipIds": []})
 
     try:
         saved_tips = json.loads(prefs.get("saved_tips_json", "[]"))
@@ -80,8 +80,23 @@ def get_preferences(user_id):
         disliked_tip_ids = json.loads(prefs.get("disliked_tip_ids_json", "[]"))
     except (json.JSONDecodeError, TypeError):
         disliked_tip_ids = []
+    try:
+        seen_tips_raw = json.loads(prefs.get("seen_tip_ids_json", "[]"))
+    except (json.JSONDecodeError, TypeError):
+        seen_tips_raw = []
 
-    return jsonify({"savedTips": saved_tips, "dislikedTipIds": disliked_tip_ids})
+    # Support both old format (string IDs) and new format (full objects)
+    seen_tips = [r for r in seen_tips_raw if isinstance(r, dict)]
+    seen_tip_ids = [r.get("category", "") + r.get("title", "") for r in seen_tips]
+    # Include any legacy string IDs
+    seen_tip_ids += [r for r in seen_tips_raw if isinstance(r, str)]
+
+    return jsonify({
+        "savedTips": saved_tips,
+        "dislikedTipIds": disliked_tip_ids,
+        "seenTipIds": seen_tip_ids,
+        "seenTips": seen_tips,
+    })
 
 
 @recommendations_bp.route("/recommendations/save", methods=["POST"])
@@ -152,12 +167,55 @@ def dislike_recommendation():
     if tip_id not in disliked_ids:
         disliked_ids.append(tip_id)
 
-    # Also remove from saved if present
+    # Also remove from saved and seen if present (mutual exclusivity)
     saved_tips = [r for r in saved_tips if (r.get("category", "") + r.get("title", "")) != tip_id]
+
+    try:
+        seen_tips = json.loads(prefs.get("seen_tip_ids_json", "[]")) if prefs else []
+    except (json.JSONDecodeError, TypeError):
+        seen_tips = []
+    seen_tips = [r for r in seen_tips if isinstance(r, dict) and (r.get("category", "") + r.get("title", "")) != tip_id]
 
     upsert_recommendation_prefs(
         user_id,
         saved_tips_json=json.dumps(saved_tips),
         disliked_tip_ids_json=json.dumps(disliked_ids),
+        seen_tip_ids_json=json.dumps(seen_tips),
     )
     return jsonify({"disliked": True})
+
+
+@recommendations_bp.route("/recommendations/seen", methods=["POST"])
+@require_auth
+def mark_already_seen():
+    """Mark a recommendation as used/already seen (hides it but doesn't negatively signal)."""
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "Request body must be JSON"}), 400
+
+    user_id = data.get("userId")
+    recommendation = data.get("recommendation")
+    if not user_id or not recommendation:
+        return jsonify({"error": "userId and recommendation are required"}), 400
+
+    user = get_user(user_id)
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
+    tip_id = recommendation.get("category", "") + recommendation.get("title", "")
+
+    prefs = get_recommendation_prefs(user_id)
+    try:
+        seen_tips = json.loads(prefs.get("seen_tip_ids_json", "[]")) if prefs else []
+    except (json.JSONDecodeError, TypeError):
+        seen_tips = []
+
+    # Handle migration: filter out any old-format string IDs
+    seen_tips = [r for r in seen_tips if isinstance(r, dict)]
+
+    existing_ids = [r.get("category", "") + r.get("title", "") for r in seen_tips]
+    if tip_id not in existing_ids:
+        seen_tips.append(recommendation)
+
+    upsert_recommendation_prefs(user_id, seen_tip_ids_json=json.dumps(seen_tips))
+    return jsonify({"seen": True})
