@@ -480,8 +480,8 @@ struct RecommendationCardView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
+            // Header — content only
             HStack(alignment: .top, spacing: 10) {
-                // Icon
                 ZStack {
                     Circle()
                         .fill(Color.accent.opacity(0.15))
@@ -510,26 +510,6 @@ struct RecommendationCardView: View {
 
                 Spacer(minLength: 0)
 
-                // Bookmark button
-                Button {
-                    onToggleSave()
-                } label: {
-                    Image(systemName: isSaved ? "bookmark.fill" : "bookmark")
-                        .font(.system(size: 14))
-                        .foregroundStyle(isSaved ? Color.accent : Color.textSecondary)
-                }
-                .buttonStyle(.plain)
-
-                // Dislike button
-                Button {
-                    onDislike()
-                } label: {
-                    Image(systemName: "hand.thumbsdown")
-                        .font(.system(size: 13))
-                        .foregroundStyle(Color.textSecondary)
-                }
-                .buttonStyle(.plain)
-
                 if item.isExpandable {
                     Image(systemName: "chevron.right")
                         .font(.system(size: 12, weight: .semibold))
@@ -541,6 +521,46 @@ struct RecommendationCardView: View {
             if isExpanded {
                 expandedContent
             }
+
+            // Action bar — save & dislike with comfortable tap targets
+            HStack(spacing: 0) {
+                Button {
+                    onToggleSave()
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: isSaved ? "bookmark.fill" : "bookmark")
+                            .font(.system(size: 14, weight: .medium))
+                        Text(isSaved ? "Saved" : "Save")
+                            .font(.system(.caption, design: .rounded, weight: .medium))
+                    }
+                    .foregroundStyle(isSaved ? Color.accent : Color.textSecondary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+
+                Divider()
+                    .frame(height: 16)
+                    .overlay(Color.textSecondary.opacity(0.2))
+
+                Button {
+                    onDislike()
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "hand.thumbsdown")
+                            .font(.system(size: 13, weight: .medium))
+                        Text("Not for me")
+                            .font(.system(.caption, design: .rounded, weight: .medium))
+                    }
+                    .foregroundStyle(Color.textSecondary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.top, 8)
         }
         .cardStyle()
         .contentShape(Rectangle())
