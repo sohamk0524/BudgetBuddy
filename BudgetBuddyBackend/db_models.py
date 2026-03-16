@@ -77,6 +77,16 @@ def delete_user_cascade(user_id: str):
     _delete_kind_for_user(client, 'CachedRecommendations', user_id)
     _delete_kind_for_user(client, 'DeviceToken', user_id)
     _delete_kind_for_user(client, 'MerchantClassification', user_id)
+    _delete_kind_for_user(client, 'UserCategoryPreference', user_id)
+
+    # Clean up OTP codes associated with user's phone
+    user = client.get(client.key('User', user_id))
+    if user and user.get('phone'):
+        otp_query = client.query(kind='OTPCode')
+        otp_query.add_filter(filter=PropertyFilter('phone', '=', user['phone']))
+        otp_keys = [e.key for e in otp_query.fetch()]
+        if otp_keys:
+            client.delete_multi(otp_keys)
 
     statement = get_statement(user_id)
     if statement:
@@ -85,7 +95,9 @@ def delete_user_cascade(user_id: str):
     for item in get_plaid_items(user_id):
         delete_plaid_item_cascade(item.key)
 
-    _delete_kind_for_user(client, 'UserCategoryPreference', user_id)
+    # Revoke Plaid access tokens before deleting
+    _revoke_plaid_tokens_for_user(user_id)
+
     client.delete(client.key('User', user_id))
 
 
