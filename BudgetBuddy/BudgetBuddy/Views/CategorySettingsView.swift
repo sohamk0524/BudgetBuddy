@@ -12,11 +12,21 @@ struct CategorySettingsView: View {
     @State private var categoryManager = CategoryManager.shared
     @State private var showAddSheet = false
 
+    private func limitBinding(for name: String) -> Binding<Double?> {
+        Binding(
+            get: { categoryManager.categories.first(where: { $0.name == name })?.weeklyLimit },
+            set: { newValue in categoryManager.setWeeklyLimit(for: name, limit: newValue) }
+        )
+    }
+
+    /// Fixed width for the delete button column so all rows align.
+    private let deleteColumnWidth: CGFloat = 28
+
     var body: some View {
         List {
             Section {
                 ForEach(categoryManager.categories) { cat in
-                    HStack(spacing: 12) {
+                    HStack(spacing: 10) {
                         Image(systemName: cat.icon)
                             .font(.system(size: 16))
                             .foregroundStyle(categoryColor(for: cat.name))
@@ -30,6 +40,22 @@ struct CategorySettingsView: View {
 
                         Spacer()
 
+                        HStack(spacing: 3) {
+                            Text("$")
+                                .font(.roundedBody)
+                                .foregroundStyle(Color.textSecondary)
+                            TextField("—", value: limitBinding(for: cat.name), format: .number)
+                                .font(.roundedBody)
+                                .foregroundStyle(Color.accent)
+                                .keyboardType(.decimalPad)
+                                .frame(width: 50)
+                                .multilineTextAlignment(.trailing)
+                            Text("/wk")
+                                .font(.roundedCaption)
+                                .foregroundStyle(Color.textSecondary)
+                        }
+
+                        // Delete button column — fixed width for alignment
                         if !cat.isBuiltin {
                             Button {
                                 if let idx = categoryManager.categories.firstIndex(of: cat) {
@@ -44,10 +70,14 @@ struct CategorySettingsView: View {
                                     .foregroundStyle(Color.danger)
                             }
                             .buttonStyle(.plain)
+                            .frame(width: deleteColumnWidth)
+                        } else {
+                            Spacer()
+                                .frame(width: deleteColumnWidth)
                         }
                     }
                     .listRowBackground(Color.surface)
-                    .moveDisabled(cat.name == "other")
+                    // Note: "Other" reorder is allowed visually but reindex() snaps it back to last
                 }
                 .onMove { source, destination in
                     categoryManager.reorder(from: source, to: destination)
@@ -57,6 +87,34 @@ struct CategorySettingsView: View {
                     .font(.roundedCaption)
                     .foregroundStyle(Color.textSecondary)
                     .textCase(nil)
+            } footer: {
+                if categoryManager.weeklyBudget > 0 {
+                    let allocated = categoryManager.totalCategoryLimits
+                    let total = categoryManager.weeklyBudget
+                    let remaining = categoryManager.remainingBudget
+                    let statusColor: Color = {
+                        if allocated > total { return .danger }
+                        if allocated == total { return .yellow }
+                        return .green
+                    }()
+
+                    HStack(spacing: 4) {
+                        Image(systemName: allocated > total ? "exclamationmark.triangle.fill" : "checkmark.circle.fill")
+                            .font(.system(size: 12))
+                            .foregroundStyle(statusColor)
+
+                        Text("$\(allocated, specifier: "%.0f") of $\(total, specifier: "%.0f") weekly budget allocated")
+                            .font(.roundedCaption)
+                            .foregroundStyle(statusColor)
+
+                        if remaining > 0 {
+                            Text("($\(remaining, specifier: "%.0f") left)")
+                                .font(.roundedCaption)
+                                .foregroundStyle(statusColor)
+                        }
+                    }
+                    .padding(.top, 4)
+                }
             }
 
             if categoryManager.canAddMore {
@@ -74,7 +132,8 @@ struct CategorySettingsView: View {
                     }
                     .listRowBackground(Color.surface)
                 } footer: {
-                    Text("Up to \(categoryManager.maxCustomCategories) custom categories. Names must be unique.")
+                    let slotsLeft = categoryManager.maxCustomCategories - categoryManager.customCategories.count
+                    Text("\(slotsLeft) of \(categoryManager.maxCustomCategories) custom category slots remaining.")
                         .font(.roundedCaption)
                         .foregroundStyle(Color.textSecondary)
                 }
@@ -88,8 +147,11 @@ struct CategorySettingsView: View {
         .toolbarColorScheme(.dark, for: .navigationBar)
         .environment(\.editMode, .constant(.active))
         .sheet(isPresented: $showAddSheet) {
-            AddCategorySheet { name, icon in
+            AddCategorySheet { name, icon, weeklyLimit in
                 categoryManager.addCategory(name: name, icon: icon)
+                if let limit = weeklyLimit {
+                    categoryManager.setWeeklyLimit(for: name.lowercased(), limit: limit)
+                }
                 Task { await categoryManager.saveCategories() }
             }
             .presentationDetents([.medium, .large])
@@ -101,6 +163,36 @@ struct CategorySettingsView: View {
     }
 }
 
+// MARK: - Icon Display Names
+
+/// Human-readable names for SF Symbols used in the icon picker.
+private let iconDisplayNames: [String: String] = [
+    "tag.fill": "Tag",
+    "briefcase.fill": "Work",
+    "house.fill": "Home",
+    "cross.case.fill": "Medical",
+    "graduationcap.fill": "Education",
+    "airplane": "Travel",
+    "tshirt.fill": "Clothing",
+    "scissors": "Salon",
+    "pawprint.fill": "Pets",
+    "gift.fill": "Gifts",
+    "iphone": "Tech",
+    "banknote.fill": "Bills",
+    "dumbbell.fill": "Fitness",
+    "music.note": "Music",
+    "book.fill": "Books",
+    "paintbrush.fill": "Art",
+    "sparkles": "Beauty",
+    "soccerball": "Sports",
+    "gamecontroller.fill": "Gaming",
+    "bag.fill": "Shopping",
+    "lightbulb.fill": "Utilities",
+    "wrench.and.screwdriver.fill": "Repairs",
+    "leaf.fill": "Nature",
+    "heart.fill": "Wellness",
+]
+
 // MARK: - Add Category Sheet
 
 @MainActor
@@ -108,13 +200,15 @@ struct AddCategorySheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var name = ""
     @State private var selectedIcon = "tag.fill"
+    @State private var weeklyLimit: Double?
     @State private var showError = false
 
-    let onSave: (String, String) -> Void
+    let onSave: (String, String, Double?) -> Void
 
     /// Human-readable label for an SF Symbol name.
     private func iconLabel(_ icon: String) -> String {
-        icon.replacingOccurrences(of: ".fill", with: "")
+        iconDisplayNames[icon] ?? icon
+            .replacingOccurrences(of: ".fill", with: "")
             .replacingOccurrences(of: ".", with: " ")
             .capitalized
     }
@@ -127,7 +221,6 @@ struct AddCategorySheet: View {
         return knownCategoryRegistry
             .filter { entry in
                 guard !activeNames.contains(entry.key) else { return false }
-                // Match on category name or any keyword
                 if entry.value.displayName.lowercased().contains(query) { return true }
                 if entry.key.contains(query) { return true }
                 return entry.value.keywords.contains { $0.contains(query) }
@@ -157,6 +250,29 @@ struct AddCategorySheet: View {
                             .padding(12)
                             .background(Color.surface)
                             .clipShape(RoundedRectangle(cornerRadius: 12))
+                    }
+
+                    // Weekly limit (optional) — right below the name
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Weekly Limit (optional)")
+                            .font(.roundedCaption)
+                            .foregroundStyle(Color.textSecondary)
+
+                        HStack(spacing: 6) {
+                            Text("$")
+                                .font(.roundedBody)
+                                .foregroundStyle(Color.textSecondary)
+                            TextField("No limit", value: $weeklyLimit, format: .number)
+                                .font(.roundedBody)
+                                .foregroundStyle(Color.accent)
+                                .keyboardType(.decimalPad)
+                                .padding(12)
+                                .background(Color.surface)
+                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                            Text("/week")
+                                .font(.roundedCaption)
+                                .foregroundStyle(Color.textSecondary)
+                        }
                     }
 
                     // Fuzzy suggestions (appear as user types)
@@ -248,7 +364,7 @@ struct AddCategorySheet: View {
                             showError = true
                             return
                         }
-                        onSave(trimmed, selectedIcon)
+                        onSave(trimmed, selectedIcon, weeklyLimit)
                         dismiss()
                     }
                     .font(.roundedHeadline)

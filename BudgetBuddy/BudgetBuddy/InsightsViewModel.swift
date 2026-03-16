@@ -16,24 +16,18 @@ final class InsightsViewModel {
 
     enum DateRange: String, CaseIterable, Identifiable {
         case week = "7 Days"
-        case month = "30 Days"
-        case quarter = "90 Days"
 
         var id: String { rawValue }
 
         var days: Int {
             switch self {
             case .week: return 7
-            case .month: return 30
-            case .quarter: return 90
             }
         }
 
         var label: String {
             switch self {
             case .week: return "Last 7 Days"
-            case .month: return "Last 30 Days"
-            case .quarter: return "Last 90 Days"
             }
         }
     }
@@ -74,13 +68,43 @@ final class InsightsViewModel {
     private var allTransactions: [ExpenseTransaction] = []
 
     init() {
-        loadFromCache(for: .month)   // pre-populate default range instantly
+        loadFromCache(for: .week)   // pre-populate default range instantly
     }
 
-    var selectedDateRange: DateRange = .month
+    var selectedDateRange: DateRange = .week
     var selectedPieCategory: String? = nil
     var barGrouping: BarGrouping = .daily
     var selectedBarDate: Date? = nil
+
+    // MARK: - Budget Limit
+
+    /// Weekly spending budget read from the user's profile (cached in UserDefaults).
+    var weeklyBudget: Double {
+        UserDefaults.standard.double(forKey: "profile_weeklyLimit")
+    }
+
+    /// The per-bar spending limit based on current grouping.
+    var barBudgetLimit: Double? {
+        guard weeklyBudget > 0 else { return nil }
+        return barGrouping == .daily ? weeklyBudget / 7.0 : weeklyBudget
+    }
+
+    /// Returns true if the given bar entry exceeds the budget limit.
+    func isOverBudget(_ entry: BarEntry) -> Bool {
+        guard let limit = barBudgetLimit else { return false }
+        return entry.amount > limit
+    }
+
+    /// Number of bars that exceeded the budget limit (only counting bars with spending).
+    var overBudgetCount: Int {
+        guard barBudgetLimit != nil else { return 0 }
+        return barData.filter { $0.amount > 0 && isOverBudget($0) }.count
+    }
+
+    /// Total number of bars with spending.
+    var barsWithSpending: Int {
+        barData.filter { $0.amount > 0 }.count
+    }
 
     // MARK: - Pie Chart Computed Data
 
@@ -108,6 +132,56 @@ final class InsightsViewModel {
             .sorted { ($0.date ?? "") > ($1.date ?? "") }
             .prefix(10)
             .map { $0 }
+    }
+
+    // MARK: - Category Budget Data
+
+    struct CategoryBudgetEntry: Identifiable {
+        let id: String
+        let category: String
+        let displayName: String
+        let spent: Double
+        let limit: Double
+        let color: Color
+        let icon: String
+        var isOverBudget: Bool { spent > limit }
+    }
+
+    /// Categories that have a weekly limit set, with their spending in the last 7 days.
+    var categoryBudgetData: [CategoryBudgetEntry] {
+        let cal = Calendar.current
+        let fmt = Self.isoFmt
+        let sevenDaysAgo = cal.date(byAdding: .day, value: -7, to: Date())!
+
+        // Sum spending per category for the last 7 days
+        var weeklyTotals: [String: Double] = [:]
+        for tx in allTransactions {
+            let cat = tx.subCategory.lowercased()
+            guard !cat.isEmpty else { continue }
+            if let dateStr = tx.date, let d = fmt.date(from: dateStr), d >= sevenDaysAgo {
+                weeklyTotals[cat, default: 0] += abs(tx.amount)
+            }
+        }
+
+        // Only include categories that have a weekly limit
+        return CategoryManager.shared.categories
+            .compactMap { userCat -> CategoryBudgetEntry? in
+                guard let limit = userCat.weeklyLimit, limit > 0 else { return nil }
+                let spent = weeklyTotals[userCat.name] ?? 0
+                return CategoryBudgetEntry(
+                    id: userCat.name,
+                    category: userCat.name,
+                    displayName: userCat.displayName,
+                    spent: spent,
+                    limit: limit,
+                    color: categoryColor(for: userCat.name),
+                    icon: userCat.icon
+                )
+            }
+    }
+
+    var categoryBudgetOverCount: Int {
+        categoryBudgetData.filter { $0.isOverBudget }.count
     }
 
     // MARK: - Bar Chart Computed Data
@@ -186,7 +260,7 @@ final class InsightsViewModel {
 
     func clearData() {
         allTransactions = []
-        selectedDateRange = .month
+        selectedDateRange = .week
         selectedPieCategory = nil
         barGrouping = .daily
         selectedBarDate = nil
@@ -230,7 +304,7 @@ final class InsightsViewModel {
 
     func fetchTransactions() async {
         guard let userId = AuthManager.shared.authToken else {
-            print("[Insights] ❌ No auth token, skipping fetch")
+            print("[Insights] No auth token, skipping fetch")
             return
         }
         isLoading = true
@@ -239,7 +313,7 @@ final class InsightsViewModel {
         let start = Self.isoFmt.string(from: Calendar.current.date(byAdding: .day, value: -selectedDateRange.days, to: Date())!)
         let end = Self.isoFmt.string(from: Date())
 
-        print("[Insights] 📡 Fetching: userId=\(userId) start=\(start) end=\(end) range=\(selectedDateRange.rawValue)")
+        print("[Insights] Fetching: userId=\(userId) start=\(start) end=\(end) range=\(selectedDateRange.rawValue)")
 
         do {
             let response = try await APIService.shared.getExpenses(
@@ -249,7 +323,7 @@ final class InsightsViewModel {
                 limit: 1000
             )
             allTransactions = response.transactions
-            print("[Insights] ✅ Got \(response.transactions.count) transactions")
+            print("[Insights] Got \(response.transactions.count) transactions")
             for tx in response.transactions.prefix(10) {
                 print("[Insights]   - \(tx.name) | $\(tx.amount) | cat=\(tx.subCategory) | date=\(tx.date ?? "nil") | src=\(tx.source ?? "nil")")
             }
@@ -257,11 +331,11 @@ final class InsightsViewModel {
                 print("[Insights]   ... and \(response.transactions.count - 10) more")
             }
             let chartEligible = response.transactions.filter { !$0.subCategory.isEmpty }
-            print("[Insights] 📊 Chart-eligible (has category): \(chartEligible.count) of \(response.transactions.count)")
+            print("[Insights] Chart-eligible (has category): \(chartEligible.count) of \(response.transactions.count)")
             saveToCache(for: selectedDateRange)
         } catch {
             errorMessage = "Unable to load spending data"
-            print("[Insights] ❌ Error: \(error)")
+            print("[Insights] Error: \(error)")
         }
         isLoading = false
     }

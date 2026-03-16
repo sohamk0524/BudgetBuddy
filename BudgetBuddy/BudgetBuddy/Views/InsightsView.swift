@@ -18,9 +18,6 @@ struct InsightsView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 20) {
-                    dateRangePicker
-                        .padding(.horizontal)
-
                     if viewModel.isLoading && viewModel.pieData.isEmpty {
                         loadingState
                     } else if viewModel.pieData.isEmpty && viewModel.barData.allSatisfy({ $0.amount == 0 }) {
@@ -35,6 +32,9 @@ struct InsightsView: View {
                         }
 
                         barChartCard
+                            .padding(.horizontal)
+
+                        categoryBudgetsCard
                             .padding(.horizontal)
                     }
                 }
@@ -342,14 +342,72 @@ struct InsightsView: View {
                 .transition(.opacity)
             } else if viewModel.barAverage > 0 {
                 HStack(spacing: 4) {
-                    Text("Average:")
+                    let unit = viewModel.barGrouping == .daily ? "Daily" : "Weekly"
+                    Text("\(unit) Average:")
                         .font(.roundedCaption)
                         .foregroundStyle(Color.textSecondary)
-                    Text("$\(viewModel.barAverage, specifier: "%.0f") / \(viewModel.barGrouping == .daily ? "day" : "week")")
+                    Text("$\(viewModel.barAverage, specifier: "%.0f")")
                         .font(.roundedCaption)
                         .fontWeight(.semibold)
                         .foregroundStyle(Color.textPrimary)
                         .monospacedDigit()
+
+                    if let limit = viewModel.barBudgetLimit {
+                        Spacer()
+                        Text("\(unit) Target:")
+                            .font(.roundedCaption)
+                            .foregroundStyle(Color.textSecondary)
+                        Text("$\(limit, specifier: "%.0f")")
+                            .font(.roundedCaption)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(budgetStatusColor)
+                            .monospacedDigit()
+                    }
+                }
+            }
+
+            // Budget summary callout
+            if viewModel.barBudgetLimit != nil {
+                let overCount = viewModel.overBudgetCount
+                let total = viewModel.barsWithSpending
+                let units = viewModel.barGrouping == .daily ? "days" : "weeks"
+
+                HStack(spacing: 6) {
+                    Image(systemName: overCount == 0 ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                        .font(.system(size: 12))
+                        .foregroundStyle(budgetStatusColor)
+
+                    if overCount >= total && total > 0 {
+                        Text("All \(units) over budget")
+                            .font(.roundedCaption)
+                            .foregroundStyle(budgetStatusColor)
+                    } else if overCount > 0 {
+                        Text("\(overCount) of \(total) \(units) over budget")
+                            .font(.roundedCaption)
+                            .foregroundStyle(budgetStatusColor)
+                    } else if total > 0 {
+                        Text("All \(units) within budget")
+                            .font(.roundedCaption)
+                            .foregroundStyle(budgetStatusColor)
+                    }
+
+                }
+            } else {
+                NavigationLink {
+                    ProfileView()
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "target")
+                            .font(.system(size: 12))
+                            .foregroundStyle(Color.accent)
+                        Text("Set a weekly budget to track spending limits")
+                            .font(.roundedCaption)
+                            .foregroundStyle(Color.textSecondary)
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 10))
+                            .foregroundStyle(Color.textSecondary)
+                    }
                 }
             }
 
@@ -367,18 +425,14 @@ struct InsightsView: View {
                             x: .value("Date", entry.date, unit: viewModel.barGrouping == .daily ? .day : .weekOfYear),
                             y: .value("Amount", entry.amount)
                         )
-                        .foregroundStyle(
-                            viewModel.selectedBarDate != nil && Calendar.current.isDate(entry.date, inSameDayAs: viewModel.selectedBarDate!)
-                                ? Color.accent
-                                : Color.accent.opacity(0.5)
-                        )
+                        .foregroundStyle(barColor(for: entry))
                         .cornerRadius(3)
                     }
 
-                    if viewModel.barAverage > 0 {
-                        RuleMark(y: .value("Average", viewModel.barAverage))
-                            .foregroundStyle(Color.textSecondary.opacity(0.6))
-                            .lineStyle(StrokeStyle(lineWidth: 1, dash: [5, 3]))
+                    if let limit = viewModel.barBudgetLimit {
+                        RuleMark(y: .value("Budget", limit))
+                            .foregroundStyle(Color.danger.opacity(0.7))
+                            .lineStyle(StrokeStyle(lineWidth: 1.5, dash: [6, 4]))
                     }
                 }
                 .chartXSelection(value: $viewModel.selectedBarDate)
@@ -400,8 +454,171 @@ struct InsightsView: View {
                             }
                         }
                     }
+                    if let limit = viewModel.barBudgetLimit {
+                        AxisMarks(position: .leading, values: [limit]) { _ in
+                            AxisValueLabel {
+                                Text("Budget")
+                                    .font(.system(size: 9, weight: .semibold, design: .rounded))
+                                    .foregroundStyle(Color.danger)
+                            }
+                        }
+                    }
                 }
                 .frame(height: 200)
+            }
+        }
+        .walletCard()
+    }
+
+    // MARK: - Category Budgets Card
+
+    private var categoryBudgetsCard: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Text("Category Budgets")
+                    .font(.roundedHeadline)
+                    .foregroundStyle(Color.textPrimary)
+                Spacer()
+                Text("Weekly")
+                    .font(.roundedCaption)
+                    .foregroundStyle(Color.textSecondary)
+            }
+
+            let data = viewModel.categoryBudgetData
+
+            if data.isEmpty {
+                NavigationLink {
+                    CategorySettingsView()
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "target")
+                            .font(.system(size: 12))
+                            .foregroundStyle(Color.accent)
+                        Text("Set weekly limits per category in Categories settings")
+                            .font(.roundedCaption)
+                            .foregroundStyle(Color.textSecondary)
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 10))
+                            .foregroundStyle(Color.textSecondary)
+                    }
+                }
+            } else {
+                // Budget status summary
+                let overCount = viewModel.categoryBudgetOverCount
+                let total = data.count
+                let statusColor: Color = {
+                    if overCount == 0 { return .green }
+                    if overCount >= total { return .danger }
+                    return .yellow
+                }()
+
+                HStack(spacing: 6) {
+                    Image(systemName: overCount == 0 ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                        .font(.system(size: 12))
+                        .foregroundStyle(statusColor)
+
+                    if overCount == 0 {
+                        Text("All categories within budget")
+                            .font(.roundedCaption)
+                            .foregroundStyle(statusColor)
+                    } else if overCount >= total {
+                        Text("All categories over budget")
+                            .font(.roundedCaption)
+                            .foregroundStyle(statusColor)
+                    } else {
+                        Text("\(overCount) of \(total) categories over budget")
+                            .font(.roundedCaption)
+                            .foregroundStyle(statusColor)
+                    }
+
+                    Spacer()
+
+                    NavigationLink {
+                        CategorySettingsView()
+                    } label: {
+                        Text("Edit Limits")
+                            .font(.roundedCaption)
+                            .foregroundStyle(Color.accent)
+                    }
+                }
+
+                Chart {
+                    ForEach(data) { entry in
+                        // Spending bar
+                        BarMark(
+                            x: .value("Category", entry.displayName),
+                            y: .value("Spent", entry.spent)
+                        )
+                        .foregroundStyle(entry.isOverBudget ? Color.danger : Color.green)
+                        .cornerRadius(3)
+                        .annotation(position: .top, spacing: 4) {
+                            Text("$\(entry.spent, specifier: "%.0f")")
+                                .font(.system(size: 10, weight: .semibold, design: .rounded))
+                                .foregroundStyle(entry.isOverBudget ? Color.danger : Color.green)
+                                .monospacedDigit()
+                        }
+
+                        // Limit indicator — thin horizontal line at the limit level
+                        BarMark(
+                            x: .value("Category", entry.displayName),
+                            yStart: .value("Lo", entry.limit * 0.98),
+                            yEnd: .value("Hi", entry.limit * 1.02)
+                        )
+                        .foregroundStyle(Color.textPrimary.opacity(0.8))
+                    }
+                }
+                .chartYAxis {
+                    AxisMarks(position: .leading) { value in
+                        AxisGridLine()
+                            .foregroundStyle(Color.textSecondary.opacity(0.15))
+                        AxisValueLabel {
+                            if let amount = value.as(Double.self) {
+                                Text("$\(Int(amount))")
+                                    .font(.system(size: 10, design: .rounded))
+                                    .foregroundStyle(Color.textSecondary)
+                            }
+                        }
+                    }
+                }
+                .chartXAxis {
+                    AxisMarks { _ in
+                        AxisValueLabel()
+                            .foregroundStyle(Color.textSecondary)
+                    }
+                }
+                .frame(height: 200)
+
+                // Per-category spent / limit breakdown
+                ForEach(data) { entry in
+                    HStack(spacing: 8) {
+                        Image(systemName: entry.icon)
+                            .font(.system(size: 12))
+                            .foregroundStyle(entry.color)
+                            .frame(width: 20)
+
+                        Text(entry.displayName)
+                            .font(.roundedCaption)
+                            .foregroundStyle(Color.textPrimary)
+
+                        Spacer()
+
+                        Text("$\(entry.spent, specifier: "%.0f")")
+                            .font(.system(size: 12, weight: .semibold, design: .rounded))
+                            .foregroundStyle(entry.isOverBudget ? Color.danger : Color.green)
+                            .monospacedDigit()
+
+                        Text("/")
+                            .font(.system(size: 12, design: .rounded))
+                            .foregroundStyle(Color.textSecondary)
+
+                        Text("$\(entry.limit, specifier: "%.0f")")
+                            .font(.system(size: 12, design: .rounded))
+                            .foregroundStyle(Color.textSecondary)
+                            .monospacedDigit()
+                    }
+                    .padding(.vertical, 2)
+                }
             }
         }
         .walletCard()
@@ -415,23 +632,38 @@ struct InsightsView: View {
 
     private var xAxisStrideCount: Int {
         if viewModel.barGrouping == .weekly { return 1 }
-        switch viewModel.selectedDateRange {
-        case .week: return 1
-        case .month: return 5
-        case .quarter: return 14
-        }
+        return 1
     }
 
     private var xAxisFormat: Date.FormatStyle {
         if viewModel.barGrouping == .weekly {
             return .dateTime.month(.abbreviated).day()
         }
-        switch viewModel.selectedDateRange {
-        case .week:
-            return .dateTime.weekday(.abbreviated)
-        case .month, .quarter:
-            return .dateTime.month(.abbreviated).day()
+        return .dateTime.weekday(.abbreviated)
+    }
+
+    // MARK: - Bar Color Helper
+
+    private func barColor(for entry: InsightsViewModel.BarEntry) -> Color {
+        let isSelected = viewModel.selectedBarDate != nil
+            && Calendar.current.isDate(entry.date, inSameDayAs: viewModel.selectedBarDate!)
+        let isOver = viewModel.isOverBudget(entry)
+
+        if isOver {
+            return isSelected ? Color.danger : Color.danger.opacity(0.6)
         }
+        return isSelected ? Color.accent : Color.accent.opacity(0.5)
+    }
+
+    // MARK: - Budget Status Color
+
+    /// Green when all within budget, yellow when some over, red when all over.
+    private var budgetStatusColor: Color {
+        let overCount = viewModel.overBudgetCount
+        let total = viewModel.barsWithSpending
+        if total == 0 || overCount == 0 { return .green }
+        if overCount >= total { return .danger }
+        return .yellow
     }
 
     // MARK: - Date Formatter

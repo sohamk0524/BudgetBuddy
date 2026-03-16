@@ -17,6 +17,7 @@ struct UserCategory: Identifiable, Codable, Equatable, Hashable {
     var icon: String        // SF Symbol name: "fork.knife", "tag.fill"
     var isBuiltin: Bool
     var displayOrder: Int
+    var weeklyLimit: Double? // optional per-category weekly spending limit
 
     static let builtins: [UserCategory] = [
         .init(id: UUID(), name: "food", displayName: "Food", icon: "fork.knife", isBuiltin: true, displayOrder: 0),
@@ -148,7 +149,8 @@ class CategoryManager {
                         displayName: pref.categoryName.capitalized,
                         icon: pref.emoji ?? defaultIcon(for: name),
                         isBuiltin: isBuiltin,
-                        displayOrder: pref.displayOrder ?? idx
+                        displayOrder: pref.displayOrder ?? idx,
+                        weeklyLimit: pref.weeklyLimit
                     )
                 }
                 reindex()  // ensures "other" is last
@@ -162,7 +164,11 @@ class CategoryManager {
     func saveCategories() async {
         guard let userId = AuthManager.shared.authToken else { return }
         let payload = categories.map { cat -> [String: Any] in
-            ["name": cat.name, "emoji": cat.icon, "isBuiltin": cat.isBuiltin]
+            var dict: [String: Any] = ["name": cat.name, "emoji": cat.icon, "isBuiltin": cat.isBuiltin]
+            if let limit = cat.weeklyLimit {
+                dict["weeklyLimit"] = limit
+            }
+            return dict
         }
         do {
             try await APIService.shared.updateCategoryPreferences(userId: userId, categories: payload)
@@ -173,6 +179,27 @@ class CategoryManager {
     }
 
     // MARK: - Mutations
+
+    /// Sum of all per-category weekly limits currently set.
+    var totalCategoryLimits: Double {
+        categories.compactMap(\.weeklyLimit).reduce(0, +)
+    }
+
+    /// The user's overall weekly spending goal from profile.
+    var weeklyBudget: Double {
+        UserDefaults.standard.double(forKey: "profile_weeklyLimit")
+    }
+
+    /// How much of the weekly budget is still unallocated to categories.
+    var remainingBudget: Double {
+        max(0, weeklyBudget - totalCategoryLimits)
+    }
+
+    func setWeeklyLimit(for categoryName: String, limit: Double?) {
+        guard let idx = categories.firstIndex(where: { $0.name == categoryName }) else { return }
+        categories[idx].weeklyLimit = limit
+        saveToCache()
+    }
 
     func addCategory(name: String, icon: String? = nil) {
         guard canAddMore else { return }

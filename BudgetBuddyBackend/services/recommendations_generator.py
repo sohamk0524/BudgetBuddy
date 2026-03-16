@@ -196,6 +196,17 @@ ACTION_PROMPTS = {
     ),
 }
 
+SEARCH_PROMPT_TEMPLATE = (
+    "The user is searching for deals related to: \"{query}\"\n\n"
+    "STEP 1: Call get_plaid_transactions to understand the user's spending context.\n"
+    "STEP 2: Call search_local_deals with the user's search query (and variations) to find relevant deals near their school.\n"
+    "STEP 3: Call get_weekly_spending_status to understand their budget.\n"
+    "STEP 4: If the first search didn't return great results, call search_local_deals again with a refined query.\n\n"
+    "Return recommendations that match what the user searched for. "
+    "Ground savings calculations in the user's actual transaction data where possible. "
+    "If the search topic doesn't match their spending history, still find deals but set potentialSavings to 0."
+)
+
 
 def _get_action_prompt(action: str) -> str:
     """Return the prompt for a given action. Falls back to a dynamic prompt for custom categories."""
@@ -469,14 +480,24 @@ def _nudge_type_to_category(nudge_type: str) -> str:
     return mapping.get(nudge_type, "habits")
 
 
-def generate_recommendations(user_id: int, action: str = "general") -> Dict[str, Any]:
+def generate_recommendations(user_id: int, action: str = "general", search_query: str = None) -> Dict[str, Any]:
     """
     Generate fresh recommendations using the LLM agent.
+
+    Parameters:
+        action: category or builtin action (default "general") — used when no search_query
+        search_query: optional free-text deal search from the user — when provided, overrides
+                      the action prompt so the agent searches for deals matching the query.
     Falls back to rules-based nudges if the LLM is unavailable.
     """
     # Pre-fetch financial context
     context = _build_user_context(user_id)
-    action_prompt = _get_action_prompt(action)
+
+    # Search query and action are independent paths — search_query takes priority when present
+    if search_query:
+        action_prompt = SEARCH_PROMPT_TEMPLATE.format(query=search_query)
+    else:
+        action_prompt = _get_action_prompt(action)
 
     user_message = (
         f"{action_prompt}\n\n"
@@ -500,6 +521,8 @@ def generate_recommendations(user_id: int, action: str = "general") -> Dict[str,
         parsed = _parse_recommendations_json(raw_content)
         if not parsed:
             print(f"[RECO FALLBACK] user={user_id} reason=json_parse_failed raw={raw_content[:200]}")
+            if search_query:
+                return {"recommendations": [], "safeToSpend": 0, "status": "unknown", "summary": "No results found.", "cached": False}
             return _cache_and_return(user_id, _fallback_recommendations(user_id))
 
         # Compute safe-to-spend from weekly spending limit
@@ -508,7 +531,7 @@ def generate_recommendations(user_id: int, action: str = "general") -> Dict[str,
         status = sts["status"]
 
         recs = parsed.get("recommendations", [])[:5]
-        if action != "general":
+        if not search_query and action != "general":
             recs = [{**r, "spendingCategory": action} for r in recs]
 
         # Filter out disliked tips
@@ -522,10 +545,18 @@ def generate_recommendations(user_id: int, action: str = "general") -> Dict[str,
             "summary": parsed.get("summary", ""),
         }
 
+        # Search results are returned directly without polluting the recommendations cache
+        if search_query:
+            output["cached"] = False
+            output["generatedAt"] = datetime.utcnow().isoformat()
+            return output
+
         return _cache_and_return(user_id, output, action=action)
 
     except Exception as e:
         print(f"[RECO FALLBACK] user={user_id} reason=exception error={e}")
+        if search_query:
+            return {"recommendations": [], "safeToSpend": 0, "status": "unknown", "summary": "Search failed.", "cached": False}
         return _cache_and_return(user_id, _fallback_recommendations(user_id), action=action)
 
 

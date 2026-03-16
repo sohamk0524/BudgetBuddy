@@ -386,6 +386,7 @@ def get_category_preferences(user_id):
                 "displayOrder": p.get('display_order'),
                 "emoji": p.get('emoji'),
                 "isBuiltin": p.get('is_builtin', True),
+                "weeklyLimit": p.get('weekly_limit'),
             }
             for p in prefs
         ]

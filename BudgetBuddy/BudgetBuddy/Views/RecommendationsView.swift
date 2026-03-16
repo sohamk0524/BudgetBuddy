@@ -44,20 +44,44 @@ struct RecommendationsView: View {
                     status: viewModel.statusDisplayText
                 )
 
+                // Search bar
+                searchBar
+
                 // Filter toggle (All / Saved)
-                if !viewModel.savedTips.isEmpty || viewModel.filterMode == .saved {
+                if !viewModel.isSearchActive && (!viewModel.savedTips.isEmpty || viewModel.filterMode == .saved) {
                     filterToggle
                 }
 
-                // Money Moves or category indicator
-                if viewModel.activeCategory != nil {
-                    categoryChip
-                } else if !viewModel.moneyMovesCards.isEmpty && viewModel.filterMode == .all {
-                    moneyMovesRow
+                // Money Moves or category indicator (hidden during search)
+                if !viewModel.isSearchActive {
+                    if viewModel.activeCategory != nil {
+                        categoryChip
+                    } else if !viewModel.moneyMovesCards.isEmpty && viewModel.filterMode == .all {
+                        moneyMovesRow
+                    }
                 }
 
-                // Content
-                if viewModel.isLoading && viewModel.recommendations.isEmpty {
+                // Search results take priority when active
+                if viewModel.isSearchActive {
+                    if viewModel.isSearching {
+                        searchingPlaceholder
+                    } else if viewModel.searchResults.isEmpty {
+                        VStack(spacing: 12) {
+                            Spacer()
+                            Image(systemName: "magnifyingglass")
+                                .font(.system(size: 32))
+                                .foregroundStyle(Color.textSecondary.opacity(0.6))
+                            Text("No deals found for \"\(viewModel.searchQuery)\"")
+                                .font(.roundedCaption)
+                                .foregroundStyle(Color.textSecondary)
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal, 32)
+                            Spacer()
+                        }
+                    } else {
+                        searchResultsList
+                    }
+                } else if viewModel.isLoading && viewModel.recommendations.isEmpty {
                     Spacer()
                     ProgressView()
                         .tint(Color.accent)
@@ -172,6 +196,100 @@ struct RecommendationsView: View {
                 .clipShape(Capsule())
         }
         .buttonStyle(.plain)
+    }
+
+    // MARK: - Search Bar
+
+    private var searchBar: some View {
+        HStack(spacing: 10) {
+            HStack(spacing: 8) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(Color.textSecondary)
+
+                TextField("Search for deals...", text: $viewModel.searchQuery)
+                    .font(.roundedBody)
+                    .foregroundStyle(Color.textPrimary)
+                    .submitLabel(.search)
+                    .onSubmit {
+                        Task { await viewModel.searchDeals() }
+                    }
+
+                if !viewModel.searchQuery.isEmpty {
+                    Button {
+                        viewModel.clearSearch()
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 14))
+                            .foregroundStyle(Color.textSecondary)
+                    }
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(Color.surface)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+
+            if viewModel.isSearchActive {
+                Button("Cancel") {
+                    viewModel.clearSearch()
+                }
+                .font(.system(.subheadline, design: .rounded, weight: .medium))
+                .foregroundStyle(Color.accent)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 4)
+    }
+
+    // MARK: - Search Results
+
+    private var searchResultsList: some View {
+        ScrollView {
+            LazyVStack(spacing: 12) {
+                HStack {
+                    Text("Results for \"\(viewModel.searchQuery)\"")
+                        .font(.roundedCaption)
+                        .foregroundStyle(Color.textSecondary)
+                    Spacer()
+                }
+
+                ForEach(viewModel.searchResults) { item in
+                    RecommendationCardView(
+                        item: item,
+                        isSaved: viewModel.savedTipIds.contains(item.id),
+                        onToggleSave: { viewModel.toggleSave(item) },
+                        onDislike: {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                viewModel.dislike(item)
+                            }
+                        }
+                    )
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+        }
+    }
+
+    private var searchingPlaceholder: some View {
+        VStack(spacing: 20) {
+            Spacer()
+            ZStack {
+                Circle()
+                    .fill(Color.accent.opacity(0.12))
+                    .frame(width: 72, height: 72)
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 28, weight: .medium))
+                    .foregroundStyle(Color.accent)
+            }
+            Text("Searching for deals...")
+                .font(.roundedBody)
+                .foregroundStyle(Color.textSecondary)
+            ProgressView()
+                .tint(Color.accent)
+            Spacer()
+        }
     }
 
     // MARK: - Recommendations List

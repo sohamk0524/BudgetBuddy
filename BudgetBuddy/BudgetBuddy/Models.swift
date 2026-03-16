@@ -638,6 +638,7 @@ struct CategoryPreference: Codable, Identifiable {
     let displayOrder: Int?
     let emoji: String?
     let isBuiltin: Bool?
+    let weeklyLimit: Double?
 }
 
 // MARK: - Smart Nudge Models
