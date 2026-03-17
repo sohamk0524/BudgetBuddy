@@ -846,6 +846,31 @@ actor APIService {
         }
     }
 
+    func getTotalSaved(userId: String) async throws -> Double {
+        let url = baseURL.appendingPathComponent("user/total-saved/\(userId)")
+        let request = try await authenticatedRequest(url: url)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse,
+              httpResponse.statusCode == 200 else {
+            throw APIError.invalidResponse
+        }
+        let result = try JSONDecoder().decode([String: Double].self, from: data)
+        return result["totalSaved"] ?? 0
+    }
+
+    func reportUsedSavings(userId: String, amount: Double) async throws {
+        let url = baseURL.appendingPathComponent("user/gamification/mark-used-savings")
+        var request = try await authenticatedRequest(url: url, method: "POST")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let body: [String: Any] = ["userId": userId, "amount": amount]
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        let (_, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse,
+              httpResponse.statusCode == 200 else {
+            throw APIError.invalidResponse
+        }
+    }
+
     /// Fetches spending summary by sub-category for Money Moves cards
     func getSpendingSummary(userId: String) async throws -> SpendingSummaryResponse {
         let url = baseURL.appendingPathComponent("expenses/spending-summary/\(userId)")
