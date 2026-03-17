@@ -151,3 +151,4 @@ creds.py
 .env
 BudgetBuddyBackend/firebase-adminsdk.json
 BudgetBuddyBackend/google-auth-2.json
+/.claude
