@@ -47,14 +47,40 @@ struct ExpensesView: View {
                             .padding(.horizontal)
                         }
 
-                        // Date range indicator
-                        if !viewModel.rangeLabel.isEmpty {
+                        // Date range selector
+                        HStack {
                             Text(viewModel.rangeLabel)
                                 .font(.roundedCaption)
                                 .foregroundStyle(Color.textSecondary)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.horizontal)
+                            Spacer()
+                            Menu {
+                                ForEach(ExpensesViewModel.DateRange.allCases) { range in
+                                    Button {
+                                        viewModel.selectDateRange(range)
+                                    } label: {
+                                        HStack {
+                                            Text(range.rawValue)
+                                            if viewModel.selectedDateRange == range {
+                                                Image(systemName: "checkmark")
+                                            }
+                                        }
+                                    }
+                                }
+                            } label: {
+                                HStack(spacing: 4) {
+                                    Text(viewModel.selectedDateRange.rawValue)
+                                        .font(.roundedCaption)
+                                    Image(systemName: "chevron.down")
+                                        .font(.system(size: 8, weight: .semibold))
+                                }
+                                .foregroundStyle(Color.accent)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 5)
+                                .background(Color.accent.opacity(0.12))
+                                .clipShape(Capsule())
+                            }
                         }
+                        .padding(.horizontal)
 
                         // Transaction list grouped by week
                         LazyVStack(spacing: 8) {
@@ -132,6 +158,7 @@ struct ExpensesView: View {
             .background(Color.appBackground)
             .navigationTitle("Expenses")
             .navigationBarTitleDisplayMode(.large)
+            .toolbarColorScheme(.dark, for: .navigationBar)
             .refreshable {
                 await viewModel.refresh()
             }
@@ -667,6 +694,27 @@ struct TransactionClassificationSheet: View {
                     }
                 }
                 .padding(.horizontal)
+
+                // Remaining budget indicator for selected category
+                if let selectedCat = CategoryManager.shared.categories.first(where: { $0.displayName == selectedCategory }),
+                   let limit = selectedCat.weeklyLimit, limit > 0 {
+                    let spent = viewModel.weeklySpent(for: selectedCat.name)
+                    let remaining = limit - spent
+                    let ratio = spent / limit
+                    let color: Color = ratio >= 1.0 ? .danger : ratio >= 0.75 ? .yellow : .green
+                    HStack(spacing: 6) {
+                        Circle()
+                            .fill(color)
+                            .frame(width: 6, height: 6)
+                        Text(remaining >= 0
+                             ? "$\(Int(remaining)) left for \(selectedCat.displayName) this week"
+                             : "$\(Int(abs(remaining))) over for \(selectedCat.displayName) this week")
+                            .font(.roundedCaption)
+                            .foregroundStyle(Color.textSecondary)
+                    }
+                    .padding(.horizontal)
+                    .padding(.top, 4)
+                }
             } else if let cat = CategoryManager.shared.categories.first(where: { $0.displayName == selectedCategory }) {
                 // Match the grid cell size: 1/3 width minus padding/spacing
                 let columnWidth = (UIScreen.main.bounds.width - 32 - 20) / 3

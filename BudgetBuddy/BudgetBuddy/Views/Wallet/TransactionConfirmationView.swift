@@ -252,6 +252,27 @@ struct TransactionConfirmationView: View {
                 }
                 .padding(.horizontal)
             }
+
+            // Remaining budget indicator for selected category
+            if !selectedCategory.isEmpty,
+               let selectedCat = CategoryManager.shared.categories.first(where: { $0.displayName == selectedCategory }),
+               let limit = selectedCat.weeklyLimit, limit > 0 {
+                let spent = Self.weeklySpentFromCache(for: selectedCat.name)
+                let remaining = limit - spent
+                let ratio = spent / limit
+                let color: Color = ratio >= 1.0 ? .danger : ratio >= 0.75 ? .yellow : .green
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(color)
+                        .frame(width: 6, height: 6)
+                    Text(remaining >= 0
+                         ? "$\(Int(remaining)) left for \(selectedCat.displayName) this week"
+                         : "$\(Int(abs(remaining))) over for \(selectedCat.displayName) this week")
+                        .font(.roundedCaption)
+                        .foregroundStyle(Color.textSecondary)
+                }
+                .padding(.horizontal)
+            }
         }
         .padding(.vertical, 4)
     }
@@ -338,6 +359,30 @@ struct TransactionConfirmationView: View {
         viewModel.transaction.store = store.isEmpty ? nil : store
         viewModel.transaction.date = date
         viewModel.transaction.items = items
+    }
+
+    /// Compute weekly spending for a category from the cached transactions in UserDefaults.
+    private static func weeklySpentFromCache(for categoryName: String) -> Double {
+        guard let data = UserDefaults.standard.data(forKey: "expenses_transactions"),
+              let transactions = try? JSONDecoder().decode([ExpenseTransaction].self, from: data) else {
+            return 0
+        }
+        let cal = Calendar.current
+        let today = Date()
+        let weekday = cal.component(.weekday, from: today) // 1=Sun
+        let daysSinceMonday = (weekday + 5) % 7
+        guard let monday = cal.date(byAdding: .day, value: -daysSinceMonday, to: today) else { return 0 }
+        let mondayStart = cal.startOfDay(for: monday)
+
+        let df = DateFormatter()
+        df.dateFormat = "yyyy-MM-dd"
+
+        return transactions
+            .filter { txn in
+                guard let dateStr = txn.date, let date = df.date(from: dateStr) else { return false }
+                return date >= mondayStart && txn.subCategory.lowercased() == categoryName.lowercased()
+            }
+            .reduce(0) { $0 + $1.amount }
     }
 
     private func confirmTransaction() {
