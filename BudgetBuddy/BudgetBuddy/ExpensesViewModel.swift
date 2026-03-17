@@ -87,6 +87,26 @@ class ExpensesViewModel {
         )
     }
 
+    // MARK: - Date Range
+
+    enum DateRange: String, CaseIterable, Identifiable {
+        case twoWeeks = "2 Weeks"
+        case oneMonth = "1 Month"
+        case threeMonths = "3 Months"
+
+        var id: String { rawValue }
+
+        var weeks: Int {
+            switch self {
+            case .twoWeeks: return 2
+            case .oneMonth: return 4
+            case .threeMonths: return 13
+            }
+        }
+    }
+
+    var selectedDateRange: DateRange = .twoWeeks
+
     /// Number of weeks of history currently loaded (default = 2).
     private(set) var weeksBack: Int = 2
     var isLoadingMore = false
@@ -285,6 +305,13 @@ class ExpensesViewModel {
         isLoadingMore = false
     }
 
+    /// Switch to a specific date range and re-fetch.
+    func selectDateRange(_ range: DateRange) {
+        selectedDateRange = range
+        weeksBack = range.weeks
+        Task { await refresh() }
+    }
+
     func classifyTransaction(transactionId: Int, subCategory: String) async {
         do {
             _ = try await classifyTransactionForSheet(transactionId: transactionId, subCategory: subCategory)
@@ -390,6 +417,21 @@ class ExpensesViewModel {
         guard !allTransactions.contains(where: { $0.id == transaction.id }) else { return }
         allTransactions.insert(transaction, at: 0)
         saveToCache()
+    }
+
+    /// Sum of this week's (Mon-Sun) spending in the given category.
+    func weeklySpent(for categoryName: String) -> Double {
+        let cal = Calendar.current
+        let today = Date()
+        let weekday = cal.component(.weekday, from: today) // 1=Sun
+        let daysSinceMonday = (weekday + 5) % 7 // Mon=0
+        let monday = cal.startOfDay(for: cal.date(byAdding: .day, value: -daysSinceMonday, to: today)!)
+        return allTransactions
+            .filter { txn in
+                guard let dateStr = txn.date, let date = Self.parseDate(dateStr) else { return false }
+                return date >= monday && txn.subCategory.lowercased() == categoryName.lowercased()
+            }
+            .reduce(0) { $0 + $1.amount }
     }
 
     /// Whether any transactions currently lack a category.

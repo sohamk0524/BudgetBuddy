@@ -16,18 +16,24 @@ final class InsightsViewModel {
 
     enum DateRange: String, CaseIterable, Identifiable {
         case week = "7 Days"
+        case month = "30 Days"
+        case quarter = "90 Days"
 
         var id: String { rawValue }
 
         var days: Int {
             switch self {
             case .week: return 7
+            case .month: return 30
+            case .quarter: return 90
             }
         }
 
         var label: String {
             switch self {
             case .week: return "Last 7 Days"
+            case .month: return "Last 30 Days"
+            case .quarter: return "Last 90 Days"
             }
         }
     }
@@ -73,7 +79,7 @@ final class InsightsViewModel {
 
     var selectedDateRange: DateRange = .week
     var selectedPieCategory: String? = nil
-    var barGrouping: BarGrouping = .daily
+    var barGrouping: BarGrouping = .weekly
     var selectedBarDate: Date? = nil
 
     // MARK: - Budget Limit
@@ -147,18 +153,23 @@ final class InsightsViewModel {
         var isOverBudget: Bool { spent > limit }
     }
 
-    /// Categories that have a weekly limit set, with their spending in the last 7 days.
+    /// Categories that have a weekly limit set, with their spending in the current Mon-Sun week.
     var categoryBudgetData: [CategoryBudgetEntry] {
         let cal = Calendar.current
         let fmt = Self.isoFmt
-        let sevenDaysAgo = cal.date(byAdding: .day, value: -7, to: Date())!
 
-        // Sum spending per category for the last 7 days
+        // Calculate current week's Monday
+        let today = Date()
+        let weekday = cal.component(.weekday, from: today) // 1=Sun
+        let daysSinceMonday = (weekday + 5) % 7 // Mon=0
+        let monday = cal.startOfDay(for: cal.date(byAdding: .day, value: -daysSinceMonday, to: today)!)
+
+        // Sum spending per category for the current Mon-Sun week
         var weeklyTotals: [String: Double] = [:]
         for tx in allTransactions {
             let cat = tx.subCategory.lowercased()
             guard !cat.isEmpty else { continue }
-            if let dateStr = tx.date, let d = fmt.date(from: dateStr), d >= sevenDaysAgo {
+            if let dateStr = tx.date, let d = fmt.date(from: dateStr), d >= monday {
                 weeklyTotals[cat, default: 0] += abs(tx.amount)
             }
         }
@@ -290,6 +301,8 @@ final class InsightsViewModel {
         selectedDateRange = range
         selectedPieCategory = nil
         selectedBarDate = nil
+        // Default to weekly grouping; user can toggle to daily manually
+        barGrouping = .weekly
         loadFromCache(for: range)   // swap in cached data instantly before network call
         Task { await fetchTransactions() }
     }

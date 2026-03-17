@@ -23,6 +23,9 @@ struct InsightsView: View {
                     } else if viewModel.pieData.isEmpty && viewModel.barData.allSatisfy({ $0.amount == 0 }) {
                         emptyState
                     } else {
+                        dateRangePicker
+                            .padding(.horizontal)
+
                         pieChartCard
                             .padding(.horizontal)
 
@@ -433,6 +436,12 @@ struct InsightsView: View {
                         RuleMark(y: .value("Budget", limit))
                             .foregroundStyle(Color.danger.opacity(0.7))
                             .lineStyle(StrokeStyle(lineWidth: 1.5, dash: [6, 4]))
+                            .annotation(position: .top, alignment: .trailing, spacing: 2) {
+                                Text("$\(Int(limit))")
+                                    .font(.system(size: 9, weight: .semibold, design: .rounded))
+                                    .foregroundStyle(Color.danger)
+                                    .padding(.trailing, 4)
+                            }
                     }
                 }
                 .chartXSelection(value: $viewModel.selectedBarDate)
@@ -451,15 +460,6 @@ struct InsightsView: View {
                                 Text("$\(Int(amount))")
                                     .font(.system(size: 10, design: .rounded))
                                     .foregroundStyle(Color.textSecondary)
-                            }
-                        }
-                    }
-                    if let limit = viewModel.barBudgetLimit {
-                        AxisMarks(position: .leading, values: [limit]) { _ in
-                            AxisValueLabel {
-                                Text("Budget")
-                                    .font(.system(size: 9, weight: .semibold, design: .rounded))
-                                    .foregroundStyle(Color.danger)
                             }
                         }
                     }
@@ -550,22 +550,28 @@ struct InsightsView: View {
                             x: .value("Category", entry.displayName),
                             y: .value("Spent", entry.spent)
                         )
-                        .foregroundStyle(entry.isOverBudget ? Color.danger : Color.green)
+                        .foregroundStyle(budgetColor(spent: entry.spent, limit: entry.limit))
                         .cornerRadius(3)
                         .annotation(position: .top, spacing: 4) {
                             Text("$\(entry.spent, specifier: "%.0f")")
                                 .font(.system(size: 10, weight: .semibold, design: .rounded))
-                                .foregroundStyle(entry.isOverBudget ? Color.danger : Color.green)
+                                .foregroundStyle(budgetColor(spent: entry.spent, limit: entry.limit))
                                 .monospacedDigit()
                         }
 
-                        // Limit indicator — thin horizontal line at the limit level
+                        // Limit line per category
                         BarMark(
                             x: .value("Category", entry.displayName),
-                            yStart: .value("Lo", entry.limit * 0.98),
-                            yEnd: .value("Hi", entry.limit * 1.02)
+                            yStart: .value("LimitLo", entry.limit - 1),
+                            yEnd: .value("LimitHi", entry.limit + 1)
                         )
-                        .foregroundStyle(Color.textPrimary.opacity(0.8))
+                        .foregroundStyle(Color.textSecondary.opacity(0.6))
+                        .annotation(position: entry.spent >= entry.limit ? .bottom : .top, spacing: 2) {
+                            Text("$\(entry.limit, specifier: "%.0f")")
+                                .font(.system(size: 9, design: .rounded))
+                                .foregroundStyle(Color.textSecondary)
+                                .monospacedDigit()
+                        }
                     }
                 }
                 .chartYAxis {
@@ -591,7 +597,7 @@ struct InsightsView: View {
 
                 // Per-category spent / limit breakdown
                 ForEach(data) { entry in
-                    HStack(spacing: 8) {
+                    HStack(spacing: 4) {
                         Image(systemName: entry.icon)
                             .font(.system(size: 12))
                             .foregroundStyle(entry.color)
@@ -600,22 +606,26 @@ struct InsightsView: View {
                         Text(entry.displayName)
                             .font(.roundedCaption)
                             .foregroundStyle(Color.textPrimary)
-
-                        Spacer()
+                            .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
 
                         Text("$\(entry.spent, specifier: "%.0f")")
                             .font(.system(size: 12, weight: .semibold, design: .rounded))
-                            .foregroundStyle(entry.isOverBudget ? Color.danger : Color.green)
+                            .foregroundStyle(budgetColor(spent: entry.spent, limit: entry.limit))
                             .monospacedDigit()
+                            .frame(width: 45, alignment: .trailing)
 
-                        Text("/")
-                            .font(.system(size: 12, design: .rounded))
-                            .foregroundStyle(Color.textSecondary)
-
-                        Text("$\(entry.limit, specifier: "%.0f")")
+                        Text("/ $\(entry.limit, specifier: "%.0f")")
                             .font(.system(size: 12, design: .rounded))
                             .foregroundStyle(Color.textSecondary)
                             .monospacedDigit()
+                            .frame(width: 50, alignment: .leading)
+
+                        let remaining = entry.limit - entry.spent
+                        Text(remaining >= 0 ? "$\(remaining, specifier: "%.0f") left" : "$\(abs(remaining), specifier: "%.0f") over")
+                            .font(.system(size: 11, weight: .medium, design: .rounded))
+                            .foregroundStyle(budgetColor(spent: entry.spent, limit: entry.limit))
+                            .monospacedDigit()
+                            .frame(width: 65, alignment: .trailing)
                     }
                     .padding(.vertical, 2)
                 }
@@ -626,20 +636,38 @@ struct InsightsView: View {
 
     // MARK: - Bar Chart Axis Helpers
 
+    /// Standardized budget color: <75% green, 75-99% yellow, >=100% red.
+    private func budgetColor(spent: Double, limit: Double) -> Color {
+        guard limit > 0 else { return .green }
+        let ratio = spent / limit
+        if ratio >= 1.0 { return .danger }
+        if ratio >= 0.75 { return .yellow }
+        return .green
+    }
+
     private var xAxisStride: Calendar.Component {
         viewModel.barGrouping == .weekly ? .weekOfYear : .day
     }
 
     private var xAxisStrideCount: Int {
         if viewModel.barGrouping == .weekly { return 1 }
-        return 1
+        // For daily view, skip labels to avoid smushing
+        switch viewModel.selectedDateRange {
+        case .quarter: return 7   // show every 7th day
+        case .month: return 5     // show every 5th day
+        case .week: return 1
+        }
     }
 
     private var xAxisFormat: Date.FormatStyle {
         if viewModel.barGrouping == .weekly {
             return .dateTime.month(.abbreviated).day()
         }
-        return .dateTime.weekday(.abbreviated)
+        // For daily: use M/d for longer ranges, day name for 7-day
+        if viewModel.selectedDateRange == .week {
+            return .dateTime.weekday(.abbreviated)
+        }
+        return .dateTime.month(.narrow).day()
     }
 
     // MARK: - Bar Color Helper
