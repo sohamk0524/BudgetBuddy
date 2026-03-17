@@ -860,6 +860,71 @@ actor APIService {
 
         return try JSONDecoder().decode(SpendingSummaryResponse.self, from: data)
     }
+
+    // MARK: - Gamification
+
+    func getGamification(userId: String) async throws -> GamificationData {
+        let url = baseURL.appendingPathComponent("user/gamification/\(userId)")
+
+        let request = try await authenticatedRequest(url: url)
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse,
+              httpResponse.statusCode == 200 else {
+            throw APIError.invalidResponse
+        }
+
+        return try JSONDecoder().decode(GamificationData.self, from: data)
+    }
+
+    func reportUsedSavings(userId: String, amount: Double) async throws {
+        let url = baseURL.appendingPathComponent("user/gamification/mark-used-savings")
+
+        var request = try await authenticatedRequest(url: url, method: "POST")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        let body: [String: Any] = ["userId": userId, "amount": amount]
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        let (_, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse,
+              httpResponse.statusCode == 200 else {
+            throw APIError.invalidResponse
+        }
+    }
+
+    func respondToChallenge(userId: String, action: String) async throws -> GamificationChallengeResponse {
+        let url = baseURL.appendingPathComponent("user/gamification/challenge-response")
+
+        var request = try await authenticatedRequest(url: url, method: "POST")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        let body: [String: Any] = ["userId": userId, "action": action]
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse,
+              httpResponse.statusCode == 200 else {
+            throw APIError.invalidResponse
+        }
+        return try JSONDecoder().decode(GamificationChallengeResponse.self, from: data)
+    }
+
+    func toggleChallenges(userId: String, enabled: Bool) async throws {
+        let url = baseURL.appendingPathComponent("user/gamification/toggle-challenges")
+
+        var request = try await authenticatedRequest(url: url, method: "POST")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        let body: [String: Any] = ["userId": userId, "enabled": enabled]
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        let (_, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse,
+              httpResponse.statusCode == 200 else {
+            throw APIError.invalidResponse
+        }
+    }
 }
 
 // MARK: - Errors

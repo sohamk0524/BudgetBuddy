@@ -698,6 +698,47 @@ struct RecommendationPreferencesResponse: Codable {
     let seenTips: [RecommendationItem]?
 }
 
+// MARK: - Gamification Models
+
+struct GamificationData: Codable {
+    let savingsStreak: Int
+    let longestStreak: Int
+    let totalSaved: Double
+    let challengesEnabled: Bool?
+    let weeklyChallenge: WeeklyChallenge?
+    let challengeHistory: [ChallengeHistoryEntry]?
+}
+
+struct WeeklyChallenge: Codable, Identifiable {
+    var id: String { category + weekStart }
+    let category: String
+    let targetAmount: Double
+    let description: String
+    let weekStart: String
+    let weekEnd: String
+    let currentSpent: Double
+    let icon: String?
+    let accepted: Bool?
+}
+
+struct ChallengeHistoryEntry: Codable, Identifiable {
+    var id: String { (weekStart) + category }
+    let category: String
+    let targetAmount: Double
+    let currentSpent: Double
+    let weekStart: String
+    let weekEnd: String
+    let accepted: Bool?
+    let completed: Bool?
+    let dismissed: Bool?
+    let description: String?
+    let icon: String?
+}
+
+struct GamificationChallengeResponse: Codable {
+    let weeklyChallenge: WeeklyChallenge?
+}
+
 // MARK: - Money Moves Models
 
 struct MoneyMovesCard: Codable, Identifiable {
