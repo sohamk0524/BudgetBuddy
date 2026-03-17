@@ -733,3 +733,234 @@ def update_manual_transaction_endpoint(transaction_id):
         return jsonify({"error": "Transaction not found"}), 404
 
     return jsonify({"success": True, "transactionId": str(transaction_id)})
+
+
+# ---------------------------------------------------------------------------
+# Gamification
+# ---------------------------------------------------------------------------
+
+@user_bp.route("/user/gamification/<user_id>", methods=["GET"])
+@require_auth
+def get_gamification_data(user_id):
+    """Return gamification stats: streak, total saved, weekly challenge, challenge history."""
+    from db_models import get_gamification, upsert_gamification
+    from services.gamification_service import (
+        calculate_streak,
+        generate_weekly_challenge,
+        get_challenge_progress,
+        archive_challenge,
+    )
+
+    user = get_user(user_id)
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
+    gam = get_gamification(user_id)
+
+    # Determine current ISO week
+    now = datetime.utcnow()
+    iso_year, iso_week, _ = now.isocalendar()
+    current_week = f"{iso_year}-W{iso_week:02d}"
+
+    # Recalculate streak if stale
+    streak_week = gam.get('streak_updated_week') if gam else None
+    if streak_week != current_week:
+        current_streak, longest_streak = calculate_streak(user_id)
+        upsert_gamification(
+            user_id,
+            savings_streak=current_streak,
+            longest_streak=longest_streak,
+            streak_updated_week=current_week,
+        )
+    else:
+        current_streak = gam.get('savings_streak', 0) if gam else 0
+        longest_streak = gam.get('longest_streak', 0) if gam else 0
+
+    total_saved = float(gam.get('total_saved', 0)) if gam else 0
+    challenges_enabled = gam.get('challenges_enabled', True) if gam else True
+
+    # Generate or reuse weekly challenge
+    challenge_week = gam.get('challenge_week') if gam else None
+    challenge = None
+
+    if challenge_week != current_week:
+        # New week — archive the old challenge first (if any)
+        old_challenge_json = gam.get('weekly_challenge_json', 'null') if gam else 'null'
+        try:
+            old_challenge = json.loads(old_challenge_json)
+        except (json.JSONDecodeError, TypeError):
+            old_challenge = None
+
+        history_update = {}
+        if old_challenge and old_challenge.get('accepted'):
+            # Finalize progress before archiving
+            old_challenge['currentSpent'] = get_challenge_progress(
+                user_id, old_challenge['category']
+            )
+            history = archive_challenge(gam, old_challenge)
+            history_update['challenge_history_json'] = json.dumps(history)
+
+        # Generate new challenge only if enabled
+        if challenges_enabled:
+            challenge = generate_weekly_challenge(user_id)
+            if challenge:
+                challenge['currentSpent'] = get_challenge_progress(user_id, challenge['category'])
+
+        upsert_gamification(
+            user_id,
+            weekly_challenge_json=json.dumps(challenge) if challenge else 'null',
+            challenge_week=current_week,
+            challenge_dismissed_this_week=False,
+            **history_update,
+        )
+    else:
+        # Same week — reuse existing challenge
+        try:
+            challenge = json.loads(gam.get('weekly_challenge_json', 'null')) if gam else None
+        except (json.JSONDecodeError, TypeError):
+            challenge = None
+        if challenge:
+            challenge['currentSpent'] = get_challenge_progress(user_id, challenge['category'])
+        elif challenges_enabled and not gam.get('challenge_dismissed_this_week'):
+            # No challenge stored but not explicitly dismissed — retry generation
+            challenge = generate_weekly_challenge(user_id)
+            if challenge:
+                challenge['currentSpent'] = get_challenge_progress(user_id, challenge['category'])
+                upsert_gamification(user_id, weekly_challenge_json=json.dumps(challenge))
+
+    # Load challenge history
+    history_json = gam.get('challenge_history_json', '[]') if gam else '[]'
+    try:
+        challenge_history = json.loads(history_json)
+    except (json.JSONDecodeError, TypeError):
+        challenge_history = []
+
+    return jsonify({
+        "savingsStreak": current_streak,
+        "longestStreak": longest_streak,
+        "totalSaved": total_saved,
+        "challengesEnabled": challenges_enabled,
+        "weeklyChallenge": challenge,
+        "challengeHistory": challenge_history,
+    })
+
+
+@user_bp.route("/user/gamification/mark-used-savings", methods=["POST"])
+@require_auth
+def mark_used_savings():
+    """Increment the user's total saved amount when they mark a tip as Used."""
+    from db_models import get_gamification, upsert_gamification
+
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "Request body must be JSON"}), 400
+
+    user_id = data.get("userId")
+    amount = data.get("amount", 0)
+    if not user_id:
+        return jsonify({"error": "userId is required"}), 400
+
+    try:
+        amount = float(amount)
+    except (TypeError, ValueError):
+        amount = 0
+
+    if amount > 0:
+        gam = get_gamification(user_id)
+        current_total = float(gam.get('total_saved', 0)) if gam else 0
+        upsert_gamification(user_id, total_saved=current_total + amount)
+
+    return jsonify({"success": True})
+
+
+@user_bp.route("/user/gamification/challenge-response", methods=["POST"])
+@require_auth
+def challenge_response():
+    """Accept, decline, or dismiss the weekly challenge."""
+    from db_models import get_gamification, upsert_gamification
+    from services.gamification_service import generate_weekly_challenge, get_challenge_progress, archive_challenge
+
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "Request body must be JSON"}), 400
+
+    user_id = data.get("userId")
+    action = data.get("action")  # "accept", "decline", or "dismiss"
+    if not user_id or action not in ("accept", "decline", "dismiss"):
+        return jsonify({"error": "userId and action (accept/decline/dismiss) required"}), 400
+
+    gam = get_gamification(user_id)
+    if not gam:
+        return jsonify({"error": "No gamification data"}), 404
+
+    if action == "accept":
+        # Mark current challenge as accepted
+        try:
+            challenge = json.loads(gam.get('weekly_challenge_json', 'null'))
+        except (json.JSONDecodeError, TypeError):
+            challenge = None
+        if challenge:
+            challenge['accepted'] = True
+            challenge['currentSpent'] = get_challenge_progress(user_id, challenge['category'])
+            upsert_gamification(user_id, weekly_challenge_json=json.dumps(challenge))
+            return jsonify({"weeklyChallenge": challenge})
+        return jsonify({"error": "No challenge to accept"}), 404
+
+    elif action == "dismiss":
+        # Archive (if accepted) and remove for the rest of the week
+        try:
+            old_challenge = json.loads(gam.get('weekly_challenge_json', 'null'))
+        except (json.JSONDecodeError, TypeError):
+            old_challenge = None
+
+        history_update = {}
+        if old_challenge and old_challenge.get('accepted'):
+            old_challenge['currentSpent'] = get_challenge_progress(user_id, old_challenge['category'])
+            old_challenge['dismissed'] = True
+            history = archive_challenge(gam, old_challenge)
+            history_update['challenge_history_json'] = json.dumps(history)
+
+        upsert_gamification(user_id, weekly_challenge_json='null', challenge_dismissed_this_week=True, **history_update)
+        return jsonify({"weeklyChallenge": None})
+
+    else:  # decline
+        # Generate a new challenge, excluding the current category
+        try:
+            old_challenge = json.loads(gam.get('weekly_challenge_json', 'null'))
+        except (json.JSONDecodeError, TypeError):
+            old_challenge = None
+        exclude_category = old_challenge.get('category') if old_challenge else None
+
+        new_challenge = generate_weekly_challenge(user_id, exclude_category=exclude_category)
+        if new_challenge:
+            new_challenge['currentSpent'] = get_challenge_progress(user_id, new_challenge['category'])
+            upsert_gamification(user_id, weekly_challenge_json=json.dumps(new_challenge))
+            return jsonify({"weeklyChallenge": new_challenge})
+        else:
+            # No alternative — clear challenge
+            upsert_gamification(user_id, weekly_challenge_json='null')
+            return jsonify({"weeklyChallenge": None})
+
+
+@user_bp.route("/user/gamification/toggle-challenges", methods=["POST"])
+@require_auth
+def toggle_challenges():
+    """Enable or disable weekly challenge generation."""
+    from db_models import get_gamification, upsert_gamification
+
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "Request body must be JSON"}), 400
+
+    user_id = data.get("userId")
+    enabled = data.get("enabled")
+    if not user_id or enabled is None:
+        return jsonify({"error": "userId and enabled (bool) required"}), 400
+
+    upsert_gamification(user_id, challenges_enabled=bool(enabled))
+
+    # If disabling, also clear current challenge
+    if not enabled:
+        upsert_gamification(user_id, weekly_challenge_json='null')
+
+    return jsonify({"success": True, "challengesEnabled": bool(enabled)})
