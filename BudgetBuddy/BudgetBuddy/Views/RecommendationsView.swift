@@ -99,7 +99,7 @@ struct RecommendationsView: View {
                             .foregroundStyle(Color.textSecondary)
                     }
                     Spacer()
-                } else if viewModel.displayedRecommendations.isEmpty && viewModel.activeCategory == nil {
+                } else if viewModel.displayedRecommendations.isEmpty && viewModel.activeCategory == nil && viewModel.filterMode != .challenges {
                     emptyState
                 } else {
                     recommendationsList
@@ -579,7 +579,7 @@ struct RecommendationsView: View {
                     Text(filterLabel)
                         .font(.system(.subheadline, design: .rounded, weight: .medium))
                 }
-                .padding(.horizontal, 14)
+                .padding(.horizontal, 18)
                 .padding(.vertical, 8)
                 .background(viewModel.filterMode == .all ? Color.surface : Color.accent.opacity(0.15))
                 .foregroundStyle(viewModel.filterMode == .all ? Color.textSecondary : Color.accent)
@@ -893,6 +893,20 @@ struct WeeklyChallengeCardView: View {
         progress >= 1.0 ? .danger : progress >= 0.75 ? .yellow : .green
     }
 
+    private var timeLeftText: String {
+        let df = DateFormatter()
+        df.dateFormat = "yyyy-MM-dd"
+        guard let end = df.date(from: challenge.weekEnd) else { return "" }
+        // End of weekEnd day
+        let endOfDay = Calendar.current.startOfDay(for: end).addingTimeInterval(86400)
+        let remaining = endOfDay.timeIntervalSince(Date())
+        if remaining <= 0 { return "Ended" }
+        let days = Int(remaining / 86400)
+        if days >= 1 { return "\(days)d left" }
+        let hours = Int(remaining / 3600)
+        return "\(hours)h left"
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             // Header — matches RecommendationCardView layout
@@ -911,14 +925,22 @@ struct WeeklyChallengeCardView: View {
                         .font(.roundedHeadline)
                         .foregroundStyle(Color.textPrimary)
 
-                    Text("Weekly Challenge")
-                        .font(.system(.caption, design: .rounded, weight: .semibold))
-                        .foregroundStyle(Color.accent)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 4)
-                        .background(Color.accent.opacity(0.12))
-                        .clipShape(Capsule())
-                        .padding(.top, 2)
+                    HStack(spacing: 8) {
+                        Text("Weekly Challenge")
+                            .font(.system(.caption, design: .rounded, weight: .semibold))
+                            .foregroundStyle(Color.accent)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 4)
+                            .background(Color.accent.opacity(0.12))
+                            .clipShape(Capsule())
+
+                        if !timeLeftText.isEmpty {
+                            Text(timeLeftText)
+                                .font(.system(.caption2, design: .rounded, weight: .medium))
+                                .foregroundStyle(Color.textSecondary)
+                        }
+                    }
+                    .padding(.top, 2)
                 }
 
                 Spacer(minLength: 0)
@@ -931,11 +953,11 @@ struct WeeklyChallengeCardView: View {
                             } label: {
                                 Label("Accept Challenge", systemImage: "checkmark.circle")
                             }
-                        }
-                        Button {
-                            onDecline?()
-                        } label: {
-                            Label("New Challenge", systemImage: "arrow.triangle.2.circlepath")
+                            Button {
+                                onDecline?()
+                            } label: {
+                                Label("New Challenge", systemImage: "arrow.triangle.2.circlepath")
+                            }
                         }
                         Button(role: .destructive) {
                             onDismiss?()
@@ -980,6 +1002,14 @@ struct WeeklyChallengeCardView: View {
                         Text("$\(Int(challenge.targetAmount - challenge.currentSpent)) left")
                             .font(.system(.caption, design: .rounded, weight: .semibold))
                             .foregroundStyle(progressColor)
+                    }
+                    if !timeLeftText.isEmpty {
+                        Text("·")
+                            .font(.roundedCaption)
+                            .foregroundStyle(Color.textSecondary)
+                        Text(timeLeftText)
+                            .font(.system(.caption, design: .rounded, weight: .medium))
+                            .foregroundStyle(Color.textSecondary)
                     }
                 }
                 .padding(.top, 6)
