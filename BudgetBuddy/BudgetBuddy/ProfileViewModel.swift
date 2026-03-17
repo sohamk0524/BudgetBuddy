@@ -34,6 +34,13 @@ class ProfileViewModel {
 
     var plaidItems: [PlaidItemInfo] = []
 
+    // Gamification
+    var savingsStreak: Int = 0
+    var longestStreak: Int = 0
+    var totalSaved: Double = 0
+    var challengesEnabled: Bool = true
+    var challengesCompleted: Int = 0
+
     var isLoading = false
     var isSaving = false
     var isEditing = false
@@ -123,6 +130,30 @@ class ProfileViewModel {
         }
 
         isSaving = false
+    }
+
+    func loadGamification() async {
+        guard let userId = AuthManager.shared.authToken else { return }
+        do {
+            let data = try await apiService.getGamification(userId: userId)
+            savingsStreak = data.savingsStreak
+            longestStreak = data.longestStreak
+            totalSaved = data.totalSaved
+            challengesEnabled = data.challengesEnabled ?? true
+            challengesCompleted = data.challengeHistory?.filter { $0.completed == true }.count ?? 0
+        } catch {
+            // Non-critical
+        }
+    }
+
+    func toggleChallenges(enabled: Bool) async {
+        guard let userId = AuthManager.shared.authToken else { return }
+        challengesEnabled = enabled
+        do {
+            try await apiService.toggleChallenges(userId: userId, enabled: enabled)
+        } catch {
+            challengesEnabled = !enabled // Revert
+        }
     }
 
     func unlinkPlaidItem(itemId: String) async {

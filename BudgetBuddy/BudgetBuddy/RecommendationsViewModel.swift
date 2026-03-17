@@ -12,6 +12,7 @@ enum RecommendationFilterMode: String, CaseIterable {
     case all = "All"
     case saved = "Saved"
     case used = "Used"
+    case challenges = "Challenges"
 }
 
 @Observable
@@ -47,6 +48,14 @@ class RecommendationsViewModel {
     var dislikedTipIds: Set<String> = []
     var usedTipIds: Set<String> = []
     var usedTips: [RecommendationItem] = []
+
+    // Gamification
+    var savingsStreak: Int = 0
+    var longestStreak: Int = 0
+    var totalSaved: Double = 0
+    var challengesEnabled: Bool = true
+    var weeklyChallenge: WeeklyChallenge?
+    var challengeHistory: [ChallengeHistoryEntry] = []
 
     // Generic undo system
     enum UndoAction: String {
@@ -99,6 +108,9 @@ class RecommendationsViewModel {
 
         case .used:
             base = usedTips
+
+        case .challenges:
+            base = []  // Challenges tab uses its own view
 
         case .all:
             base = recommendations.filter { !dislikedTipIds.contains($0.id) && !usedTipIds.contains($0.id) && !savedTipIds.contains($0.id) }
@@ -250,6 +262,65 @@ class RecommendationsViewModel {
         }
     }
 
+    func loadGamification() async {
+        guard let userId = AuthManager.shared.authToken else { return }
+        do {
+            let data = try await APIService.shared.getGamification(userId: userId)
+            savingsStreak = data.savingsStreak
+            longestStreak = data.longestStreak
+            totalSaved = data.totalSaved
+            challengesEnabled = data.challengesEnabled ?? true
+            weeklyChallenge = data.weeklyChallenge
+            challengeHistory = data.challengeHistory ?? []
+        } catch {
+            // Silently fail — gamification is non-critical
+        }
+    }
+
+    func acceptChallenge() async {
+        guard let userId = AuthManager.shared.authToken else { return }
+        do {
+            let response = try await APIService.shared.respondToChallenge(userId: userId, action: "accept")
+            weeklyChallenge = response.weeklyChallenge
+        } catch {
+            // Silently fail
+        }
+    }
+
+    func declineChallenge() async {
+        guard let userId = AuthManager.shared.authToken else { return }
+        do {
+            let response = try await APIService.shared.respondToChallenge(userId: userId, action: "decline")
+            weeklyChallenge = response.weeklyChallenge
+        } catch {
+            // Silently fail
+        }
+    }
+
+    /// Dismiss the weekly challenge — persists to backend and archives if accepted.
+    func dismissChallenge() async {
+        guard let userId = AuthManager.shared.authToken else { return }
+        weeklyChallenge = nil
+        do {
+            _ = try await APIService.shared.respondToChallenge(userId: userId, action: "dismiss")
+        } catch {
+            // Silently fail
+        }
+    }
+
+    /// Toggle challenge generation on/off.
+    func toggleChallenges(enabled: Bool) async {
+        guard let userId = AuthManager.shared.authToken else { return }
+        challengesEnabled = enabled
+        if !enabled { weeklyChallenge = nil }
+        do {
+            try await APIService.shared.toggleChallenges(userId: userId, enabled: enabled)
+        } catch {
+            // Revert on failure
+            challengesEnabled = !enabled
+        }
+    }
+
     func refreshFinancialData() async {
         guard let userId = AuthManager.shared.authToken else { return }
         do {
@@ -336,13 +407,23 @@ class RecommendationsViewModel {
 
         showUndo(.used, item: item)
 
-        // Fire API call
+        // Fire API calls
         guard let userId = AuthManager.shared.authToken else { return }
         Task {
             do {
                 try await APIService.shared.markRecommendationSeen(userId: userId, recommendation: item)
             } catch {
                 // Silently fail — tip stays hidden locally
+            }
+            // Report savings if the tip has a potentialSavings value
+            let savings = item.potentialSavings ?? 0
+            if savings > 0 {
+                do {
+                    try await APIService.shared.reportUsedSavings(userId: userId, amount: savings)
+                    totalSaved += savings
+                } catch {
+                    // Silently fail — savings counter is non-critical
+                }
             }
         }
     }

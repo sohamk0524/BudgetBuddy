@@ -11,11 +11,13 @@ struct PulseHeaderView: View {
     let safeToSpend: Double
     let isHealthy: Bool
     let status: String
+    var savingsStreak: Int = 0
 
-    init(safeToSpend: Double = 124, isHealthy: Bool = true, status: String = "On Track") {
+    init(safeToSpend: Double = 124, isHealthy: Bool = true, status: String = "On Track", savingsStreak: Int = 0) {
         self.safeToSpend = safeToSpend
         self.isHealthy = isHealthy
         self.status = status
+        self.savingsStreak = savingsStreak
     }
 
     var body: some View {
@@ -38,6 +40,26 @@ struct PulseHeaderView: View {
             }
 
             Spacer()
+
+            // Savings Streak
+            if savingsStreak >= 1 {
+                HStack(spacing: 4) {
+                    Image(systemName: "flame.fill")
+                        .font(.system(size: 18))
+                        .foregroundStyle(.orange)
+
+                    Text("\(savingsStreak)w")
+                        .font(.system(size: 22, weight: .bold, design: .rounded))
+                        .monospacedDigit()
+                        .foregroundStyle(.orange)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(
+                    Capsule()
+                        .fill(Color.orange.opacity(0.15))
+                )
+            }
 
             // Safe-to-Spend Amount
             HStack(spacing: 3) {
@@ -78,12 +100,17 @@ struct PulseHeaderView: View {
 
 #Preview {
     VStack(spacing: 0) {
-        PulseHeaderView()
+        PulseHeaderView(savingsStreak: 3)
 
         PulseHeaderView(
             safeToSpend: 42.0,
             isHealthy: false,
             status: "Over Budget"
+        )
+
+        PulseHeaderView(
+            safeToSpend: 200,
+            savingsStreak: 12
         )
 
         Spacer()

@@ -41,7 +41,8 @@ struct RecommendationsView: View {
                 PulseHeaderView(
                     safeToSpend: viewModel.dailySafeToSpend,
                     isHealthy: viewModel.isHealthy,
-                    status: viewModel.statusDisplayText
+                    status: viewModel.statusDisplayText,
+                    savingsStreak: viewModel.savingsStreak
                 )
 
                 // Search bar
@@ -157,7 +158,10 @@ struct RecommendationsView: View {
         }
         .task {
             await viewModel.loadRecommendations()
-            await viewModel.loadSpendingSummary()
+            await withTaskGroup(of: Void.self) { group in
+                group.addTask { await viewModel.loadSpendingSummary() }
+                group.addTask { await viewModel.loadGamification() }
+            }
             AnalyticsManager.logRecommendationsViewed()
         }
     }
@@ -267,6 +271,83 @@ struct RecommendationsView: View {
     private var recommendationsList: some View {
         ScrollView {
             LazyVStack(spacing: 12) {
+                // Total saved banner (Used filter only)
+                if viewModel.filterMode == .used && viewModel.totalSaved > 0 {
+                    HStack(spacing: 10) {
+                        Image(systemName: "leaf.fill")
+                            .font(.system(size: 18))
+                            .foregroundStyle(.green)
+                        Text("You've saved **$\(Int(viewModel.totalSaved))** by using tips!")
+                            .font(.roundedBody)
+                            .foregroundStyle(Color.textPrimary)
+                        Spacer()
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 14)
+                    .background(Color.surface)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                }
+
+                // Challenges history (Challenges filter only)
+                if viewModel.filterMode == .challenges {
+                    // Active challenge
+                    if let challenge = viewModel.weeklyChallenge {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Active Challenge")
+                                .font(.system(.caption, design: .rounded, weight: .semibold))
+                                .foregroundStyle(Color.textSecondary)
+                                .textCase(.uppercase)
+                                .padding(.horizontal, 4)
+                            WeeklyChallengeCardView(
+                                challenge: challenge,
+                                onAccept: { Task { await viewModel.acceptChallenge() } },
+                                onDecline: { Task { await viewModel.declineChallenge() } },
+                                onDismiss: { Task { await viewModel.dismissChallenge() } }
+                            )
+                        }
+                    }
+
+                    // History
+                    if viewModel.challengeHistory.isEmpty {
+                        VStack(spacing: 12) {
+                            Image(systemName: "trophy")
+                                .font(.system(size: 32))
+                                .foregroundStyle(Color.textSecondary.opacity(0.4))
+                            Text("No challenge history yet")
+                                .font(.roundedBody)
+                                .foregroundStyle(Color.textSecondary)
+                            Text("Complete weekly challenges to build your history")
+                                .font(.roundedCaption)
+                                .foregroundStyle(Color.textSecondary.opacity(0.7))
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 40)
+                    } else {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Past Challenges")
+                                .font(.system(.caption, design: .rounded, weight: .semibold))
+                                .foregroundStyle(Color.textSecondary)
+                                .textCase(.uppercase)
+                                .padding(.horizontal, 4)
+
+                            ForEach(viewModel.challengeHistory.reversed()) { entry in
+                                ChallengeHistoryRowView(entry: entry)
+                            }
+                        }
+                    }
+                }
+
+                // Weekly Challenge card (only in All mode with no category filter)
+                if viewModel.filterMode == .all && viewModel.activeCategory == nil,
+                   let challenge = viewModel.weeklyChallenge {
+                    WeeklyChallengeCardView(
+                        challenge: challenge,
+                        onAccept: { Task { await viewModel.acceptChallenge() } },
+                        onDecline: { Task { await viewModel.declineChallenge() } },
+                        onDismiss: { Task { await viewModel.dismissChallenge() } }
+                    )
+                }
+
                 ForEach(viewModel.displayedRecommendations) { item in
                     RecommendationCardView(
                         item: item,
@@ -495,7 +576,7 @@ struct RecommendationsView: View {
                 HStack(spacing: 6) {
                     Image(systemName: filterIcon)
                         .font(.system(size: 12, weight: .semibold))
-                    Text(viewModel.filterMode.rawValue)
+                    Text(filterLabel)
                         .font(.system(.subheadline, design: .rounded, weight: .medium))
                 }
                 .padding(.horizontal, 14)
@@ -513,7 +594,10 @@ struct RecommendationsView: View {
 
             // Refresh button (right-aligned)
             Button {
-                Task { await viewModel.generateRecommendations() }
+                Task {
+                    await viewModel.generateRecommendations()
+                    await viewModel.loadGamification()
+                }
                 AnalyticsManager.logRecommendationsGenerated()
             } label: {
                 HStack(spacing: 6) {
@@ -550,11 +634,16 @@ struct RecommendationsView: View {
         .background(Color.surface)
     }
 
+    private var filterLabel: String {
+        viewModel.filterMode.rawValue
+    }
+
     private var filterIcon: String {
         switch viewModel.filterMode {
         case .all: return "line.3.horizontal.decrease"
         case .saved: return "bookmark.fill"
         case .used: return "checkmark.circle.fill"
+        case .challenges: return "trophy.fill"
         }
     }
 
@@ -782,6 +871,265 @@ struct RecommendationCardView: View {
             }
         }
         .transition(.opacity.combined(with: .move(edge: .top)))
+    }
+}
+
+// MARK: - Weekly Challenge Card
+
+struct WeeklyChallengeCardView: View {
+    let challenge: WeeklyChallenge
+    var onAccept: (() -> Void)? = nil
+    var onDecline: (() -> Void)? = nil
+    var onDismiss: (() -> Void)? = nil
+
+    private var isAccepted: Bool { challenge.accepted ?? false }
+
+    private var progress: Double {
+        guard challenge.targetAmount > 0 else { return 0 }
+        return challenge.currentSpent / challenge.targetAmount
+    }
+
+    private var progressColor: Color {
+        progress >= 1.0 ? .danger : progress >= 0.75 ? .yellow : .green
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // Header — matches RecommendationCardView layout
+            HStack(alignment: .top, spacing: 10) {
+                ZStack {
+                    Circle()
+                        .fill(Color.accent.opacity(0.15))
+                        .frame(width: 32, height: 32)
+                    Image(systemName: "trophy.fill")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Color.accent)
+                }
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(challenge.description)
+                        .font(.roundedHeadline)
+                        .foregroundStyle(Color.textPrimary)
+
+                    Text("Weekly Challenge")
+                        .font(.system(.caption, design: .rounded, weight: .semibold))
+                        .foregroundStyle(Color.accent)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .background(Color.accent.opacity(0.12))
+                        .clipShape(Capsule())
+                        .padding(.top, 2)
+                }
+
+                Spacer(minLength: 0)
+
+                HStack(spacing: 8) {
+                    Menu {
+                        if !isAccepted {
+                            Button {
+                                onAccept?()
+                            } label: {
+                                Label("Accept Challenge", systemImage: "checkmark.circle")
+                            }
+                        }
+                        Button {
+                            onDecline?()
+                        } label: {
+                            Label("New Challenge", systemImage: "arrow.triangle.2.circlepath")
+                        }
+                        Button(role: .destructive) {
+                            onDismiss?()
+                        } label: {
+                            Label("Remove Challenge", systemImage: "xmark.circle")
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundStyle(Color.textSecondary)
+                            .frame(width: 28, height: 28)
+                            .contentShape(Rectangle())
+                    }
+                }
+            }
+
+            if isAccepted {
+                // Progress bar
+                GeometryReader { geo in
+                    ZStack(alignment: .leading) {
+                        Capsule()
+                            .fill(Color.textSecondary.opacity(0.15))
+                            .frame(height: 6)
+                        Capsule()
+                            .fill(progressColor)
+                            .frame(width: geo.size.width * min(progress, 1.0), height: 6)
+                    }
+                }
+                .frame(height: 6)
+                .padding(.top, 12)
+
+                HStack {
+                    Text("$\(Int(challenge.currentSpent)) / $\(Int(challenge.targetAmount))")
+                        .font(.roundedCaption)
+                        .foregroundStyle(Color.textSecondary)
+                    Spacer()
+                    if progress >= 1.0 {
+                        Text("Over target")
+                            .font(.system(.caption, design: .rounded, weight: .semibold))
+                            .foregroundStyle(Color.danger)
+                    } else {
+                        Text("$\(Int(challenge.targetAmount - challenge.currentSpent)) left")
+                            .font(.system(.caption, design: .rounded, weight: .semibold))
+                            .foregroundStyle(progressColor)
+                    }
+                }
+                .padding(.top, 6)
+            } else {
+                // Accept (50%) / New (25%) / Skip (25%)
+                GeometryReader { geo in
+                    let totalWidth = geo.size.width
+                    let spacing: CGFloat = 8
+                    let acceptWidth = (totalWidth - spacing * 2) * 0.5
+                    let smallWidth = (totalWidth - spacing * 2) * 0.25
+
+                    HStack(spacing: spacing) {
+                        Button {
+                            onAccept?()
+                        } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: "checkmark")
+                                    .font(.system(size: 11, weight: .bold))
+                                Text("Accept")
+                                    .font(.system(.caption, design: .rounded, weight: .semibold))
+                            }
+                            .foregroundStyle(Color.appBackground)
+                            .frame(width: acceptWidth)
+                            .padding(.vertical, 9)
+                            .background(Color.accent)
+                            .clipShape(Capsule())
+                        }
+
+                        Button {
+                            onDecline?()
+                        } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: "arrow.triangle.2.circlepath")
+                                    .font(.system(size: 10, weight: .semibold))
+                                Text("New")
+                                    .font(.system(.caption, design: .rounded, weight: .medium))
+                            }
+                            .foregroundStyle(Color.textSecondary)
+                            .frame(width: smallWidth)
+                            .padding(.vertical, 9)
+                            .background(Color.textSecondary.opacity(0.1))
+                            .clipShape(Capsule())
+                        }
+
+                        Button {
+                            onDismiss?()
+                        } label: {
+                            Text("Skip")
+                                .font(.system(.caption, design: .rounded, weight: .medium))
+                                .foregroundStyle(Color.textSecondary)
+                                .frame(width: smallWidth)
+                                .padding(.vertical, 9)
+                                .background(Color.textSecondary.opacity(0.1))
+                                .clipShape(Capsule())
+                        }
+                    }
+                }
+                .frame(height: 34)
+                .padding(.top, 10)
+            }
+        }
+        .cardStyle()
+    }
+}
+
+// MARK: - Challenge History Row
+
+struct ChallengeHistoryRowView: View {
+    let entry: ChallengeHistoryEntry
+
+    private var isCompleted: Bool { entry.completed ?? false }
+    private var wasAccepted: Bool { entry.accepted ?? false }
+    private var wasDismissed: Bool { entry.dismissed ?? false }
+
+    private var statusIcon: String {
+        if !wasAccepted { return "minus.circle" }
+        if wasDismissed { return "xmark.circle" }
+        if isCompleted { return "checkmark.circle.fill" }
+        return "exclamationmark.circle.fill"
+    }
+
+    private var statusColor: Color {
+        if !wasAccepted { return .textSecondary }
+        if wasDismissed { return .textSecondary }
+        if isCompleted { return .green }
+        return .danger
+    }
+
+    private var statusText: String {
+        if !wasAccepted { return "Not Accepted" }
+        if wasDismissed { return "Dismissed" }
+        if isCompleted { return "Completed" }
+        return "Over Target"
+    }
+
+    var body: some View {
+        HStack(spacing: 12) {
+            // Status icon
+            Image(systemName: statusIcon)
+                .font(.system(size: 20))
+                .foregroundStyle(statusColor)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(entry.description ?? "\(entry.category.capitalized) challenge")
+                    .font(.roundedBody)
+                    .foregroundStyle(Color.textPrimary)
+                    .lineLimit(2)
+
+                HStack(spacing: 8) {
+                    Text(formatWeekRange(start: entry.weekStart, end: entry.weekEnd))
+                        .font(.roundedCaption)
+                        .foregroundStyle(Color.textSecondary)
+
+                    if wasAccepted {
+                        Text("$\(Int(entry.currentSpent)) / $\(Int(entry.targetAmount))")
+                            .font(.system(size: 11, weight: .medium, design: .rounded))
+                            .foregroundStyle(statusColor)
+                            .monospacedDigit()
+                    }
+                }
+            }
+
+            Spacer()
+
+            // Status badge
+            Text(statusText)
+                .font(.system(size: 10, weight: .semibold, design: .rounded))
+                .foregroundStyle(statusColor)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(statusColor.opacity(0.12))
+                .clipShape(Capsule())
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .background(Color.surface)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+
+    private func formatWeekRange(start: String, end: String) -> String {
+        let df = DateFormatter()
+        df.dateFormat = "yyyy-MM-dd"
+        let displayFmt = DateFormatter()
+        displayFmt.dateFormat = "MMM d"
+
+        guard let startDate = df.date(from: start),
+              let endDate = df.date(from: end) else {
+            return "\(start) – \(end)"
+        }
+        return "\(displayFmt.string(from: startDate)) – \(displayFmt.string(from: endDate))"
     }
 }
 

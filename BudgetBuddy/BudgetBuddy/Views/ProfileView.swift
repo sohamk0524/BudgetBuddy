@@ -19,6 +19,9 @@ struct ProfileView: View {
                 // MARK: - Profile Header
                 profileHeader
 
+                // MARK: - Savings Stats
+                savingsStatsSection
+
                 // MARK: - Financial Profile
                 financialProfileSection
 
@@ -107,6 +110,7 @@ struct ProfileView: View {
         }
         .task {
             await viewModel.loadProfile()
+            await viewModel.loadGamification()
         }
     }
 
@@ -158,6 +162,109 @@ struct ProfileView: View {
         let first = parts.first.map { String($0.prefix(1)).uppercased() } ?? ""
         let last = parts.count > 1 ? String(parts.last!.prefix(1)).uppercased() : ""
         return first + last
+    }
+
+    // MARK: - Savings Stats Section
+
+    private var savingsStatsSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Label("Savings Stats", systemImage: "chart.bar.fill")
+                .font(.roundedHeadline)
+                .foregroundStyle(Color.textPrimary)
+
+            HStack(spacing: 0) {
+                // Streak
+                VStack(spacing: 6) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "flame.fill")
+                            .font(.system(size: 14))
+                            .foregroundStyle(.orange)
+                        Text("\(viewModel.savingsStreak)w")
+                            .font(.system(.title3, design: .rounded, weight: .bold))
+                            .foregroundStyle(Color.textPrimary)
+                    }
+                    Text("Streak")
+                        .font(.roundedCaption)
+                        .foregroundStyle(Color.textSecondary)
+                }
+                .frame(maxWidth: .infinity)
+
+                // Divider
+                Rectangle()
+                    .fill(Color.textSecondary.opacity(0.2))
+                    .frame(width: 1, height: 36)
+
+                // Longest
+                VStack(spacing: 6) {
+                    Text("\(viewModel.longestStreak)w")
+                        .font(.system(.title3, design: .rounded, weight: .bold))
+                        .foregroundStyle(Color.textPrimary)
+                    Text("Best")
+                        .font(.roundedCaption)
+                        .foregroundStyle(Color.textSecondary)
+                }
+                .frame(maxWidth: .infinity)
+
+                // Divider
+                Rectangle()
+                    .fill(Color.textSecondary.opacity(0.2))
+                    .frame(width: 1, height: 36)
+
+                // Total Saved
+                VStack(spacing: 6) {
+                    Text("$\(Int(viewModel.totalSaved))")
+                        .font(.system(.title3, design: .rounded, weight: .bold))
+                        .foregroundStyle(Color.accent)
+                    Text("Saved")
+                        .font(.roundedCaption)
+                        .foregroundStyle(Color.textSecondary)
+                }
+                .frame(maxWidth: .infinity)
+
+                // Divider
+                Rectangle()
+                    .fill(Color.textSecondary.opacity(0.2))
+                    .frame(width: 1, height: 36)
+
+                // Challenges Completed
+                VStack(spacing: 6) {
+                    Text("\(viewModel.challengesCompleted)")
+                        .font(.system(.title3, design: .rounded, weight: .bold))
+                        .foregroundStyle(Color.accent)
+                    Text("Challenges")
+                        .font(.roundedCaption)
+                        .foregroundStyle(Color.textSecondary)
+                }
+                .frame(maxWidth: .infinity)
+            }
+
+            Divider()
+                .overlay(Color.textSecondary.opacity(0.2))
+
+            // Weekly Challenges toggle
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Weekly Challenges")
+                        .font(.roundedBody)
+                        .foregroundStyle(Color.textPrimary)
+                    Text("Get a new spending challenge each week")
+                        .font(.roundedCaption)
+                        .foregroundStyle(Color.textSecondary)
+                }
+                Spacer()
+                Toggle("", isOn: Binding(
+                    get: { viewModel.challengesEnabled },
+                    set: { newValue in
+                        Task { await viewModel.toggleChallenges(enabled: newValue) }
+                    }
+                ))
+                .tint(Color.accent)
+                .labelsHidden()
+            }
+        }
+        .padding()
+        .background(Color.surface)
+        .clipShape(RoundedRectangle(cornerRadius: 16))
     }
 
     // MARK: - Financial Profile Section
