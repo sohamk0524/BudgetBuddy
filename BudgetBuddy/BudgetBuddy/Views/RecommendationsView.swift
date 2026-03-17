@@ -160,46 +160,66 @@ struct RecommendationsView: View {
             await viewModel.loadSpendingSummary()
             AnalyticsManager.logRecommendationsViewed()
         }
+        .alert("Daily Limit Reached", isPresented: $viewModel.showLimitAlert) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(viewModel.limitAlertMessage)
+        }
     }
 
     // MARK: - Search Bar
 
     private var searchBar: some View {
-        HStack(spacing: 10) {
-            HStack(spacing: 8) {
-                Image(systemName: "magnifyingglass")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(Color.textSecondary)
+        VStack(spacing: 6) {
+            HStack(spacing: 10) {
+                HStack(spacing: 8) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(viewModel.canSearch ? Color.textSecondary : Color.textSecondary.opacity(0.4))
 
-                TextField("Search for deals...", text: $viewModel.searchQuery)
+                    TextField(
+                        viewModel.canSearch ? "Search for deals..." : "Search limit reached today",
+                        text: $viewModel.searchQuery
+                    )
                     .font(.roundedBody)
                     .foregroundStyle(Color.textPrimary)
                     .submitLabel(.search)
                     .onSubmit {
                         Task { await viewModel.searchDeals() }
                     }
+                    .disabled(!viewModel.canSearch)
 
-                if !viewModel.searchQuery.isEmpty {
-                    Button {
-                        viewModel.clearSearch()
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 14))
-                            .foregroundStyle(Color.textSecondary)
+                    if !viewModel.searchQuery.isEmpty {
+                        Button {
+                            viewModel.clearSearch()
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 14))
+                                .foregroundStyle(Color.textSecondary)
+                        }
                     }
                 }
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
-            .background(Color.surface)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .background(Color.surface)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .opacity(viewModel.canSearch ? 1 : 0.7)
 
-            if viewModel.isSearchActive {
-                Button("Cancel") {
-                    viewModel.clearSearch()
+                if viewModel.isSearchActive {
+                    Button("Cancel") {
+                        viewModel.clearSearch()
+                    }
+                    .font(.system(.subheadline, design: .rounded, weight: .medium))
+                    .foregroundStyle(Color.accent)
                 }
-                .font(.system(.subheadline, design: .rounded, weight: .medium))
-                .foregroundStyle(Color.accent)
+            }
+
+            // Search counter
+            HStack {
+                Spacer()
+                Text("\(viewModel.searchesRemaining) search\(viewModel.searchesRemaining == 1 ? "" : "es") left today")
+                    .font(.system(.caption2, design: .rounded, weight: .medium))
+                    .foregroundStyle(viewModel.searchesRemaining > 0 ? Color.textSecondary : Color.danger)
             }
         }
         .padding(.horizontal, 16)
@@ -511,6 +531,12 @@ struct RecommendationsView: View {
 
             Spacer()
 
+            // Refresh counter
+            Text("\(viewModel.refreshesRemaining)/\(RecommendationsViewModel.dailyRefreshLimit)")
+                .font(.system(.caption2, design: .rounded, weight: .semibold))
+                .monospacedDigit()
+                .foregroundStyle(viewModel.canRefresh ? Color.textSecondary : Color.danger)
+
             // Refresh button (right-aligned)
             Button {
                 Task { await viewModel.generateRecommendations() }
@@ -529,6 +555,11 @@ struct RecommendationsView: View {
                                 insertion: .move(edge: .bottom).combined(with: .opacity),
                                 removal:   .move(edge: .top).combined(with: .opacity)
                             ))
+                    } else if !viewModel.canRefresh {
+                        Image(systemName: "lock.fill")
+                            .font(.system(size: 12, weight: .semibold))
+                        Text("Locked")
+                            .font(.system(.subheadline, design: .rounded, weight: .medium))
                     } else {
                         Image(systemName: "arrow.clockwise")
                             .font(.system(size: 12, weight: .semibold))
@@ -538,12 +569,12 @@ struct RecommendationsView: View {
                 }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 8)
-                .background(Color.accent.opacity(0.15))
-                .foregroundStyle(Color.accent)
+                .background(viewModel.canRefresh ? Color.accent.opacity(0.15) : Color.textSecondary.opacity(0.1))
+                .foregroundStyle(viewModel.canRefresh ? Color.accent : Color.textSecondary)
                 .clipShape(Capsule())
                 .animation(.easeInOut(duration: 0.2), value: viewModel.isGenerating)
             }
-            .disabled(viewModel.isGenerating)
+            .disabled(viewModel.isGenerating || !viewModel.canRefresh)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 8)

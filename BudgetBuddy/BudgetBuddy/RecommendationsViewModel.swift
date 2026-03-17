@@ -57,6 +57,51 @@ class RecommendationsViewModel {
     var pendingUndo: (action: UndoAction, item: RecommendationItem)?
     private var undoTimer: Task<Void, Never>?
 
+    // MARK: - Daily Usage Limits
+
+    static let dailyRefreshLimit = 5
+    static let dailySearchLimit = 5
+
+    var showLimitAlert = false
+    var limitAlertMessage = ""
+
+    var refreshesUsedToday: Int {
+        get { Self.usageCount(for: "refreshes") }
+        set { Self.setUsageCount(newValue, for: "refreshes") }
+    }
+
+    var searchesUsedToday: Int {
+        get { Self.usageCount(for: "searches") }
+        set { Self.setUsageCount(newValue, for: "searches") }
+    }
+
+    var refreshesRemaining: Int {
+        max(0, Self.dailyRefreshLimit - refreshesUsedToday)
+    }
+
+    var searchesRemaining: Int {
+        max(0, Self.dailySearchLimit - searchesUsedToday)
+    }
+
+    var canRefresh: Bool { refreshesRemaining > 0 }
+    var canSearch: Bool { searchesRemaining > 0 }
+
+    private static var todayKey: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.string(from: Date())
+    }
+
+    private static func usageCount(for action: String) -> Int {
+        let key = "dailyUsage_\(action)_\(todayKey)"
+        return UserDefaults.standard.integer(forKey: key)
+    }
+
+    private static func setUsageCount(_ count: Int, for action: String) {
+        let key = "dailyUsage_\(action)_\(todayKey)"
+        UserDefaults.standard.set(count, forKey: key)
+    }
+
     init() {
         NotificationCenter.default.publisher(for: .transactionAdded)
             .receive(on: RunLoop.main)
@@ -161,10 +206,10 @@ class RecommendationsViewModel {
 
             hasLoaded = true
 
-            // Auto-generate if no cached recommendations exist
+            // Auto-generate if no cached recommendations exist (doesn't count toward daily limit)
             if recommendations.isEmpty {
                 isLoading = false
-                await generateRecommendations()
+                await generateRecommendations(countAsRefresh: false)
                 return
             }
         } catch {
@@ -174,8 +219,16 @@ class RecommendationsViewModel {
         isLoading = false
     }
 
-    func generateRecommendations(action: String = "general") async {
+    func generateRecommendations(action: String = "general", countAsRefresh: Bool = true) async {
         guard let userId = AuthManager.shared.authToken else { return }
+
+        if countAsRefresh {
+            guard canRefresh else {
+                errorMessage = "Daily refresh limit reached. Try again tomorrow!"
+                return
+            }
+        }
+
         isGenerating = true
         errorMessage = nil
 
@@ -185,6 +238,13 @@ class RecommendationsViewModel {
                 apply(response)
             } else {
                 merge(response)
+            }
+            if countAsRefresh {
+                refreshesUsedToday += 1
+                if refreshesRemaining == 0 {
+                    limitAlertMessage = "Last deal refresh used! Check back tomorrow for more deals."
+                    showLimitAlert = true
+                }
             }
         } catch {
             errorMessage = "Failed to generate recommendations."
@@ -210,6 +270,10 @@ class RecommendationsViewModel {
 
         // Auto-generate if no existing recs match this category
         if displayedRecommendations.isEmpty && filterMode == .all {
+            guard canRefresh else {
+                errorMessage = "Daily refresh limit reached. Try again tomorrow!"
+                return
+            }
             Task { await generateRecommendations(action: category) }
         }
     }
@@ -225,6 +289,11 @@ class RecommendationsViewModel {
         guard !query.isEmpty else { return }
         guard let userId = AuthManager.shared.authToken else { return }
 
+        guard canSearch else {
+            errorMessage = "Daily search limit reached. Try again tomorrow!"
+            return
+        }
+
         isSearching = true
         isSearchActive = true
         searchResults = []
@@ -235,6 +304,11 @@ class RecommendationsViewModel {
                 searchQuery: query
             )
             searchResults = response.recommendations
+            searchesUsedToday += 1
+            if searchesRemaining == 0 {
+                limitAlertMessage = "Last deal search used! Check back tomorrow for more searches."
+                showLimitAlert = true
+            }
         } catch {
             errorMessage = "Search failed. Please try again."
         }
