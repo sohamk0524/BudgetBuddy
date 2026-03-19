@@ -62,8 +62,20 @@ class RecommendationsViewModel {
 
     // MARK: - Daily Usage Limits
 
-    static let dailyRefreshLimit = 5
-    static let dailySearchLimit = 5
+    private static let boostedPhoneNumbers = ["+15550000001", "+15550001234", "+15307608780"]
+
+    static var dailyRefreshLimit: Int {
+        if let phone = AuthManager.shared.currentPhoneNumber, boostedPhoneNumbers.contains(phone) {
+            return 10
+        }
+        return 5
+    }
+    static var dailySearchLimit: Int {
+        if let phone = AuthManager.shared.currentPhoneNumber, boostedPhoneNumbers.contains(phone) {
+            return 10
+        }
+        return 5
+    }
 
     var showLimitAlert = false
     var limitAlertMessage = ""
