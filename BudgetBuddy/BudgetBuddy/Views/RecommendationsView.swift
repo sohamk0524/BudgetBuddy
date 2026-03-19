@@ -158,6 +158,7 @@ struct RecommendationsView: View {
         .task {
             await viewModel.loadRecommendations()
             await viewModel.loadSpendingSummary()
+            await viewModel.loadTotalSaved()
             AnalyticsManager.logRecommendationsViewed()
         }
         .alert("Daily Limit Reached", isPresented: $viewModel.showLimitAlert) {
@@ -287,6 +288,23 @@ struct RecommendationsView: View {
     private var recommendationsList: some View {
         ScrollView {
             LazyVStack(spacing: 12) {
+                // Total saved banner (Used filter only)
+                if viewModel.filterMode == .used && viewModel.totalSaved > 0 {
+                    HStack(spacing: 8) {
+                        Image(systemName: "leaf.fill")
+                            .font(.system(size: 14))
+                            .foregroundStyle(Color.accent)
+                        Text("You've saved **$\(Int(viewModel.totalSaved))** by using tips!")
+                            .font(.roundedBody)
+                            .foregroundStyle(Color.textPrimary)
+                        Spacer()
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 14)
+                    .background(Color.surface)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                }
+
                 ForEach(viewModel.displayedRecommendations) { item in
                     RecommendationCardView(
                         item: item,

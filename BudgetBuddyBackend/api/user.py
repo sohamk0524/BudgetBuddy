@@ -733,3 +733,46 @@ def update_manual_transaction_endpoint(transaction_id):
         return jsonify({"error": "Transaction not found"}), 404
 
     return jsonify({"success": True, "transactionId": str(transaction_id)})
+
+
+# ---------------------------------------------------------------------------
+# Total Saved Tracking
+# ---------------------------------------------------------------------------
+
+@user_bp.route("/user/total-saved/<user_id>", methods=["GET"])
+@require_auth
+def get_total_saved(user_id):
+    """Return the user's total saved amount from used tips."""
+    from db_models import get_gamification
+
+    gam = get_gamification(user_id)
+    total_saved = float(gam.get('total_saved', 0)) if gam else 0
+    return jsonify({"totalSaved": total_saved})
+
+
+@user_bp.route("/user/gamification/mark-used-savings", methods=["POST"])
+@require_auth
+def mark_used_savings():
+    """Increment the user's total saved amount when they mark a tip as Used."""
+    from db_models import get_gamification, upsert_gamification
+
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "Request body must be JSON"}), 400
+
+    user_id = data.get("userId")
+    amount = data.get("amount", 0)
+    if not user_id:
+        return jsonify({"error": "userId is required"}), 400
+
+    try:
+        amount = float(amount)
+    except (TypeError, ValueError):
+        amount = 0
+
+    if amount > 0:
+        gam = get_gamification(user_id)
+        current_total = float(gam.get('total_saved', 0)) if gam else 0
+        upsert_gamification(user_id, total_saved=current_total + amount)
+
+    return jsonify({"success": True})

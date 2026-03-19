@@ -48,6 +48,9 @@ class RecommendationsViewModel {
     var usedTipIds: Set<String> = []
     var usedTips: [RecommendationItem] = []
 
+    // Total saved from used tips
+    var totalSaved: Double = 0
+
     // Generic undo system
     enum UndoAction: String {
         case dislike = "Removed"
@@ -253,6 +256,15 @@ class RecommendationsViewModel {
         isGenerating = false
     }
 
+    func loadTotalSaved() async {
+        guard let userId = AuthManager.shared.authToken else { return }
+        do {
+            totalSaved = try await APIService.shared.getTotalSaved(userId: userId)
+        } catch {
+            // Non-critical
+        }
+    }
+
     func loadSpendingSummary() async {
         guard let userId = AuthManager.shared.authToken else { return }
         do {
@@ -410,13 +422,18 @@ class RecommendationsViewModel {
 
         showUndo(.used, item: item)
 
-        // Fire API call
+        // Fire API calls
         guard let userId = AuthManager.shared.authToken else { return }
+        let savings = item.potentialSavings ?? 0
         Task {
             do {
                 try await APIService.shared.markRecommendationSeen(userId: userId, recommendation: item)
             } catch {
                 // Silently fail — tip stays hidden locally
+            }
+            if savings > 0 {
+                totalSaved += savings
+                try? await APIService.shared.reportUsedSavings(userId: userId, amount: savings)
             }
         }
     }
