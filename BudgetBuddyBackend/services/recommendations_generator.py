@@ -41,6 +41,10 @@ ABSOLUTELY FORBIDDEN (instant failure if you include any of these):
 ✗ "Track your spending"
 ✗ "Reduce impulse purchases"
 ✗ Any advice that tells the user to STOP doing something they enjoy
+✗ "You're on track" / budget progress updates / spending status summaries
+✗ Any recommendation that simply restates budget numbers (e.g., "$X spent out of $Y limit")
+✗ Encouragement or congratulatory messages about spending habits
+✗ Any filler recommendation that doesn't contain a SPECIFIC deal, discount, or actionable tip
 
 WHAT YOU MUST DO INSTEAD (pure deal-finding / arbitrage):
 ✓ Name a SPECIFIC local business with a SPECIFIC discount (e.g., "Philz does $1 off refills with your own cup")
@@ -87,8 +91,8 @@ OUTPUT FORMAT — return ONLY a JSON object, no markdown fences:
   "recommendations": [
     {
       "category": "spending" | "saving" | "budgeting" | "income" | "habits",
-      "title": "Short actionable title (max 60 chars)",
-      "description": "ONE short punchy sentence (max 18 words). Include the key number and the action. No compound sentences.",
+      "title": "Name of the deal or actionable tip (max 60 chars). NEVER just restate spending (e.g., '$97 spent on pizza' is WRONG). Must name a specific business, discount, or action (e.g., 'Woodstock's Pizza: 15% off with student ID').",
+      "description": "ONE short punchy sentence (max 18 words). Explain the deal and how to get it. No compound sentences. NEVER just restate how much was spent.",
       "potentialSavings": 0.00,
       "priority": 1-5 (1=highest),
       "icon": "SF Symbol name",
@@ -108,9 +112,9 @@ RULES:
 - Each recommendation MUST reference a specific local business, deal, or student program
 - CRITICAL: Each description must be ONE sentence, max 18 words. The title already provides context — the description just needs the hook.
 - potentialSavings must be mathematically derived from actual transaction amounts and frequencies
-- If you cannot find 3 verified deals, return fewer. NEVER pad with generic advice.
+- If you cannot find 3 verified deals, return fewer (even 1 is fine). NEVER pad with generic advice, budget status updates, or "you're on track" filler. Returning 1 great deal is better than 3 recommendations where 2 are budget summaries.
 - Icon names: "dollarsign.arrow.circlepath" (spending), "banknote" (saving), "chart.pie" (budgeting), "arrow.up.right" (income), "lightbulb" (habits), "tag" (deals), "exclamationmark.triangle" (warning)
-- Detail fields (steps, spendingContext, timeHorizon, link, linkTitle) are OPTIONAL. Include them ONLY for recommendations where the user can take a specific action or visit a specific place (e.g., restaurant alternatives, deals, subscription cancellations). OMIT all detail fields for status/tracking/encouragement recommendations (e.g., "you're on track").
+- Detail fields (steps, spendingContext, timeHorizon, link, linkTitle) are OPTIONAL. Include them ONLY for recommendations where the user can take a specific action or visit a specific place (e.g., restaurant alternatives, deals, subscription cancellations). Do NOT generate status/tracking/encouragement recommendations at all — every recommendation must contain a specific deal or actionable tip.
 - steps: 1-3 short imperative sentences. Focus on essential, nonredundant actions.
 - spendingContext: ONE short phrase (max ~60 chars) referencing a real number from the user's transactions.
 - timeHorizon: When/how often the deal applies (e.g., "Every Tuesday", "Weekdays 11am-2pm", "Ongoing"). Omit if unsure.
@@ -420,6 +424,22 @@ def _get_user_recommendation_prefs(user_id: int):
     return saved_titles, disliked_ids, seen_ids
 
 
+def _deduplicate_by_title(recs: List[Dict]) -> List[Dict]:
+    """Remove recommendations with near-duplicate titles (same first 3 words)."""
+    import re
+    seen = set()
+    unique = []
+    for r in recs:
+        # Normalize: lowercase, strip punctuation, take first 3 words as the key
+        title = re.sub(r'[^\w\s]', '', r.get("title", "").lower())
+        words = title.split()
+        key = " ".join(words[:3]) if len(words) >= 3 else title
+        if key not in seen:
+            seen.add(key)
+            unique.append(r)
+    return unique
+
+
 def _filter_hidden(recs: List[Dict], disliked_ids: List[str], seen_ids: List[str] = None) -> List[Dict]:
     """Remove recommendations that are disliked or already seen."""
     hidden = set(disliked_ids)
@@ -548,6 +568,9 @@ def generate_recommendations(user_id: int, action: str = "general", search_query
         recs = parsed.get("recommendations", [])[:5]
         if not search_query and action != "general":
             recs = [{**r, "spendingCategory": action} for r in recs]
+
+        # Deduplicate by similar titles (e.g., "ASUCD Pantry: Free groceries" vs "ASUCD Pantry — free staples")
+        recs = _deduplicate_by_title(recs)
 
         # Filter out disliked and seen tips
         _, disliked_ids, seen_ids = _get_user_recommendation_prefs(user_id)
