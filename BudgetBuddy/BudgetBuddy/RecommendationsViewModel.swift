@@ -66,13 +66,13 @@ class RecommendationsViewModel {
 
     static var dailyRefreshLimit: Int {
         if let phone = AuthManager.shared.currentPhoneNumber, boostedPhoneNumbers.contains(phone) {
-            return 10
+            return 100
         }
         return 5
     }
     static var dailySearchLimit: Int {
         if let phone = AuthManager.shared.currentPhoneNumber, boostedPhoneNumbers.contains(phone) {
-            return 10
+            return 100
         }
         return 5
     }
@@ -505,7 +505,10 @@ class RecommendationsViewModel {
     }
 
     private func apply(_ response: RecommendationsResponse) {
-        recommendations = response.recommendations.filter { !dislikedTipIds.contains($0.id) && !usedTipIds.contains($0.id) }
+        let newRecs = response.recommendations.filter { !dislikedTipIds.contains($0.id) && !usedTipIds.contains($0.id) }
+        let newIds = Set(newRecs.map { $0.id })
+        let oldRecs = recommendations.filter { !newIds.contains($0.id) }
+        recommendations = Self.deduplicateByTitle(newRecs + oldRecs)
         safeToSpend = response.safeToSpend ?? safeToSpend
         status = response.status ?? status
         summary = response.summary ?? summary
@@ -517,9 +520,22 @@ class RecommendationsViewModel {
         let newRecs = response.recommendations.filter {
             !existingIds.contains($0.id) && !dislikedTipIds.contains($0.id) && !usedTipIds.contains($0.id)
         }
-        recommendations.append(contentsOf: newRecs)
+        recommendations = Self.deduplicateByTitle(newRecs + recommendations)
         safeToSpend = response.safeToSpend ?? safeToSpend
         status = response.status ?? status
         summary = response.summary ?? summary
+    }
+
+    /// Removes near-duplicate recommendations by comparing the first 3 words of each title.
+    private static func deduplicateByTitle(_ recs: [RecommendationItem]) -> [RecommendationItem] {
+        var seen = Set<String>()
+        return recs.filter { rec in
+            let words = rec.title
+                .lowercased()
+                .components(separatedBy: .alphanumerics.inverted)
+                .filter { !$0.isEmpty }
+            let key = words.prefix(3).joined(separator: " ")
+            return seen.insert(key).inserted
+        }
     }
 }

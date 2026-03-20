@@ -121,6 +121,8 @@ class Agent:
         # Max iterations reached — get final response without tools
         print(f"[{self.name}] Max iterations reached, getting final response without tools")
         final_kwargs = {"model": self.model, "messages": conversation}
+        if self.tools:
+            final_kwargs["tools"] = self.tools
         if self.response_format:
             final_kwargs["response_format"] = self.response_format
         response = litellm.completion(**final_kwargs)
